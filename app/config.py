@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     database_url: str
     bot_token: str = ""
+    test_database_url: str = ""
 
 
 settings = Settings()
