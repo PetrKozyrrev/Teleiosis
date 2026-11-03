@@ -1,0 +1,17 @@
+# Виртуальное окружение
+.venv/
+venv/
+
+# Секреты
+.env
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Редакторы и ОС
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
