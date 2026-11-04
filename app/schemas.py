@@ -96,3 +96,22 @@ class ContentPage(BaseModel):
 ContentStatus = Literal["unseen", "planned", "studied", "irrelevant"]
 ContentSource = Literal["youtube", "telegram", "web", "other"]
 SortOrder = Literal["newest", "oldest", "title"]
+
+class ContentUpdate(BaseModel):
+    """Изменяемые поля материала. Любые другие поля запрещены."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)] | None = None
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=10000)] | None = None
+    status: ContentStatus | None = None
+    category_id: int | None = Field(default=None, gt=0, le=MAX_BIGINT)
+
+    @model_validator(mode="after")
+    def check_fields(self):
+        if not self.model_fields_set:
+            raise ValueError("Provide at least one field")
+        for name in ("title", "status"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null")
+        return self

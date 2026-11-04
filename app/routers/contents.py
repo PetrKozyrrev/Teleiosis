@@ -1,6 +1,7 @@
+from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Path, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -14,11 +15,14 @@ from app.schemas import (
     ContentPage,
     ContentSource,
     ContentStatus,
+    ContentUpdate,
     SortOrder,
 )
 from app.urls import detect_source, normalize_url
 
 router = APIRouter(prefix="/contents", tags=["contents"])
+
+ContentId = Annotated[int, Path(gt=0, le=MAX_BIGINT)]
 
 # К каждой сортировке добавляется id, чтобы порядок был стабильным
 SORT_ORDER = {
@@ -33,6 +37,17 @@ def make_title(url_normalized: str | None, note: str | None) -> str:
         return url_normalized.removeprefix("https://")[:200]
     first_line = next((ln.strip() for ln in note.splitlines() if ln.strip()), "")
     return first_line[:80] or "Заметка"
+
+
+def get_own_content(db: DbSession, user: CurrentUser, content_id: int) -> Content:
+    """Материал ищется сразу с фильтром по владельцу.
+    Чужой и несуществующий выглядят одинаково: 404."""
+    content = db.scalar(
+        select(Content).where(Content.id == content_id, Content.user_id == user.id)
+    )
+    if content is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Content not found")
+    return content
 
 
 @router.post("", response_model=ContentOut, status_code=status.HTTP_201_CREATED)
@@ -124,10 +139,49 @@ def list_contents(
 
 
 @router.get("/{content_id}", response_model=ContentOut)
-def read_content(content_id: int, db: DbSession, user: CurrentUser):
-    content = db.scalar(
-        select(Content).where(Content.id == content_id, Content.user_id == user.id)
-    )
-    if content is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Content not found")
+def read_content(content_id: ContentId, db: DbSession, user: CurrentUser):
+    return get_own_content(db, user, content_id)
+
+
+@router.patch("/{content_id}", response_model=ContentOut)
+def update_content(
+    content_id: ContentId, data: ContentUpdate, db: DbSession, user: CurrentUser
+):
+    content = get_own_content(db, user, content_id)
+    changes = data.model_fields_set
+
+    # 1. Сначала все проверки: при отказе ничего не должно измениться
+    if "category_id" in changes and data.category_id is not None:
+        get_own_category(db, user, data.category_id)
+
+    note = data.note or None
+    if "note" in changes and note is None and content.url is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "A material without a link must keep its note",
+        )
+
+    # 2. Потом изменения
+    if "category_id" in changes:
+        content.category_id = data.category_id
+    if "title" in changes:
+        content.title = data.title
+    if "note" in changes:
+        content.note = note
+    if "status" in changes and data.status != content.status:
+        content.status = data.status
+        content.studied_at = (
+            datetime.now(timezone.utc) if data.status == "studied" else None
+        )
+
+    db.commit()
+    db.refresh(content)
     return content
+
+
+@router.delete("/{content_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_content(content_id: ContentId, db: DbSession, user: CurrentUser):
+    content = get_own_content(db, user, content_id)
+    db.delete(content)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
