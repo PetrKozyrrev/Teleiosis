@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
@@ -85,3 +85,14 @@ class ContentOut(BaseModel):
     studied_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+class ContentPage(BaseModel):
+    items: list[ContentOut]
+    total: int
+    limit: int
+    offset: int
+
+
+ContentStatus = Literal["unseen", "planned", "studied", "irrelevant"]
+ContentSource = Literal["youtube", "telegram", "web", "other"]
+SortOrder = Literal["newest", "oldest", "title"]

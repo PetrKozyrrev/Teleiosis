@@ -1,14 +1,31 @@
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.deps import CurrentUser, DbSession
 from app.models import Content
 from app.routers.categories import get_own_category
-from app.schemas import ContentCreate, ContentOut
+from app.schemas import (
+    MAX_BIGINT,
+    ContentCreate,
+    ContentOut,
+    ContentPage,
+    ContentSource,
+    ContentStatus,
+    SortOrder,
+)
 from app.urls import detect_source, normalize_url
 
 router = APIRouter(prefix="/contents", tags=["contents"])
+
+# К каждой сортировке добавляется id, чтобы порядок был стабильным
+SORT_ORDER = {
+    "newest": (Content.created_at.desc(), Content.id.desc()),
+    "oldest": (Content.created_at.asc(), Content.id.asc()),
+    "title": (func.lower(Content.title), Content.id),
+}
 
 
 def make_title(url_normalized: str | None, note: str | None) -> str:
@@ -61,6 +78,49 @@ def create_content(data: ContentCreate, db: DbSession, user: CurrentUser):
         )
     db.refresh(content)
     return content
+
+
+@router.get("", response_model=ContentPage)
+def list_contents(
+    db: DbSession,
+    user: CurrentUser,
+    q: Annotated[str | None, Query(max_length=100)] = None,
+    status_filter: Annotated[ContentStatus | None, Query(alias="status")] = None,
+    source: ContentSource | None = None,
+    category_id: Annotated[int | None, Query(gt=0, le=MAX_BIGINT)] = None,
+    uncategorized: bool = False,
+    sort: SortOrder = "newest",
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0, le=1_000_000)] = 0,
+):
+    if category_id is not None and uncategorized:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "Use either category_id or uncategorized, not both",
+        )
+
+    # Главное условие изоляции: только материалы текущего пользователя
+    conditions = [Content.user_id == user.id]
+    if q and q.strip():
+        conditions.append(Content.title.icontains(q.strip(), autoescape=True))
+    if status_filter:
+        conditions.append(Content.status == status_filter)
+    if source:
+        conditions.append(Content.source == source)
+    if category_id is not None:
+        conditions.append(Content.category_id == category_id)
+    if uncategorized:
+        conditions.append(Content.category_id.is_(None))
+
+    total = db.scalar(select(func.count()).select_from(Content).where(*conditions))
+    items = db.scalars(
+        select(Content)
+        .where(*conditions)
+        .order_by(*SORT_ORDER[sort])
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    return ContentPage(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/{content_id}", response_model=ContentOut)
