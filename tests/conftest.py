@@ -1,10 +1,13 @@
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app import models  # noqa: F401
 from app.config import settings
 from app.db import Base
+from app.deps import get_db
+from app.main import app
 
 
 @pytest.fixture(scope="session")
@@ -31,3 +34,12 @@ def session(engine):
     session.close()
     transaction.rollback()
     connection.close()
+
+@pytest.fixture()
+def client(session, monkeypatch):
+    """API-клиент, который работает в тестовой сессии (откатывается после теста)."""
+    monkeypatch.setattr(settings, "dev_auth_enabled", True)
+    app.dependency_overrides[get_db] = lambda: session
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
