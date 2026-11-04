@@ -1,12 +1,16 @@
-from fastapi import APIRouter, HTTPException, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Path, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.deps import CurrentUser, DbSession
 from app.models import Category
-from app.schemas import CategoryCreate, CategoryOut, CategoryUpdate
+from app.schemas import MAX_BIGINT, CategoryCreate, CategoryOut, CategoryUpdate
 
 router = APIRouter(prefix="/categories", tags=["categories"])
+
+CategoryId = Annotated[int, Path(gt=0, le=MAX_BIGINT)]
 
 
 def get_own_category(db: DbSession, user: CurrentUser, category_id: int) -> Category:
@@ -53,7 +57,7 @@ def list_categories(db: DbSession, user: CurrentUser):
 
 @router.patch("/{category_id}", response_model=CategoryOut)
 def rename_category(
-    category_id: int, data: CategoryUpdate, db: DbSession, user: CurrentUser
+    category_id: CategoryId, data: CategoryUpdate, db: DbSession, user: CurrentUser
 ):
     category = get_own_category(db, user, category_id)
     category.name = data.name
@@ -63,7 +67,7 @@ def rename_category(
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_category(category_id: int, db: DbSession, user: CurrentUser):
+def delete_category(category_id: CategoryId, db: DbSession, user: CurrentUser):
     category = get_own_category(db, user, category_id)
     db.delete(category)
     db.commit()

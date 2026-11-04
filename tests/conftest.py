@@ -43,3 +43,8 @@ def client(session, monkeypatch):
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+@pytest.fixture(autouse=True)
+def no_real_network(monkeypatch):
+    """Тесты API не ходят в интернет: загрузка метаданных по умолчанию отключена."""
+    monkeypatch.setattr("app.routers.contents.fetch_metadata", lambda url: None)

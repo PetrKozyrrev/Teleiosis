@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.deps import CurrentUser, DbSession
+from app.metadata import fetch_metadata
 from app.models import Content
 from app.routers.categories import get_own_category
 from app.schemas import (
@@ -50,24 +51,51 @@ def get_own_content(db: DbSession, user: CurrentUser, content_id: int) -> Conten
     return content
 
 
+def already_saved(existing_id: int) -> HTTPException:
+    return HTTPException(
+        status.HTTP_409_CONFLICT,
+        detail={"message": "Already saved", "existing_id": existing_id},
+    )
+
+
 @router.post("", response_model=ContentOut, status_code=status.HTTP_201_CREATED)
 def create_content(data: ContentCreate, db: DbSession, user: CurrentUser):
-    # Категория должна принадлежать этому же пользователю (иначе 404)
+    # 1. Дешёвые проверки до любых обращений в интернет
     if data.category_id is not None:
         get_own_category(db, user, data.category_id)
 
+    meta = None
     if data.url:
         url_normalized = normalize_url(data.url)
         source, content_type = detect_source(data.url)
+
+        existing_id = db.scalar(
+            select(Content.id).where(
+                Content.user_id == user.id,
+                Content.url_normalized == url_normalized,
+            )
+        )
+        if existing_id is not None:
+            raise already_saved(existing_id)
+
+        # 2. Загрузка метаданных (никогда не падает: при неудаче вернёт None)
+        meta = fetch_metadata(data.url)
     else:
         url_normalized, source, content_type = None, "other", "note"
 
+    title = (
+        data.title
+        or (meta.title if meta else None)
+        or make_title(url_normalized, data.note)
+    )
     content = Content(
         user_id=user.id,
         category_id=data.category_id,
-        title=data.title or make_title(url_normalized, data.note),
+        title=title,
         url=data.url,
         url_normalized=url_normalized,
+        description=meta.description if meta else None,
+        image_url=meta.image_url if meta else None,
         note=data.note,
         content_type=content_type,
         source=source,
@@ -76,21 +104,19 @@ def create_content(data: ContentCreate, db: DbSession, user: CurrentUser):
     try:
         db.commit()
     except IntegrityError:
+        # Редкая гонка: два одинаковых запроса одновременно
         db.rollback()
-        existing = None
+        existing_id = None
         if url_normalized:
-            existing = db.scalar(
-                select(Content).where(
+            existing_id = db.scalar(
+                select(Content.id).where(
                     Content.user_id == user.id,
                     Content.url_normalized == url_normalized,
                 )
             )
-        if existing is None:
+        if existing_id is None:
             raise
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            detail={"message": "Already saved", "existing_id": existing.id},
-        )
+        raise already_saved(existing_id)
     db.refresh(content)
     return content
 

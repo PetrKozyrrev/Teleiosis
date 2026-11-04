@@ -80,3 +80,10 @@ def test_other_user_cannot_see_or_change_category(client):
     # у владельца всё осталось как было
     names = [c["name"] for c in client.get("/categories", headers=auth(1)).json()]
     assert names == ["Секрет"]
+
+
+def test_huge_id_rejected(client):
+    big = 10**20
+    response = client.patch(f"/categories/{big}", json={"name": "X"}, headers=auth(1))
+    assert response.status_code == 422
+    assert client.delete(f"/categories/{big}", headers=auth(1)).status_code == 422
