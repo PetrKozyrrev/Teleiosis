@@ -1,6 +1,11 @@
+import re
+
 from aiogram.types import MessageEntity
 
 MAX_LINKS = 5
+TITLE_MAX = 100
+# Имя публичного канала в Telegram: латиница, цифры, _, 5-32 символа, начинается с буквы
+CHANNEL_USERNAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]{3,31}")
 
 
 def _slice_utf16(text: str, offset: int, length: int) -> str:
@@ -25,3 +30,20 @@ def extract_urls(text: str | None, entities: list[MessageEntity] | None) -> list
         if url and url not in found:
             found.append(url)
     return found
+
+
+def channel_post_url(username: str | None, message_id: int | None) -> str | None:
+    """Адрес поста публичного канала или None, если данные не подходят."""
+    if not username or not CHANNEL_USERNAME_RE.fullmatch(username):
+        return None
+    if not isinstance(message_id, int) or message_id <= 0:
+        return None
+    return f"https://t.me/{username}/{message_id}"
+
+
+def post_title(text: str | None, channel: str) -> str:
+    """Название поста: первая непустая строка текста, иначе «Пост из @канал»."""
+    first_line = next(
+        (line.strip() for line in (text or "").splitlines() if line.strip()), ""
+    )
+    return first_line[:TITLE_MAX] if first_line else f"Пост из @{channel}"

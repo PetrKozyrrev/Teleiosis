@@ -56,11 +56,11 @@ class ApiClient:
             raise ApiError(f"status {response.status_code}")
         return response.json()
 
-    async def save_url(
-        self, telegram_id: int, username: str | None, url: str
+    async def _save(
+        self, telegram_id: int, username: str | None, body: dict
     ) -> SaveResult:
         response = await self._request(
-            "POST", "/contents", telegram_id, username, json={"url": url}
+            "POST", "/contents", telegram_id, username, json=body
         )
         if response.status_code == 201:
             return SaveResult("saved", content=response.json())
@@ -69,6 +69,26 @@ class ApiClient:
         if response.status_code == 422:
             return SaveResult("invalid")
         raise ApiError(f"status {response.status_code}")
+
+    async def save_url(
+        self,
+        telegram_id: int,
+        username: str | None,
+        url: str,
+        title: str | None = None,
+        note: str | None = None,
+    ) -> SaveResult:
+        body = {"url": url}
+        if title:
+            body["title"] = title
+        if note:
+            body["note"] = note
+        return await self._save(telegram_id, username, body)
+
+    async def save_note(
+        self, telegram_id: int, username: str | None, text: str
+    ) -> SaveResult:
+        return await self._save(telegram_id, username, {"note": text})
 
     async def get_content(
         self, telegram_id: int, username: str | None, content_id: int

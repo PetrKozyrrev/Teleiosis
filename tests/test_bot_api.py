@@ -112,3 +112,39 @@ def test_get_content_network_error_returns_none():
         raise httpx2.ConnectError("boom")
 
     assert run(handler, "get_content", 42, None, 1) is None
+
+def test_save_url_with_title_and_note():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return httpx2.Response(201, json={"id": 1, "title": "T"})
+
+    result = run(
+        handler, "save_url", 42, None, "https://t.me/durov/1", "Заголовок", "Текст поста"
+    )
+    assert result.status == "saved"
+    assert seen["body"] == {
+        "url": "https://t.me/durov/1",
+        "title": "Заголовок",
+        "note": "Текст поста",
+    }
+
+
+def test_save_note_sends_only_note():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        seen["path"] = request.url.path
+        return httpx2.Response(201, json={"id": 2, "title": "Идея", "content_type": "note"})
+
+    result = run(handler, "save_note", 42, None, "Идея про рассылку")
+    assert result.status == "saved"
+    assert seen["path"] == "/contents"
+    assert seen["body"] == {"note": "Идея про рассылку"}
+
+
+def test_save_note_invalid():
+    result = run(lambda r: httpx2.Response(422, json={}), "save_note", 42, None, "x")
+    assert result.status == "invalid"
