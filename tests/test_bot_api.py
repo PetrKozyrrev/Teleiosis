@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import httpx2
 import pytest
@@ -6,17 +7,17 @@ import pytest
 from bot.api import ApiClient, ApiError
 
 
-def call(handler, telegram_id=42, username=None):
-    async def run():
+def run(handler, method, *args):
+    async def go():
         client = ApiClient(
             "http://api.test", "secret-key", transport=httpx2.MockTransport(handler)
         )
         try:
-            return await client.register(telegram_id, username)
+            return await getattr(client, method)(*args)
         finally:
             await client.close()
 
-    return asyncio.run(run())
+    return asyncio.run(go())
 
 
 def test_register_sends_auth_headers():
@@ -27,7 +28,7 @@ def test_register_sends_auth_headers():
         seen["path"] = request.url.path
         return httpx2.Response(200, json={"id": 1})
 
-    assert call(handler, 42, "ivan") == {"id": 1}
+    assert run(handler, "register", 42, "ivan") == {"id": 1}
     assert seen["path"] == "/me"
     assert seen["headers"]["x-bot-key"] == "secret-key"
     assert seen["headers"]["x-telegram-id"] == "42"
@@ -41,13 +42,13 @@ def test_username_header_omitted_when_missing():
         seen["headers"] = request.headers
         return httpx2.Response(200, json={})
 
-    call(handler, 42, None)
+    run(handler, "register", 42, None)
     assert "x-telegram-username" not in seen["headers"]
 
 
 def test_error_status_raises_api_error():
     with pytest.raises(ApiError):
-        call(lambda request: httpx2.Response(401))
+        run(lambda request: httpx2.Response(401), "register", 42, None)
 
 
 def test_network_error_raises_api_error():
@@ -55,4 +56,59 @@ def test_network_error_raises_api_error():
         raise httpx2.ConnectError("boom")
 
     with pytest.raises(ApiError):
-        call(handler)
+        run(handler, "register", 42, None)
+
+
+def test_save_url_saved():
+    seen = {}
+
+    def handler(request):
+        seen["method"] = request.method
+        seen["path"] = request.url.path
+        seen["body"] = json.loads(request.content)
+        return httpx2.Response(201, json={"id": 7, "title": "Видео"})
+
+    result = run(handler, "save_url", 42, None, "https://example.com/a")
+    assert result.status == "saved"
+    assert result.content["title"] == "Видео"
+    assert (seen["method"], seen["path"]) == ("POST", "/contents")
+    assert seen["body"] == {"url": "https://example.com/a"}
+
+
+def test_save_url_duplicate_has_existing_id():
+    def handler(request):
+        return httpx2.Response(
+            409, json={"detail": {"message": "Already saved", "existing_id": 5}}
+        )
+
+    result = run(handler, "save_url", 42, None, "https://example.com/a")
+    assert result.status == "duplicate"
+    assert result.existing_id == 5
+
+
+def test_save_url_duplicate_with_unexpected_body():
+    result = run(lambda request: httpx2.Response(409, text="oops"), "save_url", 42, None, "x.com")
+    assert result.status == "duplicate"
+    assert result.existing_id is None
+
+
+def test_save_url_invalid():
+    result = run(lambda request: httpx2.Response(422, json={}), "save_url", 42, None, "bad")
+    assert result.status == "invalid"
+
+
+def test_save_url_server_error_raises():
+    with pytest.raises(ApiError):
+        run(lambda request: httpx2.Response(500), "save_url", 42, None, "https://example.com")
+
+
+def test_get_content_ok_and_not_found():
+    assert run(lambda r: httpx2.Response(200, json={"title": "T"}), "get_content", 42, None, 1) == {"title": "T"}
+    assert run(lambda r: httpx2.Response(404), "get_content", 42, None, 1) is None
+
+
+def test_get_content_network_error_returns_none():
+    def handler(request):
+        raise httpx2.ConnectError("boom")
+
+    assert run(handler, "get_content", 42, None, 1) is None
