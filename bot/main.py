@@ -4,9 +4,9 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 
+from bot import callbacks, handlers
 from bot.api import ApiClient
 from bot.config import settings
-from bot.handlers import router
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,8 @@ async def main() -> None:
         logger.info("Запросы к Telegram идут через прокси")
     bot = Bot(token=settings.bot_token, session=session)
     dp = Dispatcher(api=api)  # api доступен в обработчиках по имени
-    dp.include_router(router)
+    dp.include_router(handlers.router)
+    dp.include_router(callbacks.router)
     try:
         await dp.start_polling(bot)
     finally:

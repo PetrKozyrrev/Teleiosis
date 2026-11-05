@@ -26,49 +26,67 @@ def describe(api, url="https://example.com/a", **kwargs):
     return asyncio.run(describe_save(api, 1, None, url, **kwargs))
 
 
-def test_saved_message_contains_title():
-    text = describe(StubApi(SaveResult("saved", content={"title": "Название"})))
-    assert text.startswith("✅")
-    assert "Название" in text
+def test_saved_outcome_has_title_and_buttons_data():
+    api = StubApi(
+        SaveResult("saved", content={"id": 9, "title": "Название", "status": "unseen"})
+    )
+    outcome = describe(api)
+    assert outcome.text.startswith("✅")
+    assert "Название" in outcome.text
+    assert outcome.content_id == 9
+    assert outcome.status == "unseen"
 
 
-def test_duplicate_message_shows_existing_title():
-    api = StubApi(SaveResult("duplicate", existing_id=3), existing={"title": "Старое"})
-    text = describe(api)
-    assert text.startswith("ℹ️")
-    assert "Старое" in text
+def test_duplicate_outcome_shows_existing_title_and_id():
+    api = StubApi(
+        SaveResult("duplicate", existing_id=3),
+        existing={"title": "Старое", "status": "studied"},
+    )
+    outcome = describe(api)
+    assert outcome.text.startswith("ℹ️")
+    assert "Старое" in outcome.text
+    assert outcome.content_id == 3
+    assert outcome.status == "studied"
 
 
-def test_duplicate_without_title_has_generic_message():
-    text = describe(StubApi(SaveResult("duplicate", existing_id=3), existing=None))
-    assert "уже есть" in text
+def test_duplicate_without_content_has_generic_message_but_keeps_id():
+    outcome = describe(StubApi(SaveResult("duplicate", existing_id=3), existing=None))
+    assert "уже есть" in outcome.text
+    assert outcome.content_id == 3
+    assert outcome.status is None
 
 
-def test_invalid_message():
-    text = describe(StubApi(SaveResult("invalid")), url="http://bad")
-    assert text.startswith("⚠️")
-    assert "http://bad" in text
+def test_invalid_outcome_has_no_buttons():
+    outcome = describe(StubApi(SaveResult("invalid")), url="http://bad")
+    assert outcome.text.startswith("⚠️")
+    assert "http://bad" in outcome.text
+    assert outcome.content_id is None
 
 
 def test_title_and_note_are_passed_to_api():
-    api = StubApi(SaveResult("saved", content={"title": "Заголовок"}))
+    api = StubApi(SaveResult("saved", content={"id": 1, "title": "Заголовок"}))
     describe(api, "https://t.me/durov/1", title="Заголовок", note="Текст")
     assert api.calls == [("url", "https://t.me/durov/1", "Заголовок", "Текст")]
 
 
-def test_note_saved_message():
+def test_note_saved_outcome():
     api = StubApi(
-        SaveResult("saved", content={"title": "Идея", "content_type": "note"})
+        SaveResult(
+            "saved",
+            content={"id": 4, "title": "Идея", "content_type": "note", "status": "unseen"},
+        )
     )
-    text = asyncio.run(describe_note(api, 1, None, "Идея про рассылку"))
-    assert text.startswith("📝")
-    assert "Идея" in text
+    outcome = asyncio.run(describe_note(api, 1, None, "Идея про рассылку"))
+    assert outcome.text.startswith("📝")
+    assert "Идея" in outcome.text
+    assert outcome.content_id == 4
     assert api.calls == [("note", "Идея про рассылку")]
 
 
-def test_note_invalid_message():
-    text = asyncio.run(describe_note(StubApi(SaveResult("invalid")), 1, None, "x"))
-    assert text.startswith("⚠️")
+def test_note_invalid_outcome():
+    outcome = asyncio.run(describe_note(StubApi(SaveResult("invalid")), 1, None, "x"))
+    assert outcome.text.startswith("⚠️")
+    assert outcome.content_id is None
 
 
 def test_shorten():

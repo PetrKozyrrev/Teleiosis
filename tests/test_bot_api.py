@@ -148,3 +148,54 @@ def test_save_note_sends_only_note():
 def test_save_note_invalid():
     result = run(lambda r: httpx2.Response(422, json={}), "save_note", 42, None, "x")
     assert result.status == "invalid"
+
+def test_update_content_sends_patch_and_returns_content():
+    seen = {}
+
+    def handler(request):
+        seen["method"] = request.method
+        seen["path"] = request.url.path
+        seen["body"] = json.loads(request.content)
+        return httpx2.Response(200, json={"id": 5, "status": "studied"})
+
+    result = run(handler, "update_content", 42, None, 5, {"status": "studied"})
+    assert result == {"id": 5, "status": "studied"}
+    assert (seen["method"], seen["path"]) == ("PATCH", "/contents/5")
+    assert seen["body"] == {"status": "studied"}
+
+
+def test_update_content_can_clear_category():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return httpx2.Response(200, json={"id": 5})
+
+    run(handler, "update_content", 42, None, 5, {"category_id": None})
+    assert seen["body"] == {"category_id": None}
+
+
+def test_update_content_not_found_returns_none():
+    assert run(lambda r: httpx2.Response(404), "update_content", 42, None, 5, {"status": "planned"}) is None
+
+
+def test_update_content_other_error_raises():
+    with pytest.raises(ApiError):
+        run(lambda r: httpx2.Response(500), "update_content", 42, None, 5, {"status": "planned"})
+
+
+def test_list_categories():
+    result = run(lambda r: httpx2.Response(200, json=[{"id": 1, "name": "Бизнес"}]), "list_categories", 42, None)
+    assert result == [{"id": 1, "name": "Бизнес"}]
+    with pytest.raises(ApiError):
+        run(lambda r: httpx2.Response(401), "list_categories", 42, None)
+
+
+def test_create_category_results():
+    created = run(lambda r: httpx2.Response(201, json={"id": 1, "name": "Бизнес"}), "create_category", 42, None, "Бизнес")
+    assert created.status == "created"
+    assert created.category["name"] == "Бизнес"
+    assert run(lambda r: httpx2.Response(409), "create_category", 42, None, "Бизнес").status == "duplicate"
+    assert run(lambda r: httpx2.Response(422), "create_category", 42, None, "").status == "invalid"
+    with pytest.raises(ApiError):
+        run(lambda r: httpx2.Response(500), "create_category", 42, None, "Бизнес")

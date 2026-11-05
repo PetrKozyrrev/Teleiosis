@@ -14,6 +14,12 @@ class SaveResult:
     existing_id: int | None = None  # для "duplicate"
 
 
+@dataclass
+class CategoryResult:
+    status: str  # "created", "duplicate" или "invalid"
+    category: dict | None = None
+
+
 def _existing_id(response) -> int | None:
     try:
         value = response.json()["detail"]["existing_id"]
@@ -101,6 +107,41 @@ class ApiClient:
         except ApiError:
             return None
         return response.json() if response.status_code == 200 else None
+
+    async def update_content(
+        self, telegram_id: int, username: str | None, content_id: int, fields: dict
+    ) -> dict | None:
+        """Меняет материал. None = материал (или категория) не найден."""
+        response = await self._request(
+            "PATCH", f"/contents/{content_id}", telegram_id, username, json=fields
+        )
+        if response.status_code == 200:
+            return response.json()
+        if response.status_code == 404:
+            return None
+        raise ApiError(f"status {response.status_code}")
+
+    async def list_categories(
+        self, telegram_id: int, username: str | None
+    ) -> list[dict]:
+        response = await self._request("GET", "/categories", telegram_id, username)
+        if response.status_code != 200:
+            raise ApiError(f"status {response.status_code}")
+        return response.json()
+
+    async def create_category(
+        self, telegram_id: int, username: str | None, name: str
+    ) -> CategoryResult:
+        response = await self._request(
+            "POST", "/categories", telegram_id, username, json={"name": name}
+        )
+        if response.status_code == 201:
+            return CategoryResult("created", category=response.json())
+        if response.status_code == 409:
+            return CategoryResult("duplicate")
+        if response.status_code == 422:
+            return CategoryResult("invalid")
+        raise ApiError(f"status {response.status_code}")
 
     async def close(self) -> None:
         await self._client.aclose()
