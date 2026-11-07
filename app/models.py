@@ -135,3 +135,25 @@ class Reminder(Base):
     )
 
     content: Mapped["Content"] = relationship(back_populates="reminders")
+
+class AuthSession(Base):
+    """Серверная сессия Mini App. Хранится только хэш токена, не сам токен."""
+
+    __tablename__ = "auth_sessions"
+    __table_args__ = (
+        CheckConstraint(
+            "char_length(token_hash) = 64", name="ck_auth_sessions_hash_len"
+        ),
+        CheckConstraint("expires_at > created_at", name="ck_auth_sessions_expiry"),
+        Index("ix_auth_sessions_user", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    token_hash: Mapped[str] = mapped_column(Text, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

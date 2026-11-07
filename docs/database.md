@@ -85,3 +85,15 @@ CHECK (status IN ('pending','sent','cancelled'))
 | Пользователь | Удаляются его категории, материалы и напоминания |
 | Материал | Удаляются его напоминания |
 | Категория | Материалы остаются, `category_id` = NULL |
+
+auth_sessions
+| Поле | Тип | Ограничения |
+|---|---|---|
+| id | BIGINT, identity | PK |
+| user_id | BIGINT | NOT NULL, FK → users(id), ON DELETE CASCADE |
+| token_hash | TEXT | NOT NULL, UNIQUE, CHECK длина 64 (hex SHA-256) |
+| created_at | TIMESTAMPTZ | NOT NULL, now() |
+| expires_at | TIMESTAMPTZ | NOT NULL, CHECK expires_at > created_at |
+
+Сам токен не хранится, только хэш. Индекс по user_id для каскадного удаления и очистки.
+Правило удаления: при удалении пользователя его сессии удаляются.
