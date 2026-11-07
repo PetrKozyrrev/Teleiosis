@@ -67,25 +67,22 @@ def get_current_user(
     x_bot_key: Annotated[str | None, Header(max_length=256)] = None,
     x_telegram_id: TelegramId = None,
     x_telegram_username: Annotated[str | None, Header(max_length=64)] = None,
-    x_dev_telegram_id: TelegramId = None,
 ) -> User:
-    """Определяет, кто делает запрос.
+    """Определяет, кто делает запрос. Способов входа ровно два.
 
     1. Mini App: Authorization: Bearer <токен сессии>.
     2. Бот: X-Bot-Key + X-Telegram-Id (+ X-Telegram-Username).
-    3. ВРЕМЕННО для разработки: X-Dev-Telegram-Id при DEV_AUTH_ENABLED
-       (будет удалён в шаге 5.5).
 
-    Если указан Authorization или X-Bot-Key, это единственный способ входа:
-    при неудаче сразу 401, без перехода к другим способам.
+    Если указан Authorization, это единственный способ входа. Authorization
+    вместе с X-Bot-Key даёт 401: два способа в одном запросе это неоднозначность.
+    При любой неудаче сразу 401, без перехода к другому способу.
     """
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
     )
 
     if authorization is not None:
-        # Два способа входа в одном запросе: отказываем
-        if x_bot_key is not None or x_dev_telegram_id is not None:
+        if x_bot_key is not None:
             raise unauthorized
         token = _bearer_token(authorization)
         user = find_user_by_token(db, token) if token else None
@@ -106,9 +103,6 @@ def get_current_user(
             user.username = username
             db.commit()
         return user
-
-    if settings.dev_auth_enabled and x_dev_telegram_id is not None:
-        return get_or_create_user(db, x_dev_telegram_id)
 
     raise unauthorized
 

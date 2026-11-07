@@ -42,13 +42,6 @@ def test_missing_telegram_id_rejected(client):
     assert client.get("/me", headers={"X-Bot-Key": KEY}).status_code == 401
 
 
-def test_wrong_key_does_not_fall_back_to_dev_auth(client, monkeypatch):
-    monkeypatch.setattr(settings, "dev_auth_enabled", True)
-    headers = bot(key="x" * 40)
-    headers["X-Dev-Telegram-Id"] = "5"
-    assert client.get("/me", headers=headers).status_code == 401
-
-
 def test_short_configured_key_disables_bot_auth(client, monkeypatch):
     monkeypatch.setattr(settings, "bot_api_key", "short")
     assert client.get("/me", headers=bot(key="short")).status_code == 401
@@ -78,8 +71,6 @@ def test_invalid_telegram_id_rejected(client):
     assert client.get("/me", headers=bot(telegram_id=10**20)).status_code == 422
 
 
-def test_dev_auth_still_works(client, monkeypatch):
-    monkeypatch.setattr(settings, "dev_auth_enabled", True)
-    response = client.get("/me", headers={"X-Dev-Telegram-Id": "5"})
-    assert response.status_code == 200
-    assert response.json()["telegram_id"] == 5
+def test_dev_header_gives_no_access(client):
+    # Временный вход удалён: заголовок X-Dev-Telegram-Id ничего не значит
+    assert client.get("/me", headers={"X-Dev-Telegram-Id": "5"}).status_code == 401

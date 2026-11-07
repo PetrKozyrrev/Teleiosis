@@ -109,22 +109,9 @@ def test_deleted_user_loses_access(client, session):
     assert client.get("/me", headers=bearer(token)).status_code == 401
 
 
-def test_bearer_with_dev_header_rejected(client, monkeypatch):
-    monkeypatch.setattr(settings, "dev_auth_enabled", True)
-    token = login(client)
-    headers = {**bearer(token), "X-Dev-Telegram-Id": "42"}
-    assert client.get("/me", headers=headers).status_code == 401
-
-
 def test_bearer_with_bot_key_rejected(client):
     token = login(client)
     headers = {**bearer(token), "X-Bot-Key": BOT_KEY, "X-Telegram-Id": "42"}
-    assert client.get("/me", headers=headers).status_code == 401
-
-
-def test_bad_bearer_does_not_fall_back_to_dev_auth(client, monkeypatch):
-    monkeypatch.setattr(settings, "dev_auth_enabled", True)
-    headers = {**bearer("A" * 43), "X-Dev-Telegram-Id": "5"}
     assert client.get("/me", headers=headers).status_code == 401
 
 
@@ -132,4 +119,17 @@ def test_token_is_not_a_bot_credential(client):
     token = login(client)
     # токен в заголовке бота не принимается
     headers = {"X-Bot-Key": token, "X-Telegram-Id": "42"}
+    assert client.get("/me", headers=headers).status_code == 401
+
+
+def test_dev_header_cannot_override_valid_token(client):
+    token = login(client)
+    headers = {**bearer(token), "X-Dev-Telegram-Id": "99"}
+    response = client.get("/me", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["telegram_id"] == 42  # заголовок проигнорирован
+
+
+def test_dev_header_cannot_rescue_bad_token(client):
+    headers = {**bearer("A" * 43), "X-Dev-Telegram-Id": "5"}
     assert client.get("/me", headers=headers).status_code == 401

@@ -26,7 +26,6 @@ alembic upgrade head
 | BOT_API_KEY | Секрет бота для входа в API, не короче 32 символов |
 | API_BASE_URL | Адрес API для бота (http://127.0.0.1:8000) |
 | TELEGRAM_PROXY | Прокси только для запросов к Telegram; пусто, если Telegram доступен напрямую |
-| DEV_AUTH_ENABLED | true только локально; на сервере false |
 
 Ключ бота: `python -c "import secrets; print(secrets.token_urlsafe(32))"`
 
