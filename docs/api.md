@@ -8,7 +8,8 @@
    + необязательно `X-Telegram-Username`. Пользователь создаётся при первом запросе.
 2. ВРЕМЕННО, только разработка: `X-Dev-Telegram-Id` при `DEV_AUTH_ENABLED=true`.
    Будет удалён на этапе 5.
-3. Mini App: проверка подписи Telegram initData, этап 5 (пока не реализовано).
+3. Mini App: клиент отправляет Telegram initData на POST /auth/telegram и получает
+   токен сессии (24 часа). Вход по токену (Authorization: Bearer) появится в 5.4.|
 
 Ошибки: нет или неверные данные входа дают 401; чужой или несуществующий ресурс
 даёт 404 (не 403); идентификаторы вне диапазона BIGINT дают 422.
@@ -27,6 +28,7 @@
 | GET /contents/{id} | Один материал | 200, 404 |
 | PATCH /contents/{id} | Изменить только `title`, `note`, `status`, `category_id`; лишние поля дают 422 | 200, 404, 422 |
 | DELETE /contents/{id} | Удалить (напоминания удаляются каскадом) | 204, 404 |
+| POST /auth/telegram | Обмен initData на токен сессии `{init_data}` → `{token, token_type, expires_at, user}` | 200, 401 любая ошибка проверки, 422, 503 нет BOT_TOKEN |
 
 ### POST /contents
 - Ссылка нормализуется (https, без www, без трекинговых параметров и #фрагмента;

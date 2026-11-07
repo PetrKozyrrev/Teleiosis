@@ -32,6 +32,6 @@
 ## Этап 5. Безопасность и авторизация Mini App — в работе
 - [x] 5.1 Проверка подписи Telegram initData (app/telegram_auth.py)
 - [x] 5.2 Таблица сессий auth_sessions, решение по токенам
-- [ ] 5.3 Эндпоинт POST /auth/telegram
+- [x] 5.3 Эндпоинт POST /auth/telegram
 - [ ] 5.4 Вход по Bearer-токену в get_current_user
 - [ ] 5.5 Удаление dev-входа, перевод тестов на новый способ входа

@@ -15,9 +15,8 @@ import time
 from dataclasses import dataclass
 from urllib.parse import parse_qsl
 
-from app.schemas import MAX_BIGINT
+from app.schemas import MAX_BIGINT, MAX_INIT_DATA_LENGTH
 
-MAX_INIT_DATA_LENGTH = 8192
 MAX_FIELDS = 50
 DEFAULT_MAX_AGE_SECONDS = 3600  # как долго initData считается свежим
 MAX_FUTURE_SKEW_SECONDS = 60  # допуск на расхождение часов

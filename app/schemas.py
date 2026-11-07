@@ -13,6 +13,7 @@ from pydantic import (
 from app.urls import clean_url
 
 MAX_BIGINT = 9_223_372_036_854_775_807
+MAX_INIT_DATA_LENGTH = 8192
 
 CategoryName = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)
@@ -115,3 +116,17 @@ class ContentUpdate(BaseModel):
             if name in self.model_fields_set and getattr(self, name) is None:
                 raise ValueError(f"{name} cannot be null")
         return self
+
+class AuthRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    init_data: Annotated[
+        str, StringConstraints(min_length=1, max_length=MAX_INIT_DATA_LENGTH)
+    ]
+
+
+class AuthResponse(BaseModel):
+    token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_at: datetime
+    user: UserOut
