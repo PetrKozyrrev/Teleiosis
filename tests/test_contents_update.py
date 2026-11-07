@@ -1,10 +1,7 @@
 from sqlalchemy import select, text
 
 from app.models import Reminder
-
-
-def auth(telegram_id):
-    return {"X-Dev-Telegram-Id": str(telegram_id)}
+from tests.helpers import auth_headers as auth
 
 
 def save(client, telegram_id=1, **body):

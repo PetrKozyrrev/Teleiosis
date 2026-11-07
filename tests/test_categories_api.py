@@ -1,6 +1,4 @@
-def auth(telegram_id):
-    return {"X-Dev-Telegram-Id": str(telegram_id)}
-
+from tests.helpers import auth_headers as auth
 
 def create(client, name, telegram_id=1):
     return client.post("/categories", json={"name": name}, headers=auth(telegram_id))

@@ -109,7 +109,8 @@ def test_deleted_user_loses_access(client, session):
     assert client.get("/me", headers=bearer(token)).status_code == 401
 
 
-def test_bearer_with_dev_header_rejected(client):
+def test_bearer_with_dev_header_rejected(client, monkeypatch):
+    monkeypatch.setattr(settings, "dev_auth_enabled", True)
     token = login(client)
     headers = {**bearer(token), "X-Dev-Telegram-Id": "42"}
     assert client.get("/me", headers=headers).status_code == 401
@@ -121,7 +122,8 @@ def test_bearer_with_bot_key_rejected(client):
     assert client.get("/me", headers=headers).status_code == 401
 
 
-def test_bad_bearer_does_not_fall_back_to_dev_auth(client):
+def test_bad_bearer_does_not_fall_back_to_dev_auth(client, monkeypatch):
+    monkeypatch.setattr(settings, "dev_auth_enabled", True)
     headers = {**bearer("A" * 43), "X-Dev-Telegram-Id": "5"}
     assert client.get("/me", headers=headers).status_code == 401
 

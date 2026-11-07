@@ -1,9 +1,6 @@
 import app.routers.contents as contents_module
 from app.metadata import Metadata
-
-
-def auth(telegram_id):
-    return {"X-Dev-Telegram-Id": str(telegram_id)}
+from tests.helpers import auth_headers as auth
 
 
 def save(client, telegram_id=1, **body):
