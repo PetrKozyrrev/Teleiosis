@@ -1,6 +1,7 @@
 """Серверные сессии Mini App: выдача токена и хранение его хэша."""
 
 import hashlib
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -8,6 +9,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models import AuthSession, User
+
+TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{16,128}")
 
 SESSION_LIFETIME = timedelta(hours=24)
 MAX_SESSIONS_PER_USER = 10
@@ -50,3 +53,18 @@ def create_session(db: Session, user: User) -> tuple[str, datetime]:
     )
     db.commit()
     return token, expires_at
+
+
+
+def find_user_by_token(db: Session, token: str) -> User | None:
+    """Пользователь по токену сессии или None. Просроченная сессия не подходит."""
+    if not TOKEN_RE.fullmatch(token):
+        return None
+    return db.scalar(
+        select(User)
+        .join(AuthSession, AuthSession.user_id == User.id)
+        .where(
+            AuthSession.token_hash == hash_token(token),
+            AuthSession.expires_at > datetime.now(timezone.utc),
+        )
+    )

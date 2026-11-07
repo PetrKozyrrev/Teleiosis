@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Response, status
 
 from app.config import settings
-from app.deps import DbSession, _get_or_create_user
+from app.deps import DbSession, get_or_create_user
 from app.schemas import AuthRequest, AuthResponse
 from app.sessions import create_session
 from app.telegram_auth import InitDataError, validate_init_data
@@ -29,7 +29,7 @@ def login_with_telegram(data: AuthRequest, response: Response, db: DbSession):
         logger.warning("initData rejected: %s", exc)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
 
-    user = _get_or_create_user(db, verified.telegram_id, verified.username)
+    user = get_or_create_user(db, verified.telegram_id, verified.username)
     if user.username != verified.username:
         user.username = verified.username
         db.commit()
