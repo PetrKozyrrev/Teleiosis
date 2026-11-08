@@ -4,6 +4,7 @@ from sqlalchemy import select
 from app.models import User
 from app.passwords import verify_password
 from app.routers.auth import CONSENT_VERSION
+from tests.helpers import ORIGIN
 
 GOOD_PASSWORD = "correct horse battery"
 
@@ -11,7 +12,7 @@ GOOD_PASSWORD = "correct horse battery"
 def register(client, **overrides):
     body = {"email": "ivan@example.com", "password": GOOD_PASSWORD, "consent": True}
     body.update(overrides)
-    return client.post("/auth/register", json=body)
+    return client.post("/auth/register", json=body, headers={"Origin": ORIGIN})
 
 
 def test_register_creates_user(client, session):
@@ -75,7 +76,7 @@ def test_password_is_not_trimmed(client, session):
 def test_consent_required(client):
     assert register(client, consent=False).status_code == 422
     body = {"email": "ivan@example.com", "password": GOOD_PASSWORD}
-    assert client.post("/auth/register", json=body).status_code == 422
+    assert (client.post("/auth/register", json=body, headers={"Origin": ORIGIN}).status_code== 422)
 
 
 def test_unknown_fields_rejected(client):

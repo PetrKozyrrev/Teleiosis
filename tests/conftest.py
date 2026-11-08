@@ -55,3 +55,10 @@ def client(session):
 def no_real_network(monkeypatch):
     """Тесты API не ходят в интернет: загрузка метаданных по умолчанию отключена."""
     monkeypatch.setattr("app.routers.contents.fetch_metadata", lambda url: None)
+
+@pytest.fixture(autouse=True)
+def web_settings(monkeypatch):
+    """Настройки сайта в тестах не зависят от .env разработчика."""
+    monkeypatch.setattr(settings, "app_env", "dev")
+    monkeypatch.setattr(settings, "app_origin", helpers.ORIGIN)
+    monkeypatch.setattr(settings, "cookie_secure", False)

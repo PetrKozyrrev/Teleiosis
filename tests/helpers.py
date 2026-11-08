@@ -18,6 +18,9 @@ _state: dict = {"session": None, "headers": {}}
 
 USER = {"id": 42, "first_name": "Иван", "username": "ivan_1"}
 
+# Адрес сайта в тестах: тестовые настройки (conftest.py) задают тот же origin
+ORIGIN = "http://localhost:8000"
+
 
 def sign(fields: dict[str, str], bot_token: str) -> str:
     check_string = "\n".join(f"{k}={v}" for k, v in sorted(fields.items()))

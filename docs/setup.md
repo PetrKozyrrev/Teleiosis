@@ -23,6 +23,9 @@ alembic upgrade head
 | BOT_API_KEY | Секрет бота для входа в API, не короче 32 символов. Нужен только боту. Пустой = вход ботом отключён |
 | API_BASE_URL | Адрес API для бота (http://127.0.0.1:8000) |
 | TELEGRAM_PROXY | Прокси только для запросов бота к Telegram; пусто, если Telegram доступен напрямую |
+| APP_ENV | `dev` (по умолчанию) или `prod`. В `prod` сервер не запустится без COOKIE_SECURE=true и адреса https:// |
+| APP_ORIGIN | Адрес сайта в браузере (по умолчанию http://localhost:8000). Сайт нужно открывать именно по этому адресу: с http://127.0.0.1:8000 изменяющие запросы будут отклонены |
+| COOKIE_SECURE | `false` в разработке (http://localhost), `true` на боевом сервере |
 
 Для работы API и будущего сайта достаточно переменных PostgreSQL, DATABASE_URL и TEST_DATABASE_URL.
 

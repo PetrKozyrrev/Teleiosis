@@ -1,4 +1,4 @@
-"""Серверные сессии Mini App: выдача токена и хранение его хэша."""
+"""Серверные сессии: выдача токена, поиск, продление, удаление."""
 
 import hashlib
 import re
@@ -12,7 +12,9 @@ from app.models import AuthSession, User
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{16,128}")
 
-SESSION_LIFETIME = timedelta(hours=24)
+SESSION_IDLE = timedelta(days=14)  # сколько живёт сессия без использования
+SESSION_ABSOLUTE = timedelta(days=60)  # максимум от создания, продлением не обойти
+RENEW_STEP = timedelta(days=1)  # продлеваем, только если выигрыш не меньше суток
 MAX_SESSIONS_PER_USER = 10
 
 
@@ -45,7 +47,7 @@ def create_session(db: Session, user: User) -> tuple[str, datetime]:
 
     # 3. Новая сессия
     token = secrets.token_urlsafe(32)
-    expires_at = now + SESSION_LIFETIME
+    expires_at = now + SESSION_IDLE
     db.add(
         AuthSession(
             user_id=user.id, token_hash=hash_token(token), expires_at=expires_at
@@ -55,16 +57,41 @@ def create_session(db: Session, user: User) -> tuple[str, datetime]:
     return token, expires_at
 
 
+def renew_session(db: Session, row: AuthSession, now: datetime) -> bool:
+    """Продлевает сессию до now + SESSION_IDLE, но не дальше created_at + SESSION_ABSOLUTE.
+    Не чаще, чем даёт выигрыш в RENEW_STEP: чтобы не писать в БД на каждый запрос."""
+    target = min(now + SESSION_IDLE, row.created_at + SESSION_ABSOLUTE)
+    if target - row.expires_at < RENEW_STEP:
+        return False
+    row.expires_at = target
+    db.commit()
+    return True
+
 
 def find_user_by_token(db: Session, token: str) -> User | None:
-    """Пользователь по токену сессии или None. Просроченная сессия не подходит."""
+    """Пользователь по токену сессии или None. Просроченная сессия не подходит.
+    Успешное обращение продлевает сессию."""
     if not TOKEN_RE.fullmatch(token):
         return None
-    return db.scalar(
-        select(User)
-        .join(AuthSession, AuthSession.user_id == User.id)
-        .where(
+    now = datetime.now(timezone.utc)
+    row = db.scalar(
+        select(AuthSession).where(
             AuthSession.token_hash == hash_token(token),
-            AuthSession.expires_at > datetime.now(timezone.utc),
+            AuthSession.expires_at > now,
         )
     )
+    if row is None:
+        return None
+    user = db.get(User, row.user_id)
+    if user is None:
+        return None
+    renew_session(db, row, now)
+    return user
+
+
+def delete_session(db: Session, token: str) -> None:
+    """Удаляет сессию по токену (если есть). Незнакомый токен не ошибка."""
+    if not TOKEN_RE.fullmatch(token):
+        return
+    db.execute(delete(AuthSession).where(AuthSession.token_hash == hash_token(token)))
+    db.commit()

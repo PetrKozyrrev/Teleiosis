@@ -152,3 +152,10 @@ class RegisterRequest(BaseModel):
         if value is not True:
             raise ValueError("Consent is required")
         return value
+
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Формат адреса здесь не проверяем строго: любой неподходящий вход даёт 401
+    email: Annotated[str, StringConstraints(min_length=1, max_length=320)]
+    password: Annotated[str, StringConstraints(min_length=1, max_length=128)]

@@ -1,15 +1,25 @@
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
+from app.cookies import clear_session_cookie, cookie_name, set_session_cookie
+from app.csrf import require_same_origin
 from app.deps import DbSession, get_or_create_user
+from app.emails import normalize_email
 from app.models import User
-from app.passwords import hash_password
-from app.schemas import AuthRequest, AuthResponse, RegisterRequest, UserOut
-from app.sessions import create_session
+from app.passwords import hash_password, needs_rehash, verify_dummy, verify_password
+from app.schemas import (
+    AuthRequest,
+    AuthResponse,
+    LoginRequest,
+    RegisterRequest,
+    UserOut,
+)
+from app.sessions import create_session, delete_session
 from app.telegram_auth import InitDataError, validate_init_data
 
 logger = logging.getLogger(__name__)
@@ -19,6 +29,21 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # Версия текста согласия на обработку персональных данных.
 # Заменить версией утверждённого юристом текста до публичного запуска.
 CONSENT_VERSION = "draft-1"
+
+
+def invalid_login() -> HTTPException:
+    # Одно сообщение для неверного пароля и несуществующего e-mail
+    return HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
+
+
+def start_session(request: Request, response: Response, db: DbSession, user: User) -> None:
+    """Новая сессия для браузера. Сессия из прежней cookie (если была) удаляется."""
+    old_token = request.cookies.get(cookie_name())
+    if old_token:
+        delete_session(db, old_token)
+    token, _ = create_session(db, user)
+    set_session_cookie(response, token)
+    response.headers["Cache-Control"] = "no-store"
 
 
 @router.post("/telegram", response_model=AuthResponse)
@@ -47,8 +72,13 @@ def login_with_telegram(data: AuthRequest, response: Response, db: DbSession):
     return {"token": token, "expires_at": expires_at, "user": user}
 
 
-@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def register(data: RegisterRequest, response: Response, db: DbSession):
+@router.post(
+    "/register",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_same_origin)],
+)
+def register(data: RegisterRequest, request: Request, response: Response, db: DbSession):
     # Хэшируем до обращения к БД: время ответа не зависит от того, занят ли адрес
     password_hash = hash_password(data.password)
     user = User(
@@ -65,5 +95,47 @@ def register(data: RegisterRequest, response: Response, db: DbSession):
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
     db.refresh(user)
-    response.headers["Cache-Control"] = "no-store"
+    start_session(request, response, db, user)
     return user
+
+
+@router.post(
+    "/login",
+    response_model=UserOut,
+    dependencies=[Depends(require_same_origin)],
+)
+def login(data: LoginRequest, request: Request, response: Response, db: DbSession):
+    try:
+        email = normalize_email(data.email)
+    except ValueError:
+        email = None  # такого аккаунта быть не может: ответ как для неверного пароля
+
+    user = db.scalar(select(User).where(User.email == email)) if email else None
+    if user is None or user.password_hash is None:
+        verify_dummy(data.password)  # то же время ответа, что при неверном пароле
+        raise invalid_login()
+    if not verify_password(data.password, user.password_hash):
+        raise invalid_login()
+
+    # Параметры хэширования могли измениться: обновляем хэш после успешного входа
+    if needs_rehash(user.password_hash):
+        user.password_hash = hash_password(data.password)
+        db.commit()
+
+    start_session(request, response, db, user)
+    return user
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_same_origin)],
+)
+def logout(request: Request, db: DbSession):
+    """Выход всегда успешен: удаляет сессию из cookie (если есть) и саму cookie."""
+    token = request.cookies.get(cookie_name())
+    if token:
+        delete_session(db, token)
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    clear_session_cookie(response)
+    return response

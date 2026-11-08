@@ -2,12 +2,14 @@ import hmac
 from collections.abc import Iterator
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.cookies import cookie_name
+from app.csrf import check_same_origin
 from app.db import SessionLocal
 from app.models import User
 from app.schemas import MAX_BIGINT
@@ -64,30 +66,42 @@ def get_or_create_user(
 
 
 def get_current_user(
+    request: Request,
     db: DbSession,
     authorization: Annotated[str | None, Header(max_length=512)] = None,
     x_bot_key: Annotated[str | None, Header(max_length=256)] = None,
     x_telegram_id: TelegramId = None,
     x_telegram_username: Annotated[str | None, Header(max_length=64)] = None,
 ) -> User:
-    """Определяет, кто делает запрос. Способов входа ровно два.
+    """Определяет, кто делает запрос. Способов входа ровно три.
 
-    1. Mini App: Authorization: Bearer <токен сессии>.
-    2. Бот: X-Bot-Key + X-Telegram-Id (+ X-Telegram-Username).
+    1. Сайт: cookie сессии (HttpOnly). Изменяющие запросы дополнительно
+       проверяются на Origin (защита от CSRF).
+    2. Токен сессии: Authorization: Bearer <токен> (тесты, будущие приложения).
+    3. Бот: X-Bot-Key + X-Telegram-Id (+ X-Telegram-Username).
 
-    Если указан Authorization, это единственный способ входа. Authorization
-    вместе с X-Bot-Key даёт 401: два способа в одном запросе это неоднозначность.
-    При любой неудаче сразу 401, без перехода к другому способу.
+    Если пришли сразу два способа, это неоднозначность: 401. Если способ один
+    и он неверный, тоже сразу 401, без перехода к другому.
     """
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
     )
+    cookie_token = request.cookies.get(cookie_name())
+
+    provided = (authorization is not None, x_bot_key is not None, cookie_token is not None)
+    if sum(provided) > 1:
+        raise unauthorized
 
     if authorization is not None:
-        if x_bot_key is not None:
-            raise unauthorized
         token = _bearer_token(authorization)
         user = find_user_by_token(db, token) if token else None
+        if user is None:
+            raise unauthorized
+        return user
+
+    if cookie_token is not None:
+        check_same_origin(request)
+        user = find_user_by_token(db, cookie_token)
         if user is None:
             raise unauthorized
         return user
