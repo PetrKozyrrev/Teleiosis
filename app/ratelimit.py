@@ -23,7 +23,6 @@ from app.models import RateLimitEvent
 # Записи старше этого срока удаляются (дольше самого длинного окна)
 RETENTION = timedelta(hours=2)
 
-
 @dataclass(frozen=True)
 class Rule:
     bucket: str  # название счётчика
@@ -34,6 +33,9 @@ class Rule:
 LOGIN_IP = Rule("login_ip", 30, timedelta(minutes=15))
 LOGIN_EMAIL_IP = Rule("login_email_ip", 5, timedelta(minutes=15))
 REGISTER_IP = Rule("register_ip", 5, timedelta(hours=1))
+
+RESET_EMAIL = Rule("reset_email", 3, timedelta(hours=1))
+RESET_IP = Rule("reset_ip", 10, timedelta(hours=1))
 
 
 def client_ip(request: Request) -> str:

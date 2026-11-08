@@ -26,6 +26,8 @@ alembic upgrade head
 | APP_ENV | `dev` (по умолчанию) или `prod`. В `prod` сервер не запустится без COOKIE_SECURE=true и адреса https:// |
 | APP_ORIGIN | Адрес сайта в браузере (по умолчанию http://localhost:8000). Сайт нужно открывать именно по этому адресу: с http://127.0.0.1:8000 изменяющие запросы будут отклонены |
 | COOKIE_SECURE | `false` в разработке (http://localhost), `true` на боевом сервере |
+| EMAIL_BACKEND | `console` (по умолчанию, письма печатаются в терминал с uvicorn) или `smtp`. В `prod` допустим только `smtp` |
+| SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_SECURITY | Почтовый сервер (`starttls`, `ssl` или `none`); нужны при `EMAIL_BACKEND=smtp`, хост и отправитель обязательны |
 
 Для работы API и будущего сайта достаточно переменных PostgreSQL, DATABASE_URL и TEST_DATABASE_URL.
 

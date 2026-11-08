@@ -159,3 +159,22 @@ class LoginRequest(BaseModel):
     # Формат адреса здесь не проверяем строго: любой неподходящий вход даёт 401
     email: Annotated[str, StringConstraints(min_length=1, max_length=320)]
     password: Annotated[str, StringConstraints(min_length=1, max_length=128)]
+
+
+class PasswordResetRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def clean_email(cls, value):
+        return normalize_email(value)
+
+
+class PasswordResetConfirm(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Формат токена проверяет обработчик: любая ошибка даёт одинаковый 400
+    token: Annotated[str, StringConstraints(min_length=1, max_length=256)]
+    password: Annotated[str, StringConstraints(min_length=10, max_length=128)]

@@ -40,6 +40,32 @@ def test_prod_requires_https_origin():
         make(app_env="prod", app_origin="http://example.ru", cookie_secure=True)
 
 
+SMTP = {
+    "email_backend": "smtp",
+    "smtp_host": "smtp.example.ru",
+    "smtp_from": "noreply@example.ru",
+}
+
+
 def test_prod_with_secure_settings_is_ok():
-    settings = make(app_env="prod", app_origin="https://example.ru/", cookie_secure=True)
+    settings = make(
+        app_env="prod", app_origin="https://example.ru/", cookie_secure=True, **SMTP
+    )
     assert settings.app_origin == "https://example.ru"
+
+
+def test_prod_requires_real_email_backend():
+    with pytest.raises(ValidationError):
+        make(app_env="prod", app_origin="https://example.ru", cookie_secure=True)
+
+
+def test_smtp_backend_needs_host_and_sender():
+    with pytest.raises(ValidationError):
+        make(email_backend="smtp")
+    with pytest.raises(ValidationError):
+        make(email_backend="smtp", smtp_host="smtp.example.ru")
+    assert make(**SMTP).email_backend == "smtp"
+
+
+def test_default_email_backend_is_console():
+    assert make().email_backend == "console"
