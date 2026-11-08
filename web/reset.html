@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Новый пароль в Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <div class="auth-layout">
+    <aside class="brand-panel">
+      <a class="brand-name" href="./">Teleiosis</a>
+      <img class="brand-squiggle" src="img/logo-cream.png" width="328" height="317" alt="">
+      <p class="brand-line">Придумайте новый пароль, и всё сохранённое снова с вами.</p>
+    </aside>
+    <main class="auth-main">
+      <div class="auth-card">
+        <h1>Новый пароль</h1>
+        <p id="error" class="message message-error" role="alert" hidden></p>
+        <p id="info" class="message message-info" role="status" hidden></p>
+        <form id="reset-form" class="card" method="post">
+          <div class="field">
+            <label class="label" for="password">Новый пароль</label>
+            <div class="password-row">
+              <input class="input" id="password" name="password" type="password" autocomplete="new-password" aria-describedby="password-hint" required>
+              <button class="button-quiet" id="toggle-password" type="button" aria-controls="password" aria-label="Показать пароль">Показать</button>
+            </div>
+            <p class="hint" id="password-hint">От 10 до 128 символов. Длинная фраза надёжнее сложного пароля.</p>
+          </div>
+          <button class="button" type="submit">Сохранить пароль</button>
+        </form>
+        <div class="footer-links">
+          <a href="login.html">Перейти ко входу</a>
+          <a id="to-forgot" href="forgot.html" hidden>Запросить новую ссылку</a>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/reset.js"></script>
+</body>
+</html>

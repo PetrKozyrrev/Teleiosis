@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Регистрация в Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <div class="auth-layout">
+    <aside class="brand-panel">
+      <a class="brand-name" href="./">Teleiosis</a>
+      <img class="brand-squiggle" src="img/logo-cream.png" width="328" height="317" alt="">
+      <p class="brand-line">Собирайте полезное в одном месте и возвращайтесь к нему.</p>
+    </aside>
+    <main class="auth-main">
+      <div class="auth-card">
+        <h1>Создать аккаунт</h1>
+        <p id="error" class="message message-error" role="alert" hidden></p>
+        <form id="register-form" class="card" method="post">
+          <div class="field">
+            <label class="label" for="email">E-mail</label>
+            <input class="input" id="email" name="email" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" required>
+          </div>
+          <div class="field">
+            <label class="label" for="password">Пароль</label>
+            <div class="password-row">
+              <input class="input" id="password" name="password" type="password" autocomplete="new-password" aria-describedby="password-hint" required>
+              <button class="button-quiet" id="toggle-password" type="button" aria-controls="password" aria-label="Показать пароль">Показать</button>
+            </div>
+            <p class="hint" id="password-hint">От 10 до 128 символов. Длинная фраза надёжнее сложного пароля.</p>
+          </div>
+          <div class="check">
+            <input id="consent" name="consent" type="checkbox" required>
+            <label for="consent">Я даю согласие на обработку персональных данных</label>
+          </div>
+          <button class="button" type="submit">Создать аккаунт</button>
+        </form>
+        <div class="footer-links">
+          <span>Уже есть аккаунт? <a href="login.html">Войти</a></span>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/register.js"></script>
+</body>
+</html>

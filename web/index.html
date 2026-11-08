@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Библиотека — Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <header class="topbar">
+    <a class="topbar-brand" href="./">
+      <img src="img/icon.png" width="36" height="36" alt="">
+      <span>Teleiosis</span>
+    </a>
+    <div class="topbar-user">
+      <span class="user-email" id="user-email"></span>
+      <button class="button-quiet" id="logout" type="button">Выйти</button>
+    </div>
+  </header>
+  <p id="error" class="message message-error" role="alert" hidden></p>
+  <main class="page" id="main" hidden>
+    <h1>Библиотека</h1>
+    <section class="empty">
+      <h2>Пока пусто</h2>
+      <p>Сохранённые ссылки и заметки появятся здесь.</p>
+    </section>
+  </main>
+  <script type="module" src="js/index.js"></script>
+</body>
+</html>

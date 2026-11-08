@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход в Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <div class="auth-layout">
+    <aside class="brand-panel">
+      <a class="brand-name" href="./">Teleiosis</a>
+      <img class="brand-squiggle" src="img/logo-cream.png" width="328" height="317" alt="">
+      <p class="brand-line">Не откладывайте на завтра то, что можно узнать сегодня.</p>
+    </aside>
+    <main class="auth-main">
+      <div class="auth-card">
+        <h1>Вход</h1>
+        <p id="error" class="message message-error" role="alert" hidden></p>
+        <form id="login-form" class="card" method="post">
+          <div class="field">
+            <label class="label" for="email">E-mail</label>
+            <input class="input" id="email" name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required>
+          </div>
+          <div class="field">
+            <label class="label" for="password">Пароль</label>
+            <div class="password-row">
+              <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+              <button class="button-quiet" id="toggle-password" type="button" aria-controls="password" aria-label="Показать пароль">Показать</button>
+            </div>
+          </div>
+          <button class="button" type="submit">Войти</button>
+        </form>
+        <div class="footer-links">
+          <a href="forgot.html">Забыли пароль?</a>
+          <span>Нет аккаунта? <a href="register.html">Создать аккаунт</a></span>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+import re
+from pathlib import Path
+from urllib.parse import urljoin
+
+import pytest
+
+WEB = Path(__file__).resolve().parent.parent / "web"
+PAGES = ["index.html", "login.html", "register.html", "forgot.html", "reset.html"]
+HTML_FILES = sorted(WEB.glob("*.html"))
+JS_FILES = sorted((WEB / "js").glob("*.js"))
+
+DANGEROUS_JS = ["innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function"]
+
+
+def local(reference):
+    return not re.match(r"([a-z]+:|//)", reference)
+
+
+def test_expected_pages_exist():
+    assert set(PAGES) <= {p.name for p in HTML_FILES}
+
+
+@pytest.mark.parametrize("page", PAGES)
+def test_page_served_with_security_headers(client, page):
+    response = client.get(f"/app/{page}")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    policy = response.headers["content-security-policy"]
+    for part in ("default-src 'self'", "img-src 'self' data:", "object-src 'none'", "frame-ancestors 'none'"):
+        assert part in policy
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["cache-control"] == "no-cache"
+
+
+def test_site_root_serves_the_library_page(client):
+    response = client.get("/app/")
+    assert response.status_code == 200
+    assert "Библиотека" in response.text
+
+
+def test_redirects_to_the_site(client):
+    root = client.get("/", follow_redirects=False)
+    assert root.status_code in (302, 307)
+    assert root.headers["location"].endswith("/app/")
+    bare = client.get("/app", follow_redirects=False)
+    assert bare.status_code in (301, 307)
+    assert bare.headers["location"].endswith("/app/")
+
+
+def test_missing_file_is_404_but_keeps_headers(client):
+    response = client.get("/app/nope.html")
+    assert response.status_code == 404
+    assert "content-security-policy" in response.headers
+
+
+def test_path_traversal_is_not_possible(client):
+    assert client.get("/app/..%2f..%2fapp%2fmain.py").status_code == 404
+    assert client.get("/app/%2e%2e/%2e%2e/.env").status_code == 404
+
+
+def test_api_and_docs_do_not_get_site_headers(client):
+    for path in ("/health", "/docs"):
+        assert "content-security-policy" not in client.get(path).headers
+
+
+@pytest.mark.parametrize("page", HTML_FILES, ids=lambda p: p.name)
+def test_html_references_resolve(client, page):
+    html = page.read_text(encoding="utf-8")
+    references = [r for r in re.findall(r'(?:src|href)="([^"#?]+)', html) if local(r)]
+    assert references
+    for reference in references:
+        url = urljoin("/app/", reference)
+        assert client.get(url).status_code == 200, f"{page.name}: {reference}"
+
+
+@pytest.mark.parametrize("script", JS_FILES, ids=lambda p: p.name)
+def test_js_imports_resolve(client, script):
+    text = script.read_text(encoding="utf-8")
+    for reference in re.findall(r'from\s+"(\.[^"]+)"', text):
+        url = urljoin("/app/js/", reference)
+        assert client.get(url).status_code == 200, f"{script.name}: {reference}"
+
+
+@pytest.mark.parametrize("page", HTML_FILES, ids=lambda p: p.name)
+def test_no_inline_code_that_csp_would_block(page):
+    html = page.read_text(encoding="utf-8")
+    assert not re.search(r"<script(?![^>]*\bsrc=)", html)
+    assert "<style" not in html
+    assert not re.search(r"\sstyle\s*=", html)
+    assert not re.search(r"\son[a-z]+\s*=", html, re.I)
+
+
+@pytest.mark.parametrize("page", HTML_FILES, ids=lambda p: p.name)
+def test_forms_post_so_passwords_never_reach_the_address_bar(page):
+    html = page.read_text(encoding="utf-8")
+    for form in re.findall(r"<form\b[^>]*>", html):
+        assert 'method="post"' in form
+
+
+@pytest.mark.parametrize("script", JS_FILES, ids=lambda p: p.name)
+def test_js_does_not_use_dangerous_apis(script):
+    text = script.read_text(encoding="utf-8")
+    for api in DANGEROUS_JS:
+        assert api not in text, f"{script.name}: {api}"

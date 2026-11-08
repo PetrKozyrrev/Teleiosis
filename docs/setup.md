@@ -34,11 +34,15 @@ alembic upgrade head
 Ключ бота (если бот понадобится): `python -c "import secrets; print(secrets.token_urlsafe(32))"`
 
 ## Ежедневный запуск (два терминала, в каждом `source .venv/bin/activate`)
+
 ```bash
 docker compose up -d
 uvicorn app.main:app --reload
 ```
 После изменения .env перезапускайте uvicorn.
+
+## Сайт
+После запуска `uvicorn app.main:app --reload` откройте http://localhost:8000/ (откроется /app/). Сайт нужно открывать именно по адресу из APP_ORIGIN (по умолчанию localhost, не 127.0.0.1), иначе изменяющие запросы будут отклонены. Письма для сброса пароля в разработке печатаются в терминал с uvicorn.
 
 ## Telegram-бот (заморожен)
 Запускается только при необходимости, в третьем терминале, в одном экземпляре:

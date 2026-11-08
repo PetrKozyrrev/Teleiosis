@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Восстановление доступа в Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <div class="auth-layout">
+    <aside class="brand-panel">
+      <a class="brand-name" href="./">Teleiosis</a>
+      <img class="brand-squiggle" src="img/logo-cream.png" width="328" height="317" alt="">
+      <p class="brand-line">Забытый пароль не повод терять свою библиотеку.</p>
+    </aside>
+    <main class="auth-main">
+      <div class="auth-card">
+        <h1>Восстановление доступа</h1>
+        <p class="lead" id="lead">Укажите e-mail аккаунта. Если он зарегистрирован, мы отправим ссылку для нового пароля.</p>
+        <p id="error" class="message message-error" role="alert" hidden></p>
+        <p id="info" class="message message-info" role="status" hidden></p>
+        <form id="forgot-form" class="card" method="post">
+          <div class="field">
+            <label class="label" for="email">E-mail</label>
+            <input class="input" id="email" name="email" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" required>
+          </div>
+          <button class="button" type="submit">Отправить ссылку</button>
+        </form>
+        <div class="footer-links">
+          <a href="login.html">Вернуться ко входу</a>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/forgot.js"></script>
+</body>
+</html>
