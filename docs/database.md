@@ -1,6 +1,6 @@
 # База данных (PostgreSQL 16)
 
-Итоговая схема: 5 таблиц (users, categories, contents, reminders, auth_sessions). Схема меняется только миграциями Alembic. Время всегда хранится в UTC (TIMESTAMPTZ), перевод в часовой пояс пользователя делается при показе и при расчёте времени отправки.
+Итоговая схема: 6 таблиц (users, categories, contents, reminders, auth_sessions, rate_limit_events). Схема меняется только миграциями Alembic. Время всегда хранится в UTC (TIMESTAMPTZ), перевод в часовой пояс пользователя делается при показе и при расчёте времени отправки.
 
 ## users
 | Поле | Тип | Ограничения |
@@ -81,6 +81,16 @@ CHECK (status IN ('pending','sent','cancelled')). Защиты от дублей
 
 Сам токен не хранится, только хэш.
 
+## rate_limit_events
+| Поле | Тип | Ограничения |
+|---|---|---|
+| id | BIGINT, identity | PK |
+| bucket | TEXT | NOT NULL (название счётчика: login_ip, login_email_ip, register_ip) |
+| key_hash | TEXT | NOT NULL, CHECK длина 64 (SHA-256 от адреса или e-mail) |
+| created_at | TIMESTAMPTZ | NOT NULL, now() |
+
+Журнал попыток для ограничения частоты запросов (скользящее окно). Адрес и e-mail в открытом виде не хранятся. Записи старше 2 часов удаляются при каждой новой записи. Связей с другими таблицами нет.
+
 ## Индексы
 | Таблица | Индекс | Зачем |
 |---|---|---|
@@ -90,6 +100,8 @@ CHECK (status IN ('pending','sent','cancelled')). Защиты от дублей
 | reminders | (scheduled_at) WHERE status = 'pending' | Планировщик быстро находит то, что пора отправить |
 | reminders | (content_id) | Каскадное удаление и просмотр напоминаний материала |
 | auth_sessions | (user_id) | Каскадное удаление и очистка сессий пользователя |
+| rate_limit_events | (bucket, key_hash, created_at) | Подсчёт попыток за окно |
+| rate_limit_events | (created_at) | Быстрое удаление устаревших записей |
 
 Индексы по telegram_id, (user_id, name), (user_id, url_normalized) и token_hash создаются автоматически благодаря UNIQUE.
 

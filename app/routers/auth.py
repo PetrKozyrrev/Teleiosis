@@ -12,6 +12,16 @@ from app.deps import DbSession, get_or_create_user
 from app.emails import normalize_email
 from app.models import User
 from app.passwords import hash_password, needs_rehash, verify_dummy, verify_password
+from app.ratelimit import (
+    LOGIN_EMAIL_IP,
+    LOGIN_IP,
+    REGISTER_IP,
+    check_limits,
+    clear,
+    client_ip,
+    make_key,
+    record,
+)
 from app.schemas import (
     AuthRequest,
     AuthResponse,
@@ -34,6 +44,12 @@ CONSENT_VERSION = "draft-1"
 def invalid_login() -> HTTPException:
     # Одно сообщение для неверного пароля и несуществующего e-mail
     return HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
+
+def login_failed(db: DbSession, ip_key: str, pair_key: str) -> HTTPException:
+    """Записывает неудачную попытку в оба счётчика и возвращает общую ошибку входа."""
+    record(db, LOGIN_IP, ip_key)
+    record(db, LOGIN_EMAIL_IP, pair_key)
+    return invalid_login()
 
 
 def start_session(request: Request, response: Response, db: DbSession, user: User) -> None:
@@ -79,6 +95,12 @@ def login_with_telegram(data: AuthRequest, response: Response, db: DbSession):
     dependencies=[Depends(require_same_origin)],
 )
 def register(data: RegisterRequest, request: Request, response: Response, db: DbSession):
+    # Лимит проверяется до хэширования: заблокированный запрос ничего не стоит.
+    # Считаются все попытки, дошедшие до этого места (ошибки формата не считаются).
+    ip_key = make_key(client_ip(request))
+    check_limits(db, (REGISTER_IP, ip_key))
+    record(db, REGISTER_IP, ip_key)
+
     # Хэшируем до обращения к БД: время ответа не зависит от того, занят ли адрес
     password_hash = hash_password(data.password)
     user = User(
@@ -110,18 +132,26 @@ def login(data: LoginRequest, request: Request, response: Response, db: DbSessio
     except ValueError:
         email = None  # такого аккаунта быть не может: ответ как для неверного пароля
 
+    # Лимит проверяется до любой работы с паролем. Ключ строится от введённой
+    # строки, а не от наличия аккаунта: ответ 429 не выдаёт, есть ли такой e-mail.
+    ip = client_ip(request)
+    ip_key = make_key(ip)
+    pair_key = make_key(email or data.email.strip().lower(), ip)
+    check_limits(db, (LOGIN_IP, ip_key), (LOGIN_EMAIL_IP, pair_key))
+
     user = db.scalar(select(User).where(User.email == email)) if email else None
     if user is None or user.password_hash is None:
         verify_dummy(data.password)  # то же время ответа, что при неверном пароле
-        raise invalid_login()
+        raise login_failed(db, ip_key, pair_key)
     if not verify_password(data.password, user.password_hash):
-        raise invalid_login()
+        raise login_failed(db, ip_key, pair_key)
 
     # Параметры хэширования могли измениться: обновляем хэш после успешного входа
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(data.password)
         db.commit()
 
+    clear(db, LOGIN_EMAIL_IP, pair_key)  # счётчик пары обнуляется, счётчик IP нет
     start_session(request, response, db, user)
     return user
 

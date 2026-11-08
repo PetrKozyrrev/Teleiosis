@@ -181,3 +181,25 @@ class AuthSession(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+class RateLimitEvent(Base):
+    """Журнал попыток для ограничения частоты запросов.
+
+    Хранится не адрес и не e-mail, а SHA-256 от них. Записи старше нескольких
+    часов удаляются кодом (app/ratelimit.py)."""
+
+    __tablename__ = "rate_limit_events"
+    __table_args__ = (
+        CheckConstraint(
+            "char_length(key_hash) = 64", name="ck_rate_limit_hash_len"
+        ),
+        Index("ix_rate_limit_lookup", "bucket", "key_hash", "created_at"),
+        Index("ix_rate_limit_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    bucket: Mapped[str] = mapped_column(Text)
+    key_hash: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
