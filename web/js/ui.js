@@ -85,3 +85,29 @@ export function attachPasswordToggle(button, input) {
     button.setAttribute("aria-label", show ? "Скрыть пароль" : "Показать пароль");
   });
 }
+
+// Создаёт элемент. Текст ставится только через textContent, пустые дочерние узлы пропускаются.
+export function el(tag, options = {}, ...children) {
+  const node = document.createElement(tag);
+  if (options.class) node.className = options.class;
+  if (options.text !== undefined) node.textContent = options.text;
+  for (const [name, value] of Object.entries(options.attrs ?? {})) node.setAttribute(name, value);
+  node.append(...children.filter(Boolean));
+  return node;
+}
+
+// Адрес для ссылки: только http и https, иначе null
+export function safeHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+// Обрезка по символам (эмодзи не рвётся посередине)
+export function shorten(text, limit) {
+  const chars = Array.from(text);
+  return chars.length <= limit ? text : `${chars.slice(0, limit - 1).join("")}…`;
+}

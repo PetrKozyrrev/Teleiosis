@@ -28,3 +28,13 @@ export async function redirectIfSignedIn() {
     // нет связи: оставляем форму, ошибку покажет отправка
   }
 }
+
+
+// Если сессия кончилась (401), отправляет на вход и возвращает true
+export function redirectIfUnauthorized(error) {
+  if (error instanceof ApiError && error.status === 401) {
+    location.replace("login.html");
+    return true;
+  }
+  return false;
+}

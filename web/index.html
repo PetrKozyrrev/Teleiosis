@@ -22,9 +22,75 @@
   <p id="error" class="message message-error" role="alert" hidden></p>
   <main class="page" id="main" hidden>
     <h1>Библиотека</h1>
-    <section class="empty">
-      <h2>Пока пусто</h2>
-      <p>Сохранённые ссылки и заметки появятся здесь.</p>
+
+    <section class="card quick-add" aria-labelledby="add-title">
+      <h2 id="add-title">Добавить материал</h2>
+      <p id="add-error" class="message message-error" role="alert" hidden></p>
+      <p id="add-info" class="message message-info" role="status" hidden></p>
+      <form id="add-form" method="post">
+        <div class="field">
+          <label class="label" for="add-input">Ссылка или заметка</label>
+          <textarea class="input" id="add-input" name="content" rows="2" maxlength="10000" aria-describedby="add-hint" required></textarea>
+          <p class="hint" id="add-hint">К ссылке можно добавить пару слов через пробел: они станут заметкой. Ctrl+Enter сохраняет.</p>
+        </div>
+        <button class="button button-inline" type="submit">Сохранить</button>
+      </form>
+    </section>
+
+    <section class="library" aria-labelledby="list-title">
+      <h2 id="list-title">Ваши материалы</h2>
+      <form id="filters" class="filters" role="search" method="post">
+        <div class="field filter-search">
+          <label class="label" for="filter-q">Поиск по названию</label>
+          <input class="input" id="filter-q" type="search" maxlength="100" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="label" for="filter-status">Статус</label>
+          <select class="input" id="filter-status">
+            <option value="">Все</option>
+            <option value="unseen">Не просмотрено</option>
+            <option value="planned">Запланировано</option>
+            <option value="studied">Изучено</option>
+            <option value="irrelevant">Неактуально</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="filter-source">Источник</label>
+          <select class="input" id="filter-source">
+            <option value="">Все</option>
+            <option value="youtube">YouTube</option>
+            <option value="telegram">Telegram</option>
+            <option value="web">Сайты</option>
+            <option value="other">Заметки</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="filter-category">Категория</label>
+          <select class="input" id="filter-category">
+            <option value="">Все</option>
+            <option value="none">Без категории</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label" for="filter-sort">Порядок</label>
+          <select class="input" id="filter-sort">
+            <option value="newest">Сначала новые</option>
+            <option value="oldest">Сначала старые</option>
+            <option value="title">По названию</option>
+          </select>
+        </div>
+      </form>
+
+      <p class="count" id="count" aria-live="polite"></p>
+      <p id="list-error" class="message message-error" role="alert" hidden></p>
+      <button class="button-quiet retry" id="retry" type="button" hidden>Повторить</button>
+      <ul class="items" id="items" aria-busy="false"></ul>
+      <div class="empty" id="empty" hidden>
+        <h3 id="empty-title"></h3>
+        <p id="empty-text"></p>
+        <button class="button-quiet" id="reset-filters" type="button" hidden>Сбросить фильтры</button>
+      </div>
+      <button class="button-quiet more" id="more" type="button" hidden>Показать ещё</button>
     </section>
   </main>
   <script type="module" src="js/index.js"></script>

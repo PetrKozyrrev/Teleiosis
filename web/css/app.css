@@ -158,3 +158,34 @@ a { color: var(--clay); text-underline-offset: 3px; }
 .user-email { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9375rem; color: var(--muted); }
 .page { max-width: 960px; margin: 0 auto; padding: 28px 20px 48px; }
 .empty { margin-top: 24px; padding: 28px 24px; background: var(--surface); border: 1px dashed var(--field-border); border-radius: 10px; }
+
+/* ---------- библиотека ---------- */
+.button-inline { width: auto; }
+textarea.input { resize: vertical; }
+.quick-add { margin-top: 16px; }
+.library { margin-top: 32px; }
+
+.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0 8px; }
+.filters .field { margin: 0; }
+.filter-search { grid-column: 1 / -1; }
+@media (min-width: 720px) {
+  .filters { grid-template-columns: 2fr 1fr 1fr 1fr 1fr; }
+  .filter-search { grid-column: auto; }
+}
+
+.count { margin: 8px 0 12px; font-size: 0.9375rem; color: var(--muted); }
+.retry { margin-bottom: 12px; }
+.items { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.item { padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 6px; font-size: 0.875rem; color: var(--muted); }
+.source { display: inline-flex; align-items: center; gap: 6px; }
+.source img { width: 18px; height: 18px; }
+.chip { padding: 1px 10px; font-size: 0.8125rem; color: var(--espresso); border: 1px solid var(--field-border); border-radius: 999px; }
+.chip-planned { background: var(--beach); border-color: var(--beach); }
+.chip-studied { color: var(--surface); background: var(--olive); border-color: var(--olive); }
+.chip-irrelevant { color: var(--muted); border-style: dashed; }
+.item-title { margin: 0 0 6px; font-size: 1.0625rem; line-height: 1.35; overflow-wrap: anywhere; }
+.item-text { display: -webkit-box; margin: 0 0 6px; overflow: hidden; color: var(--muted); overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.item-note { margin: 0; padding-left: 10px; border-left: 3px solid var(--beach); overflow-wrap: anywhere; white-space: pre-line; }
+.empty h3 { margin: 0 0 8px; font-size: 1.125rem; }
+.more { display: block; margin: 16px auto 0; }

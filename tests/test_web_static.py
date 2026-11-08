@@ -3,6 +3,9 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 import pytest
+from typing import get_args
+
+from app.schemas import ContentSource, ContentStatus, SortOrder
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 PAGES = ["index.html", "login.html", "register.html", "forgot.html", "reset.html"]
@@ -104,3 +107,22 @@ def test_js_does_not_use_dangerous_apis(script):
     text = script.read_text(encoding="utf-8")
     for api in DANGEROUS_JS:
         assert api not in text, f"{script.name}: {api}"
+
+def test_source_icons_used_by_cards_exist(client):
+    cards = (WEB / "js" / "cards.js").read_text(encoding="utf-8")
+    icons = re.findall(r'"(img/source-[a-z]+\.svg)"', cards)
+    assert len(icons) == len(get_args(ContentSource))
+    for icon in icons:
+        response = client.get(urljoin("/app/", icon))
+        assert response.status_code == 200, icon
+        assert response.headers["content-type"].startswith("image/svg+xml")
+
+
+def test_filters_and_labels_match_the_api():
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    cards = (WEB / "js" / "cards.js").read_text(encoding="utf-8")
+    values = get_args(ContentStatus) + get_args(ContentSource) + get_args(SortOrder)
+    for value in values:
+        assert f'value="{value}"' in html, value
+    for value in get_args(ContentStatus) + get_args(ContentSource):
+        assert re.search(rf"\b{value}:", cards), value
