@@ -10,6 +10,7 @@ from pydantic import (
     model_validator,
 )
 
+from app.emails import normalize_email
 from app.urls import clean_url
 
 MAX_BIGINT = 9_223_372_036_854_775_807
@@ -131,3 +132,23 @@ class AuthResponse(BaseModel):
     token_type: Literal["bearer"] = "bearer"
     expires_at: datetime
     user: UserOut
+
+class RegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: str
+    # Пароль не обрезается и не меняется: пробелы по краям тоже часть пароля
+    password: Annotated[str, StringConstraints(min_length=10, max_length=128)]
+    consent: bool
+
+    @field_validator("email")
+    @classmethod
+    def clean_email(cls, value):
+        return normalize_email(value)
+
+    @field_validator("consent")
+    @classmethod
+    def consent_required(cls, value):
+        if value is not True:
+            raise ValueError("Consent is required")
+        return value

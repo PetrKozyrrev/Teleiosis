@@ -1,16 +1,24 @@
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Response, status
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.deps import DbSession, get_or_create_user
-from app.schemas import AuthRequest, AuthResponse
+from app.models import User
+from app.passwords import hash_password
+from app.schemas import AuthRequest, AuthResponse, RegisterRequest, UserOut
 from app.sessions import create_session
 from app.telegram_auth import InitDataError, validate_init_data
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Версия текста согласия на обработку персональных данных.
+# Заменить версией утверждённого юристом текста до публичного запуска.
+CONSENT_VERSION = "draft-1"
 
 
 @router.post("/telegram", response_model=AuthResponse)
@@ -37,3 +45,25 @@ def login_with_telegram(data: AuthRequest, response: Response, db: DbSession):
     token, expires_at = create_session(db, user)
     response.headers["Cache-Control"] = "no-store"
     return {"token": token, "expires_at": expires_at, "user": user}
+
+
+@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def register(data: RegisterRequest, response: Response, db: DbSession):
+    # Хэшируем до обращения к БД: время ответа не зависит от того, занят ли адрес
+    password_hash = hash_password(data.password)
+    user = User(
+        email=data.email,
+        password_hash=password_hash,
+        consent_at=datetime.now(timezone.utc),
+        consent_version=CONSENT_VERSION,
+    )
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Занятый e-mail ловит ограничение БД (нет гонки «проверить, потом вставить»)
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
+    db.refresh(user)
+    response.headers["Cache-Control"] = "no-store"
+    return user
