@@ -40,7 +40,7 @@
 | POST /auth/telegram | Заморожен. Обмен initData на токен сессии: `{init_data}` → `{token, token_type, expires_at, user}`; ответ с `Cache-Control: no-store` | 200, 401 любая ошибка проверки, 422, 503 |
 
 ## Поля ответов
-- **Пользователь (UserOut):** `id`, `telegram_id`, `username`, `timezone`. Поля настроек напоминаний (`reminders_enabled`, `reminder_time`) в ответ пока не входят.
+- **Пользователь (UserOut):** `id`, `telegram_id` (для пользователей сайта `null`), `email` (для пользователей из Telegram `null`), `username`, `timezone`. Поля настроек напоминаний (`reminders_enabled`, `reminder_time`) в ответ пока не входят.
 - **Категория:** `id`, `name`, `created_at`.
 - **Материал (ContentOut):** `id`, `category_id`, `title`, `url`, `description`, `note`, `content_type`, `source`, `image_url`, `status`, `studied_at`, `created_at`, `updated_at`.
 

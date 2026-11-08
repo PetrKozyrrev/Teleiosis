@@ -6,14 +6,19 @@
 | Поле | Тип | Ограничения |
 |---|---|---|
 | id | BIGINT, identity | PK |
-| telegram_id | BIGINT | NOT NULL, UNIQUE |
+| telegram_id | BIGINT | NULL, UNIQUE (нужен только пользователям из Telegram, заморожено) |
 | username | TEXT | NULL |
+| email | TEXT | NULL, UNIQUE, CHECK email = lower(email), длина не больше 254 |
+| password_hash | TEXT | NULL, CHECK: хэш возможен только при заданном e-mail |
+| email_verified_at | TIMESTAMPTZ | NULL |
+| consent_at | TIMESTAMPTZ | NULL |
+| consent_version | TEXT | NULL, CHECK: consent_at и consent_version задаются парой |
 | timezone | TEXT | NOT NULL, по умолчанию 'UTC' |
 | reminders_enabled | BOOLEAN | NOT NULL, по умолчанию true |
 | reminder_time | TIME | NOT NULL, по умолчанию '09:00' |
 | created_at | TIMESTAMPTZ | NOT NULL, по умолчанию now() |
 
-Telegram ID превышает размер обычного INTEGER, поэтому тип BIGINT. Настройки напоминаний хранятся прямо в users (связь 1:1).
+Дополнительно CHECK (email IS NOT NULL OR telegram_id IS NOT NULL): у пользователя есть хотя бы один способ входа. Уникальность не мешает нескольким значениям NULL, поэтому пользователи без Telegram или без e-mail не конфликтуют. Приложение само приводит e-mail к нижнему регистру, а БД это проверяет. В хэше пароля лежит строка Argon2id целиком (соль внутри). Telegram ID превышает размер INTEGER, поэтому BIGINT. Настройки напоминаний хранятся в users (связь 1:1).
 
 ## categories
 | Поле | Тип | Ограничения |

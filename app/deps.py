@@ -47,6 +47,8 @@ def _bearer_token(header_value: str) -> str | None:
 def get_or_create_user(
     db: Session, telegram_id: int, username: str | None = None
 ) -> User:
+    """ТОЛЬКО для замороженных путей (бот и вход по Telegram initData).
+    Пользователей сайта (e-mail и пароль) создаёт отдельный код регистрации."""
     query = select(User).where(User.telegram_id == telegram_id)
     user = db.scalar(query)
     if user is None:

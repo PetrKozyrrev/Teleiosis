@@ -21,10 +21,34 @@ from app.db import Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "email IS NOT NULL OR telegram_id IS NOT NULL",
+            name="ck_users_login_method",
+        ),
+        CheckConstraint("email = lower(email)", name="ck_users_email_lower"),
+        CheckConstraint("char_length(email) <= 254", name="ck_users_email_len"),
+        CheckConstraint(
+            "password_hash IS NULL OR email IS NOT NULL",
+            name="ck_users_password_needs_email",
+        ),
+        CheckConstraint(
+            "(consent_at IS NULL) = (consent_version IS NULL)",
+            name="ck_users_consent_pair",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True)
+    # Нужен только пользователям, пришедшим из Telegram (бот заморожен)
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     username: Mapped[str | None] = mapped_column(Text)
+    # Вход на сайте. Адрес всегда в нижнем регистре (проверяет CHECK в БД)
+    email: Mapped[str | None] = mapped_column(Text, unique=True)
+    password_hash: Mapped[str | None] = mapped_column(Text)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Согласие на обработку персональных данных: когда и какая версия текста
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consent_version: Mapped[str | None] = mapped_column(Text)
     timezone: Mapped[str] = mapped_column(Text, server_default="UTC")
     reminders_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     reminder_time: Mapped[time] = mapped_column(Time, server_default=text("'09:00'"))
