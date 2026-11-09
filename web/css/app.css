@@ -226,3 +226,18 @@ dialog {
 }
 dialog::backdrop { background: rgba(59, 48, 43, 0.5); }
 .dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+
+/* ---------- навигация и категории ---------- */
+.topbar { flex-wrap: wrap; }
+.topnav { display: flex; gap: 16px; margin-right: auto; margin-left: 20px; }
+.topnav a[aria-current="page"] { color: var(--espresso); font-weight: 600; text-decoration-thickness: 2px; }
+@media (max-width: 640px) {
+  .topnav { order: 3; width: 100%; margin: 0; }
+}
+.category-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.category-main { min-width: 0; }
+.category-main .item-title,
+.category-main .hint { margin: 0; }
+.category-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.rename-form { display: flex; flex: 1; flex-wrap: wrap; gap: 8px; }
+.rename-form .input { flex: 1 1 200px; width: auto; }

@@ -2,17 +2,21 @@ import { api, ApiError } from "./api.js";
 import { SOURCE_LABELS, bindOpenTracking, formatDate, hostOf } from "./cards.js";
 import { initTopbar, redirectIfUnauthorized, requireUser } from "./session.js";
 import {
-  $, describeError, hideMessage, markReady, onSubmit, safeHttpUrl, showError, showInfo,
+  $, describeError, el, hideMessage, markReady, onSubmit, safeHttpUrl, showError, showInfo,
 } from "./ui.js";
 
 const id = new URLSearchParams(location.search).get("id") ?? "";
 const path = `/contents/${encodeURIComponent(id)}`;
 let item = null;
+let categoryList = [];
 let categories = new Map();
 
 const itemError = $("#item-error");
 const editError = $("#edit-error");
 const editInfo = $("#edit-info");
+const categoryError = $("#category-error");
+const categoryNote = $("#category-note");
+const categorySelect = $("#item-category");
 const titleInput = $("#edit-title");
 const noteInput = $("#edit-note");
 const statusButtons = [...document.querySelectorAll(".status-button")];
@@ -30,8 +34,7 @@ function render() {
   const href = item.url ? safeHttpUrl(item.url) : null;
   const category = item.category_id != null ? categories.get(item.category_id) : null;
   const parts = [SOURCE_LABELS[source], href && hostOf(href), category, `Добавлено ${formatDate(item.created_at)}`];
-  const meta = $("#item-meta");
-  meta.replaceChildren(
+  $("#item-meta").replaceChildren(
     ...parts.filter(Boolean).map((text) => {
       const span = document.createElement("span");
       span.textContent = text;
@@ -68,6 +71,14 @@ function fillForm() {
   noteInput.value = item.note ?? "";
 }
 
+function fillCategorySelect() {
+  categorySelect.replaceChildren(
+    el("option", { text: "Без категории", attrs: { value: "" } }),
+    ...categoryList.map((c) => el("option", { text: c.name, attrs: { value: String(c.id) } })),
+  );
+  categorySelect.value = item.category_id != null ? String(item.category_id) : "";
+}
+
 // Обновляет счётчики после открытия оригинала, не трогая поля формы
 async function refresh() {
   try {
@@ -80,10 +91,10 @@ async function refresh() {
 
 async function loadCategories() {
   try {
-    const list = await api("GET", "/categories");
-    categories = new Map(list.map((c) => [c.id, c.name]));
+    categoryList = await api("GET", "/categories");
+    categories = new Map(categoryList.map((c) => [c.id, c.name]));
   } catch {
-    // без названия категории страница работает
+    // без категорий страница работает
   }
 }
 
@@ -103,6 +114,39 @@ async function changeStatus(status) {
     showError(itemError, describeError(e));
   } finally {
     statusButtons.forEach((button) => (button.disabled = false));
+  }
+}
+
+async function changeCategory() {
+  hideMessage(categoryError);
+  categoryNote.textContent = "";
+  const value = categorySelect.value;
+  categorySelect.disabled = true;
+  try {
+    item = await api("PATCH", path, { category_id: value ? Number(value) : null });
+    render();
+    categoryNote.textContent = "Категория сохранена.";
+  } catch (e) {
+    if (redirectIfUnauthorized(e)) return;
+    if (e instanceof ApiError && e.status === 404) {
+      // 404 бывает и у материала, и у категории: проверяем материал
+      try {
+        item = await api("GET", path);
+      } catch (e2) {
+        if (e2 instanceof ApiError && e2.status === 404) {
+          showMissing();
+          return;
+        }
+      }
+      await loadCategories();
+      render();
+      showError(categoryError, "Такой категории больше нет. Список обновлён.");
+    } else {
+      showError(categoryError, describeError(e));
+    }
+    fillCategorySelect();
+  } finally {
+    categorySelect.disabled = false;
   }
 }
 
@@ -200,11 +244,13 @@ async function main() {
   await loadCategories();
   render();
   fillForm();
+  fillCategorySelect();
   $("#item").hidden = false;
 
   statusButtons.forEach((button) =>
     button.addEventListener("click", () => changeStatus(button.dataset.status)),
   );
+  categorySelect.addEventListener("change", changeCategory);
   setupEdit();
   setupDelete();
   bindOpenTracking(document.body, refresh);

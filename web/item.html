@@ -14,6 +14,10 @@
       <img src="img/icon.png" width="36" height="36" alt="">
       <span>Teleiosis</span>
     </a>
+    <nav class="topnav" aria-label="Разделы">
+      <a href="./">Библиотека</a>
+      <a href="categories.html">Категории</a>
+    </nav>
     <div class="topbar-user">
       <span class="user-email" id="user-email"></span>
       <button class="button-quiet" id="logout" type="button">Выйти</button>
@@ -40,6 +44,19 @@
           <button class="status-button" type="button" data-status="irrelevant" aria-pressed="false">Неактуально</button>
         </div>
         <p class="hint status-note" id="status-note" aria-live="polite"></p>
+      </section>
+
+      <section class="card section" aria-labelledby="category-title">
+        <h2 id="category-title">Категория</h2>
+        <p id="category-error" class="message message-error" role="alert" hidden></p>
+        <div class="field">
+          <label class="label" for="item-category">Категория материала</label>
+          <select class="input" id="item-category">
+            <option value="">Без категории</option>
+          </select>
+        </div>
+        <p class="hint" id="category-note" aria-live="polite"></p>
+        <p class="hint"><a href="categories.html">Управление категориями</a></p>
       </section>
 
       <section class="card section" aria-labelledby="edit-heading">

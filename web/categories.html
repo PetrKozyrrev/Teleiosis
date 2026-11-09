@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Категории — Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <header class="topbar">
+    <a class="topbar-brand" href="./">
+      <img src="img/icon.png" width="36" height="36" alt="">
+      <span>Teleiosis</span>
+    </a>
+    <nav class="topnav" aria-label="Разделы">
+      <a href="./">Библиотека</a>
+      <a href="categories.html" aria-current="page">Категории</a>
+    </nav>
+    <div class="topbar-user">
+      <span class="user-email" id="user-email"></span>
+      <button class="button-quiet" id="logout" type="button">Выйти</button>
+    </div>
+  </header>
+  <p id="error" class="message message-error" role="alert" hidden></p>
+  <p id="boot-error" class="message message-error" role="alert" hidden></p>
+  <main class="page" id="main" hidden>
+    <h1>Категории</h1>
+    <p class="lead">Категория это тема, по которой вы группируете материалы. У материала может быть одна категория.</p>
+
+    <section class="card section" aria-labelledby="new-heading">
+      <h2 id="new-heading">Новая категория</h2>
+      <p id="create-error" class="message message-error" role="alert" hidden></p>
+      <p id="create-info" class="message message-info" role="status" hidden></p>
+      <form id="create-form" method="post">
+        <div class="field">
+          <label class="label" for="new-name">Название</label>
+          <input class="input" id="new-name" name="name" type="text" maxlength="50" autocomplete="off" required>
+        </div>
+        <button class="button button-inline" type="submit">Создать категорию</button>
+      </form>
+    </section>
+
+    <section class="section" aria-labelledby="list-heading">
+      <h2 id="list-heading">Ваши категории</h2>
+      <p id="list-error" class="message message-error" role="alert" hidden></p>
+      <button class="button-quiet retry" id="retry" type="button" hidden>Повторить</button>
+      <p class="count" id="count" aria-live="polite"></p>
+      <ul class="items" id="categories"></ul>
+      <div class="empty" id="empty" hidden>
+        <h3>Категорий пока нет</h3>
+        <p>Создайте первую в форме выше.</p>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="delete-dialog" aria-labelledby="delete-heading">
+    <form method="dialog">
+      <h2 id="delete-heading">Удалить категорию?</h2>
+      <p id="delete-text"></p>
+      <div class="dialog-actions">
+        <button class="button-quiet" type="submit" value="cancel">Отмена</button>
+        <button class="button button-danger button-inline" type="submit" value="confirm">Удалить</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/boot.js"></script>
+  <script type="module" src="js/categories.js"></script>
+</body>
+</html>

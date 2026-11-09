@@ -9,8 +9,9 @@ async function main() {
   $("#main").hidden = false;
   markReady();
 
-  const library = createLibrary();
-  initQuickAdd({ onSaved: library.showNewest });
+  // library используется внутри обработчика после создания, поэтому порядок безопасен
+  const quickAdd = initQuickAdd({ onSaved: () => library.showNewest() });
+  const library = createLibrary({ onCategories: quickAdd.setCategories });
   await library.start();
 }
 

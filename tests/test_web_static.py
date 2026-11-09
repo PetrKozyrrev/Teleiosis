@@ -8,7 +8,10 @@ from typing import get_args
 from app.schemas import ContentSource, ContentStatus, SortOrder
 
 WEB = Path(__file__).resolve().parent.parent / "web"
-PAGES = ["index.html", "login.html", "register.html", "forgot.html", "reset.html", "item.html"]
+PAGES = [
+    "index.html", "login.html", "register.html", "forgot.html", "reset.html",
+    "item.html", "categories.html",
+]
 HTML_FILES = sorted(WEB.glob("*.html"))
 JS_FILES = sorted((WEB / "js").glob("*.js"))
 
@@ -127,14 +130,17 @@ def test_filters_and_labels_match_the_api():
     for value in get_args(ContentStatus) + get_args(ContentSource):
         assert re.search(rf"\b{value}:", cards), value
 
-@pytest.mark.parametrize("page", ["index.html", "item.html"])
+AUTH_PAGES = ["index.html", "item.html", "categories.html"]
+
+
+@pytest.mark.parametrize("page", AUTH_PAGES)
 def test_authenticated_pages_have_the_load_guard(page):
     html = (WEB / page).read_text(encoding="utf-8")
     assert 'src="js/boot.js"' in html
     assert 'id="boot-error"' in html
 
 
-@pytest.mark.parametrize("script", ["index.js", "item.js"])
+@pytest.mark.parametrize("script", ["index.js", "item.js", "categories.js"])
 def test_page_scripts_mark_themselves_ready(script):
     assert "markReady()" in (WEB / "js" / script).read_text(encoding="utf-8")
 
@@ -142,3 +148,20 @@ def test_page_scripts_mark_themselves_ready(script):
 @pytest.mark.parametrize("script", ["library.js", "item.js"])
 def test_pages_track_opening_of_the_original(script):
     assert "bindOpenTracking(" in (WEB / "js" / script).read_text(encoding="utf-8")
+
+@pytest.mark.parametrize("page", AUTH_PAGES)
+def test_authenticated_pages_have_navigation(page):
+    html = (WEB / page).read_text(encoding="utf-8")
+    assert 'class="topnav"' in html
+    assert 'href="categories.html"' in html
+    assert 'href="./"' in html
+
+
+def test_library_reads_the_category_from_the_address():
+    text = (WEB / "js" / "library.js").read_text(encoding="utf-8")
+    assert 'get("category")' in text
+
+
+def test_category_links_match_what_the_library_reads():
+    text = (WEB / "js" / "categories.js").read_text(encoding="utf-8")
+    assert "./?category=" in text

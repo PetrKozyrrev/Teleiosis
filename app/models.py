@@ -68,7 +68,9 @@ class User(Base):
 class Category(Base):
     __tablename__ = "categories"
     __table_args__ = (
-        UniqueConstraint("user_id", "name", name="uq_categories_user_name"),
+        # Названия уникальны без учёта регистра: «Бизнес» и «бизнес» это одна категория.
+        # Выражение задано через text(): так alembic check не даёт ложных расхождений.
+        Index("uq_categories_user_lower_name", "user_id", text("lower(name)"), unique=True),
         CheckConstraint(
             "char_length(name) BETWEEN 1 AND 50", name="ck_categories_name_len"
         ),

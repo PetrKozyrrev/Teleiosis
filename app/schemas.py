@@ -45,6 +45,7 @@ class CategoryOut(BaseModel):
     id: int
     name: str
     created_at: datetime
+    contents_count: int
 
 
 class ContentCreate(BaseModel):

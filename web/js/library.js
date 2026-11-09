@@ -6,7 +6,8 @@ import { $, describeError, el, hideMessage, showError } from "./ui.js";
 const PAGE_SIZE = 20;
 const SEARCH_DELAY_MS = 300;
 
-export function createLibrary() {
+// onCategories: вызывается со списком категорий, когда он загружен (для формы добавления)
+export function createLibrary({ onCategories } = {}) {
   const controls = {
     q: $("#filter-q"),
     status: $("#filter-status"),
@@ -109,8 +110,18 @@ export function createLibrary() {
       for (const c of categories) {
         controls.category.append(el("option", { text: c.name, attrs: { value: String(c.id) } }));
       }
-    } catch {
+      onCategories?.(categories);
+    } catch (e) {
+      redirectIfUnauthorized(e);
       // фильтр категорий останется с двумя пунктами, библиотека работает
+    }
+  }
+
+  // Ссылка со страницы категорий: ./?category=ID
+  function applyCategoryFromAddress() {
+    const wanted = new URLSearchParams(location.search).get("category");
+    if (wanted && /^\d+$/.test(wanted)) {
+      controls.category.value = wanted; // если такой категории нет, останется «Все»
     }
   }
 
@@ -141,6 +152,7 @@ export function createLibrary() {
   return {
     async start() {
       await loadCategories();
+      applyCategoryFromAddress();
       await load(true);
     },
     // После сохранения: фильтры сбрасываются, чтобы новый материал был виден

@@ -1,11 +1,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.deps import CurrentUser, DbSession
-from app.models import Category
+from app.models import Category, Content
 from app.schemas import MAX_BIGINT, CategoryCreate, CategoryOut, CategoryUpdate
 
 router = APIRouter(prefix="/categories", tags=["categories"])
@@ -36,13 +36,34 @@ def commit_or_conflict(db: DbSession) -> None:
         )
 
 
+def counts_for(db: DbSession, user: CurrentUser, category_ids: list[int]) -> dict[int, int]:
+    """Сколько материалов текущего пользователя в каждой категории (одним запросом)."""
+    if not category_ids:
+        return {}
+    rows = db.execute(
+        select(Content.category_id, func.count())
+        .where(Content.user_id == user.id, Content.category_id.in_(category_ids))
+        .group_by(Content.category_id)
+    ).all()
+    return {row[0]: row[1] for row in rows}
+
+
+def to_out(category: Category, counts: dict[int, int]) -> dict:
+    return {
+        "id": category.id,
+        "name": category.name,
+        "created_at": category.created_at,
+        "contents_count": counts.get(category.id, 0),
+    }
+
+
 @router.post("", response_model=CategoryOut, status_code=status.HTTP_201_CREATED)
 def create_category(data: CategoryCreate, db: DbSession, user: CurrentUser):
     category = Category(user_id=user.id, name=data.name)
     db.add(category)
     commit_or_conflict(db)
     db.refresh(category)
-    return category
+    return to_out(category, {})  # новая категория пуста
 
 
 @router.get("", response_model=list[CategoryOut])
@@ -52,7 +73,9 @@ def list_categories(db: DbSession, user: CurrentUser):
         .where(Category.user_id == user.id)
         .order_by(Category.name, Category.id)
     )
-    return db.scalars(query).all()
+    categories = db.scalars(query).all()
+    counts = counts_for(db, user, [c.id for c in categories])
+    return [to_out(c, counts) for c in categories]
 
 
 @router.patch("/{category_id}", response_model=CategoryOut)
@@ -63,7 +86,7 @@ def rename_category(
     category.name = data.name
     commit_or_conflict(db)
     db.refresh(category)
-    return category
+    return to_out(category, counts_for(db, user, [category.id]))
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { redirectIfUnauthorized } from "./session.js";
-import { $, describeError, hideMessage, onSubmit, showError, showInfo } from "./ui.js";
+import { $, describeError, el, hideMessage, onSubmit, showError, showInfo } from "./ui.js";
 
 // Адрес с http(s):// или вида example.com/путь (латиница, без пробелов)
 const URL_PATTERN = /^(?:https?:\/\/\S+|(?:[\w-]+\.)+[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?)$/i;
@@ -19,6 +19,7 @@ export function parseInput(text) {
 export function initQuickAdd({ onSaved }) {
   const form = $("#add-form");
   const input = $("#add-input");
+  const select = $("#add-category");
   const error = $("#add-error");
   const info = $("#add-info");
 
@@ -37,6 +38,7 @@ export function initQuickAdd({ onSaved }) {
       return;
     }
     const body = parseInput(input.value);
+    if (select.value) body.category_id = Number(select.value);
     if (body.url) {
       showInfo(info, "Сохраняю и загружаю название страницы. Это может занять несколько секунд.");
     }
@@ -51,6 +53,7 @@ export function initQuickAdd({ onSaved }) {
       showError(
         error,
         describeError(e, {
+          404: "Выбранной категории больше нет. Обновите страницу.",
           409: "Эта ссылка уже есть в вашей библиотеке.",
           422: body.url
             ? "Не получилось сохранить: ссылка выглядит некорректно. Проверьте адрес."
@@ -59,4 +62,16 @@ export function initQuickAdd({ onSaved }) {
       );
     }
   });
+
+  return {
+    // Заполняет список категорий в форме, сохраняя выбор, если он ещё возможен
+    setCategories(categories) {
+      const current = select.value;
+      select.replaceChildren(
+        el("option", { text: "Без категории", attrs: { value: "" } }),
+        ...categories.map((c) => el("option", { text: c.name, attrs: { value: String(c.id) } })),
+      );
+      select.value = current;
+    },
+  };
 }

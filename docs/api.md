@@ -53,7 +53,7 @@
 
 ## Поля ответов
 - **Пользователь (UserOut):** `id`, `telegram_id` (для пользователей сайта `null`), `email` (для пользователей из Telegram `null`), `username`, `timezone`. Поля настроек напоминаний (`reminders_enabled`, `reminder_time`) в ответ пока не входят.
-- **Категория:** `id`, `name`, `created_at`.
+- **Категория:** id, name, created_at, contents_count (сколько материалов пользователя в категории).
 - **Материал (ContentOut):** `id`, `category_id`, `title`, `url`, `description`, `note`, `content_type`, `source`, `image_url`, `status`, `studied_at`, `created_at`, `updated_at`.
 
 ## POST /contents
