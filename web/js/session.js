@@ -1,4 +1,5 @@
 import { api, ApiError } from "./api.js";
+import { $, describeError, showError } from "./ui.js";
 
 // Текущий пользователь или null, если вход не выполнен
 export async function currentUser() {
@@ -29,7 +30,6 @@ export async function redirectIfSignedIn() {
   }
 }
 
-
 // Если сессия кончилась (401), отправляет на вход и возвращает true
 export function redirectIfUnauthorized(error) {
   if (error instanceof ApiError && error.status === 401) {
@@ -37,4 +37,17 @@ export function redirectIfUnauthorized(error) {
     return true;
   }
   return false;
+}
+
+// Шапка страниц после входа: e-mail пользователя и кнопка «Выйти»
+export function initTopbar(user) {
+  $("#user-email").textContent = user.email ?? user.username ?? "";
+  $("#logout").addEventListener("click", async () => {
+    try {
+      await api("POST", "/auth/logout");
+      location.replace("login.html");
+    } catch (error) {
+      showError($("#error"), describeError(error));
+    }
+  });
 }

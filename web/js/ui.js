@@ -18,6 +18,13 @@ export function hideMessage(element) {
   element.hidden = true;
 }
 
+// Страница сообщает, что её скрипт запустился: сообщение стража загрузки скрывается
+export function markReady() {
+  document.documentElement.dataset.ready = "1";
+  const box = document.getElementById("boot-error");
+  if (box) box.hidden = true;
+}
+
 function formatWait(seconds) {
   if (!seconds) return "позже";
   const minutes = Math.ceil(seconds / 60);

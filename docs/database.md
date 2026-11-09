@@ -46,13 +46,17 @@
 | image_url | TEXT | NULL |
 | status | TEXT | NOT NULL, по умолчанию 'unseen', CHECK |
 | studied_at | TIMESTAMPTZ | NULL |
+| last_opened_at | TIMESTAMPTZ | NULL (когда последний раз открывали исходную ссылку) |
+| open_count | INTEGER | NOT NULL, по умолчанию 0, CHECK open_count >= 0 |
 | created_at | TIMESTAMPTZ | NOT NULL, now() |
 | updated_at | TIMESTAMPTZ | NOT NULL, now() |
+
 
 Ограничения:
 - CHECK (status IN ('unseen','planned','studied','irrelevant')).
 - UNIQUE (user_id, url_normalized): защита от дублей (для заметок url_normalized равен NULL, они не конфликтуют).
 - CHECK (url IS NOT NULL OR note IS NOT NULL): материал без ссылки обязан иметь текст.
+- CHECK (open_count >= 0).
 
 Значения content_type (video, article, post, note, other) и source (youtube, telegram, web, other) хранятся как текст без CHECK: новые источники будут добавляться, а менять ограничение при каждом новом источнике неудобно. Допустимые значения проверяет код.
 

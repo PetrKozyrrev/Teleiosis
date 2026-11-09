@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { renderItem } from "./cards.js";
+import { bindOpenTracking, renderItem } from "./cards.js";
 import { redirectIfUnauthorized } from "./session.js";
 import { $, describeError, el, hideMessage, showError } from "./ui.js";
 
@@ -122,6 +122,7 @@ export function createLibrary() {
     controls.sort.value = "newest";
   }
 
+  bindOpenTracking(list);
   $("#filters").addEventListener("submit", (event) => event.preventDefault());
   controls.q.addEventListener("input", () => {
     clearTimeout(timer);

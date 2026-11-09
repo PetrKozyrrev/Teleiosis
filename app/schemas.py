@@ -88,6 +88,8 @@ class ContentOut(BaseModel):
     studied_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    last_opened_at: datetime | None
+    open_count: int
 
 class ContentPage(BaseModel):
     items: list[ContentOut]

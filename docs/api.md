@@ -41,7 +41,7 @@
 | POST /contents | Сохранить материал `{url?, note?, title?, category_id?}`; нужен url или note | 201, 401, 404 чужая категория, 409 дубль, 422 |
 | GET /contents | Список материалов (параметры ниже) | 200, 401, 422 |
 | GET /contents/{id} | Один материал | 200, 401, 404, 422 |
-| PATCH /contents/{id} | Изменить только `title`, `note`, `status`, `category_id` | 200, 401, 404, 422 |
+| PATCH /contents/{id} | Изменить только `title`, `note`, `status`, `category_id`. Поля last_opened_at и open_count изменить нельзя (422). | 200, 401, 404, 422 |
 | DELETE /contents/{id} | Удалить материал (напоминания удаляются каскадом) | 204, 401, 404, 422 |
 | POST /auth/telegram | Заморожен. Обмен initData на токен сессии: `{init_data}` → `{token, token_type, expires_at, user}`; ответ с `Cache-Control: no-store` | 200, 401 любая ошибка проверки, 422, 503 |
 | POST /auth/register | Регистрация на сайте: `{email, password, consent}` → 201 `UserOut`, сразу открывает сессию (cookie) | 201, 403, 409 e-mail занят, 422 |
@@ -49,6 +49,7 @@
 | POST /auth/logout | Выход: удаляет сессию и cookie, всегда 204 | 204, 403 |
 | POST /auth/password-reset/request | Запрос сброса: `{email}` → 202, ответ всегда одинаковый. Если аккаунт есть, на почту уходит ссылка (токен во фрагменте `#token=`, действует 1 час, один раз) | 202, 403, 422, 429 |
 | POST /auth/password-reset/confirm | `{token, password}` → 204: пароль заменён, e-mail подтверждён, все сессии пользователя закрыты, cookie удалена. Автоматического входа нет | 204, 400, 403, 422 |
+| POST /contents/{id}/open | Фиксирует открытие исходной ссылки (счётчик +1, время последнего открытия); `updated_at` и статус не меняются | 204, 401, 404, 422 |
 
 ## Поля ответов
 - **Пользователь (UserOut):** `id`, `telegram_id` (для пользователей сайта `null`), `email` (для пользователей из Telegram `null`), `username`, `timezone`. Поля настроек напоминаний (`reminders_enabled`, `reminder_time`) в ответ пока не входят.

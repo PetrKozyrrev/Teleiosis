@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Query, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.deps import CurrentUser, DbSession
@@ -209,5 +209,25 @@ def update_content(
 def delete_content(content_id: ContentId, db: DbSession, user: CurrentUser):
     content = get_own_content(db, user, content_id)
     db.delete(content)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.post("/{content_id}/open", status_code=status.HTTP_204_NO_CONTENT)
+def record_open(content_id: ContentId, db: DbSession, user: CurrentUser):
+    """Фиксирует открытие исходной ссылки (для метрики «доля материалов, к которым
+    вернулись»). Счётчик растёт одной командой БД; updated_at не меняется, поэтому
+    его значение задано явно (иначе сработал бы onupdate)."""
+    result = db.execute(
+        update(Content)
+        .where(Content.id == content_id, Content.user_id == user.id)
+        .values(
+            open_count=Content.open_count + 1,
+            last_opened_at=func.now(),
+            updated_at=Content.updated_at,
+        )
+    )
+    if result.rowcount == 0:
+        # Чужой и несуществующий материал выглядят одинаково
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Content not found")
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

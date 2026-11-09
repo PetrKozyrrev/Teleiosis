@@ -189,3 +189,40 @@ textarea.input { resize: vertical; }
 .item-note { margin: 0; padding-left: 10px; border-left: 3px solid var(--beach); overflow-wrap: anywhere; white-space: pre-line; }
 .empty h3 { margin: 0 0 8px; font-size: 1.125rem; }
 .more { display: block; margin: 16px auto 0; }
+
+/* ---------- карточка материала ---------- */
+.button { text-decoration: none; }
+.button-danger { background: var(--error); }
+.button-danger:hover { background: #7E2222; }
+.button-danger-quiet { color: var(--error); border-color: var(--error); }
+.section { margin-top: 20px; }
+.item-heading { overflow-wrap: anywhere; }
+.item-description { overflow-wrap: anywhere; }
+.item-links { margin: 8px 0 0; font-size: 0.9375rem; }
+.status-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.status-button {
+  min-height: 44px;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--espresso);
+  background: transparent;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.status-button[aria-pressed="true"] { color: var(--surface); background: var(--olive); border-color: var(--olive); }
+.status-button:disabled { opacity: 0.6; cursor: not-allowed; }
+.status-note { margin-top: 10px; min-height: 1.4em; }
+
+dialog {
+  width: calc(100% - 32px);
+  max-width: 420px;
+  padding: 24px;
+  color: var(--espresso);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+dialog::backdrop { background: rgba(59, 48, 43, 0.5); }
+.dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 16px; }

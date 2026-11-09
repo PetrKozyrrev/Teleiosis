@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Материал — Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <header class="topbar">
+    <a class="topbar-brand" href="./">
+      <img src="img/icon.png" width="36" height="36" alt="">
+      <span>Teleiosis</span>
+    </a>
+    <div class="topbar-user">
+      <span class="user-email" id="user-email"></span>
+      <button class="button-quiet" id="logout" type="button">Выйти</button>
+    </div>
+  </header>
+  <p id="error" class="message message-error" role="alert" hidden></p>
+  <p id="boot-error" class="message message-error" role="alert" hidden></p>
+  <main class="page" id="main" hidden>
+    <p><a href="./">Назад в библиотеку</a></p>
+    <p id="missing" class="message message-error" role="alert" hidden></p>
+    <article id="item" hidden>
+      <h1 class="item-heading" id="item-title"></h1>
+      <div class="item-meta" id="item-meta"></div>
+      <p id="item-error" class="message message-error" role="alert" hidden></p>
+      <p><a class="button button-inline" id="item-link" target="_blank" rel="noopener noreferrer" hidden>Открыть оригинал</a></p>
+      <p class="item-description" id="item-description" hidden></p>
+
+      <section class="card section" aria-labelledby="status-title">
+        <h2 id="status-title">Статус</h2>
+        <div class="status-group" role="group" aria-labelledby="status-title">
+          <button class="status-button" type="button" data-status="unseen" aria-pressed="false">Не просмотрено</button>
+          <button class="status-button" type="button" data-status="planned" aria-pressed="false">Запланировано</button>
+          <button class="status-button" type="button" data-status="studied" aria-pressed="false">Изучено</button>
+          <button class="status-button" type="button" data-status="irrelevant" aria-pressed="false">Неактуально</button>
+        </div>
+        <p class="hint status-note" id="status-note" aria-live="polite"></p>
+      </section>
+
+      <section class="card section" aria-labelledby="edit-heading">
+        <h2 id="edit-heading">Правка</h2>
+        <p id="edit-error" class="message message-error" role="alert" hidden></p>
+        <p id="edit-info" class="message message-info" role="status" hidden></p>
+        <form id="edit-form" method="post">
+          <div class="field">
+            <label class="label" for="edit-title">Название</label>
+            <input class="input" id="edit-title" name="title" type="text" maxlength="300" required>
+          </div>
+          <div class="field">
+            <label class="label" for="edit-note">Заметка</label>
+            <textarea class="input" id="edit-note" name="note" rows="5" maxlength="10000"></textarea>
+          </div>
+          <button class="button button-inline" type="submit">Сохранить изменения</button>
+        </form>
+      </section>
+
+      <section class="section">
+        <p class="hint" id="opens"></p>
+        <button class="button-quiet button-danger-quiet" id="delete" type="button">Удалить материал</button>
+      </section>
+    </article>
+  </main>
+
+  <dialog id="delete-dialog" aria-labelledby="delete-heading">
+    <form method="dialog">
+      <h2 id="delete-heading">Удалить материал?</h2>
+      <p id="delete-text"></p>
+      <div class="dialog-actions">
+        <button class="button-quiet" type="submit" value="cancel">Отмена</button>
+        <button class="button button-danger button-inline" type="submit" value="confirm">Удалить</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/boot.js"></script>
+  <script type="module" src="js/item.js"></script>
+</body>
+</html>

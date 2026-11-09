@@ -8,7 +8,7 @@ from typing import get_args
 from app.schemas import ContentSource, ContentStatus, SortOrder
 
 WEB = Path(__file__).resolve().parent.parent / "web"
-PAGES = ["index.html", "login.html", "register.html", "forgot.html", "reset.html"]
+PAGES = ["index.html", "login.html", "register.html", "forgot.html", "reset.html", "item.html"]
 HTML_FILES = sorted(WEB.glob("*.html"))
 JS_FILES = sorted((WEB / "js").glob("*.js"))
 
@@ -96,10 +96,10 @@ def test_no_inline_code_that_csp_would_block(page):
 
 
 @pytest.mark.parametrize("page", HTML_FILES, ids=lambda p: p.name)
-def test_forms_post_so_passwords_never_reach_the_address_bar(page):
-    html = page.read_text(encoding="utf-8")
+def test_forms_never_submit_passwords_to_the_address_bar(page):
+    html = (WEB / page.name).read_text(encoding="utf-8")
     for form in re.findall(r"<form\b[^>]*>", html):
-        assert 'method="post"' in form
+        assert 'method="post"' in form or 'method="dialog"' in form
 
 
 @pytest.mark.parametrize("script", JS_FILES, ids=lambda p: p.name)
@@ -126,3 +126,19 @@ def test_filters_and_labels_match_the_api():
         assert f'value="{value}"' in html, value
     for value in get_args(ContentStatus) + get_args(ContentSource):
         assert re.search(rf"\b{value}:", cards), value
+
+@pytest.mark.parametrize("page", ["index.html", "item.html"])
+def test_authenticated_pages_have_the_load_guard(page):
+    html = (WEB / page).read_text(encoding="utf-8")
+    assert 'src="js/boot.js"' in html
+    assert 'id="boot-error"' in html
+
+
+@pytest.mark.parametrize("script", ["index.js", "item.js"])
+def test_page_scripts_mark_themselves_ready(script):
+    assert "markReady()" in (WEB / "js" / script).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("script", ["library.js", "item.js"])
+def test_pages_track_opening_of_the_original(script):
+    assert "bindOpenTracking(" in (WEB / "js" / script).read_text(encoding="utf-8")
