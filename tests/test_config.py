@@ -69,3 +69,13 @@ def test_smtp_backend_needs_host_and_sender():
 
 def test_default_email_backend_is_console():
     assert make().email_backend == "console"
+
+def test_validation_error_does_not_leak_secrets():
+    with pytest.raises(ValidationError) as exc:
+        Settings(
+            _env_file=None,
+            database_url="postgresql+psycopg://u:SECRET-PASS@localhost/db",
+            app_env="prod",
+            cookie_secure=False,
+        )
+    assert "SECRET-PASS" not in str(exc.value)

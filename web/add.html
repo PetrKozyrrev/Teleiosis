@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Сохранить в Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <header class="topbar">
+    <a class="topbar-brand" href="./">
+      <img src="img/icon.png" width="36" height="36" alt="">
+      <span>Teleiosis</span>
+    </a>
+  </header>
+  <p id="error" class="message message-error" role="alert" hidden></p>
+  <p id="boot-error" class="message message-error" role="alert" hidden></p>
+  <main class="page page-narrow" id="main" hidden>
+    <h1>Сохранить в библиотеку</h1>
+    <p id="add-error" class="message message-error" role="alert" hidden></p>
+    <p id="add-info" class="message message-info" role="status" hidden></p>
+    <form id="add-form" class="card" method="post">
+      <div class="field">
+        <label class="label" for="add-url">Ссылка</label>
+        <input class="input" id="add-url" name="url" type="text" inputmode="url" autocapitalize="none" spellcheck="false" autocomplete="off" maxlength="2048" required>
+      </div>
+      <div class="field">
+        <label class="label" for="add-title">Название</label>
+        <input class="input" id="add-title" name="title" type="text" maxlength="300" autocomplete="off" aria-describedby="title-hint">
+        <p class="hint" id="title-hint">Можно оставить пустым: название попробуем загрузить со страницы.</p>
+      </div>
+      <div class="field">
+        <label class="label" for="add-note">Заметка</label>
+        <textarea class="input" id="add-note" name="note" rows="3" maxlength="10000"></textarea>
+      </div>
+      <div class="field">
+        <label class="label" for="add-category">Категория</label>
+        <select class="input" id="add-category">
+          <option value="">Без категории</option>
+        </select>
+      </div>
+      <button class="button" type="submit">Сохранить</button>
+    </form>
+    <div id="done" hidden>
+      <p class="actions-row">
+        <a class="button button-inline" id="open-saved" href="./">Открыть материал</a>
+        <a href="./">В библиотеку</a>
+        <button class="button-quiet" id="close-window" type="button">Закрыть окно</button>
+      </p>
+      <p class="hint" id="close-hint" hidden>Если окно не закрылось, закройте вкладку вручную.</p>
+    </div>
+  </main>
+  <script src="js/boot.js"></script>
+  <script type="module" src="js/add.js"></script>
+</body>
+</html>

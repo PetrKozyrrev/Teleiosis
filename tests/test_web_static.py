@@ -10,7 +10,7 @@ from app.schemas import ContentSource, ContentStatus, SortOrder
 WEB = Path(__file__).resolve().parent.parent / "web"
 PAGES = [
     "index.html", "login.html", "register.html", "forgot.html", "reset.html",
-    "item.html", "categories.html",
+    "item.html", "categories.html", "add.html", "bookmark.html",
 ]
 HTML_FILES = sorted(WEB.glob("*.html"))
 JS_FILES = sorted((WEB / "js").glob("*.js"))
@@ -130,7 +130,8 @@ def test_filters_and_labels_match_the_api():
     for value in get_args(ContentStatus) + get_args(ContentSource):
         assert re.search(rf"\b{value}:", cards), value
 
-AUTH_PAGES = ["index.html", "item.html", "categories.html"]
+AUTH_PAGES = ["index.html", "item.html", "categories.html", "add.html", "bookmark.html"]
+NAV_PAGES = ["index.html", "item.html", "categories.html", "bookmark.html"]
 
 
 @pytest.mark.parametrize("page", AUTH_PAGES)
@@ -140,7 +141,7 @@ def test_authenticated_pages_have_the_load_guard(page):
     assert 'id="boot-error"' in html
 
 
-@pytest.mark.parametrize("script", ["index.js", "item.js", "categories.js"])
+@pytest.mark.parametrize("script", ["index.js", "item.js", "categories.js", "add.js", "bookmark.js"])
 def test_page_scripts_mark_themselves_ready(script):
     assert "markReady()" in (WEB / "js" / script).read_text(encoding="utf-8")
 
@@ -149,7 +150,7 @@ def test_page_scripts_mark_themselves_ready(script):
 def test_pages_track_opening_of_the_original(script):
     assert "bindOpenTracking(" in (WEB / "js" / script).read_text(encoding="utf-8")
 
-@pytest.mark.parametrize("page", AUTH_PAGES)
+@pytest.mark.parametrize("page", NAV_PAGES)
 def test_authenticated_pages_have_navigation(page):
     html = (WEB / page).read_text(encoding="utf-8")
     assert 'class="topnav"' in html
@@ -165,3 +166,21 @@ def test_library_reads_the_category_from_the_address():
 def test_category_links_match_what_the_library_reads():
     text = (WEB / "js" / "categories.js").read_text(encoding="utf-8")
     assert "./?category=" in text
+
+def test_library_links_to_the_bookmark_page():
+    assert 'href="bookmark.html"' in (WEB / "index.html").read_text(encoding="utf-8")
+
+
+def test_bookmarklet_opens_the_add_page_safely():
+    bookmark = (WEB / "js" / "bookmark.js").read_text(encoding="utf-8")
+    assert "/app/add.html" in bookmark
+    assert "#url=" in bookmark
+    assert "noopener" in bookmark
+
+
+def test_add_page_reads_the_fragment_and_never_saves_by_itself():
+    add = (WEB / "js" / "add.js").read_text(encoding="utf-8")
+    assert "location.hash" in add
+    assert "location.search" not in add
+    assert "requestSubmit" not in add
+    assert ".submit()" not in add

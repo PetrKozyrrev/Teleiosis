@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Закладка для быстрого сохранения — Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <header class="topbar">
+    <a class="topbar-brand" href="./">
+      <img src="img/icon.png" width="36" height="36" alt="">
+      <span>Teleiosis</span>
+    </a>
+    <nav class="topnav" aria-label="Разделы">
+      <a href="./">Библиотека</a>
+      <a href="categories.html">Категории</a>
+    </nav>
+    <div class="topbar-user">
+      <span class="user-email" id="user-email"></span>
+      <button class="button-quiet" id="logout" type="button">Выйти</button>
+    </div>
+  </header>
+  <p id="error" class="message message-error" role="alert" hidden></p>
+  <p id="boot-error" class="message message-error" role="alert" hidden></p>
+  <main class="page page-narrow" id="main" hidden>
+    <h1>Закладка для быстрого сохранения</h1>
+    <p class="lead">Находясь на любой странице, нажмите закладку: откроется небольшое окно Teleiosis с готовой ссылкой и названием. Останется нажать «Сохранить».</p>
+    <p id="info" class="message message-info" role="status" hidden></p>
+    <ol class="steps">
+      <li>Покажите панель закладок браузера: в Chrome, Edge и Firefox это Ctrl+Shift+B.</li>
+      <li>Перетащите кнопку ниже на панель закладок.</li>
+      <li>Откройте любую страницу и нажмите новую закладку.</li>
+    </ol>
+    <p><a class="button button-inline" id="bookmarklet" href="bookmark.html">Сохранить в Teleiosis</a></p>
+    <h2>Ограничения</h2>
+    <ul class="steps">
+      <li>Закладка рассчитана на компьютер. На телефоне проще вставить ссылку в библиотеку: приём через «Поделиться» появится в мобильных приложениях.</li>
+      <li>Некоторые сайты со строгой политикой безопасности могут блокировать закладки. Тогда скопируйте ссылку и вставьте её в библиотеку.</li>
+      <li>Закладка привязана к адресу, с которого вы открыли эту страницу. Если адрес сайта изменится, установите её заново.</li>
+    </ul>
+  </main>
+  <script src="js/boot.js"></script>
+  <script type="module" src="js/bookmark.js"></script>
+</body>
+</html>

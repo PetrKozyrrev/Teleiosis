@@ -6,7 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # hide_input_in_errors: при ошибке настроек в сообщение не попадают значения
+    # (пароль БД, токены, пароль почты)
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", hide_input_in_errors=True
+    )
 
     database_url: str
     bot_token: str = ""
