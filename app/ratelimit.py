@@ -40,6 +40,8 @@ RESET_IP = Rule("reset_ip", 10, timedelta(hours=1))
 VERIFY_USER = Rule("verify_user", 3, timedelta(hours=1))
 VERIFY_IP = Rule("verify_ip", 10, timedelta(hours=1))
 
+PASSWORD_USER = Rule("password_user", 5, timedelta(minutes=15))
+
 
 def client_ip(request: Request) -> str:
     """Адрес клиента для счётчиков. IPv6 сводится к сети /64.

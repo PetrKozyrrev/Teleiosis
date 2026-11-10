@@ -11,6 +11,7 @@ WEB = Path(__file__).resolve().parent.parent / "web"
 PAGES = [
     "index.html", "login.html", "register.html", "forgot.html", "reset.html",
     "item.html", "categories.html", "add.html", "bookmark.html", "verify.html",
+    "settings.html",
 ]
 HTML_FILES = sorted(WEB.glob("*.html"))
 JS_FILES = sorted((WEB / "js").glob("*.js"))
@@ -130,8 +131,8 @@ def test_filters_and_labels_match_the_api():
     for value in get_args(ContentStatus) + get_args(ContentSource):
         assert re.search(rf"\b{value}:", cards), value
 
-AUTH_PAGES = ["index.html", "item.html", "categories.html", "add.html", "bookmark.html"]
-NAV_PAGES = ["index.html", "item.html", "categories.html", "bookmark.html"]
+AUTH_PAGES = ["index.html", "item.html", "categories.html", "add.html", "bookmark.html", "settings.html"]
+NAV_PAGES = ["index.html", "item.html", "categories.html", "bookmark.html", "settings.html"]
 
 
 @pytest.mark.parametrize("page", AUTH_PAGES)
@@ -141,7 +142,7 @@ def test_authenticated_pages_have_the_load_guard(page):
     assert 'id="boot-error"' in html
 
 
-@pytest.mark.parametrize("script", ["index.js", "item.js", "categories.js", "add.js", "bookmark.js"])
+@pytest.mark.parametrize("script", ["index.js", "item.js", "categories.js", "add.js", "bookmark.js", "settings.js"])
 def test_page_scripts_mark_themselves_ready(script):
     assert "markReady()" in (WEB / "js" / script).read_text(encoding="utf-8")
 
@@ -156,6 +157,7 @@ def test_authenticated_pages_have_navigation(page):
     assert 'class="topnav"' in html
     assert 'href="categories.html"' in html
     assert 'href="./"' in html
+    assert 'href="settings.html"' in html
 
 
 def test_library_reads_the_category_from_the_address():
@@ -198,3 +200,19 @@ def test_verify_page_confirms_by_post_and_hides_the_token():
 def test_topbar_offers_to_verify_the_email():
     text = (WEB / "js" / "session.js").read_text(encoding="utf-8")
     assert "/auth/email-verification/request" in text
+
+from app.timezones import is_valid_timezone
+
+
+def test_settings_zone_list_has_only_zones_the_server_accepts():
+    text = (WEB / "js" / "settings.js").read_text(encoding="utf-8")
+    zones = re.findall(r'\["([A-Za-z_]+(?:/[A-Za-z_]+)?)",', text)
+    assert len(zones) >= 10
+    for zone in zones:
+        assert is_valid_timezone(zone), zone
+
+
+def test_settings_page_talks_to_the_right_endpoints():
+    text = (WEB / "js" / "settings.js").read_text(encoding="utf-8")
+    assert '"/me/settings"' in text
+    assert '"/auth/change-password"' in text

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Настройки — Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <header class="topbar">
+    <a class="topbar-brand" href="./">
+      <img src="img/icon.png" width="36" height="36" alt="">
+      <span>Teleiosis</span>
+    </a>
+    <nav class="topnav" aria-label="Разделы">
+      <a href="./">Библиотека</a>
+      <a href="categories.html">Категории</a>
+      <a href="settings.html" aria-current="page">Настройки</a>
+    </nav>
+    <div class="topbar-user">
+      <span class="user-email" id="user-email"></span>
+      <button class="button-quiet" id="logout" type="button">Выйти</button>
+    </div>
+  </header>
+  <p id="error" class="message message-error" role="alert" hidden></p>
+  <p id="boot-error" class="message message-error" role="alert" hidden></p>
+  <main class="page page-narrow" id="main" hidden>
+    <h1>Настройки</h1>
+
+    <section class="card section" aria-labelledby="reminders-heading">
+      <h2 id="reminders-heading">Напоминания</h2>
+      <p id="settings-error" class="message message-error" role="alert" hidden></p>
+      <p id="settings-info" class="message message-info" role="status" hidden></p>
+      <form id="settings-form" method="post">
+        <div class="check">
+          <input id="reminders-enabled" name="reminders_enabled" type="checkbox">
+          <label for="reminders-enabled">Присылать ежедневную подборку материалов на e-mail</label>
+        </div>
+        <div class="field">
+          <label class="label" for="reminder-time">Время подборки</label>
+          <input class="input" id="reminder-time" name="reminder_time" type="time" required>
+        </div>
+        <div class="field">
+          <label class="label" for="timezone">Часовой пояс</label>
+          <select class="input" id="timezone" name="timezone"></select>
+          <p class="hint">Время подборки считается по этому поясу.</p>
+          <p><button class="button-quiet" id="detect-timezone" type="button">Определить по браузеру</button></p>
+        </div>
+        <button class="button button-inline" type="submit">Сохранить</button>
+      </form>
+    </section>
+
+    <section class="card section" aria-labelledby="email-heading">
+      <h2 id="email-heading">Адрес e-mail</h2>
+      <p id="email-status"></p>
+      <p class="hint" id="email-hint"></p>
+    </section>
+
+    <section class="card section" aria-labelledby="password-heading">
+      <h2 id="password-heading">Смена пароля</h2>
+      <p id="password-error" class="message message-error" role="alert" hidden></p>
+      <p id="password-info" class="message message-info" role="status" hidden></p>
+      <form id="password-form" method="post">
+        <div class="field">
+          <label class="label" for="current-password">Текущий пароль</label>
+          <div class="password-row">
+            <input class="input" id="current-password" name="current_password" type="password" autocomplete="current-password" required>
+            <button class="button-quiet" id="toggle-current" type="button" aria-controls="current-password" aria-label="Показать пароль">Показать</button>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="new-password">Новый пароль</label>
+          <div class="password-row">
+            <input class="input" id="new-password" name="new_password" type="password" autocomplete="new-password" aria-describedby="new-password-hint" required>
+            <button class="button-quiet" id="toggle-new" type="button" aria-controls="new-password" aria-label="Показать пароль">Показать</button>
+          </div>
+          <p class="hint" id="new-password-hint">От 10 до 128 символов. После смены вы останетесь в этом браузере, на остальных устройствах придётся войти заново.</p>
+        </div>
+        <button class="button button-inline" type="submit">Сменить пароль</button>
+      </form>
+    </section>
+  </main>
+  <script src="js/boot.js"></script>
+  <script type="module" src="js/settings.js"></script>
+</body>
+</html>
