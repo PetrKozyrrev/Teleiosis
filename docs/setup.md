@@ -33,12 +33,13 @@ alembic upgrade head
 
 Ключ бота (если бот понадобится): `python -c "import secrets; print(secrets.token_urlsafe(32))"`
 
-## Ежедневный запуск (два терминала, в каждом `source .venv/bin/activate`)
+## Ежедневный запуск (в каждом терминале `source .venv/bin/activate`)
 
 ```bash
 docker compose up -d
 uvicorn app.main:app --reload
 ```
+Отдельный процесс отправки напоминаний (`python -m app.worker`) появится на этапе 7; тогда понадобится второй терминал.
 После изменения .env перезапускайте uvicorn.
 
 ## Сайт
