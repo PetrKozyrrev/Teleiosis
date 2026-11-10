@@ -99,3 +99,15 @@ def test_send_failure_is_swallowed_and_not_leaking(smtp, caplog):
     assert "OSError" in caplog.text
     assert "a@example.com" not in caplog.text
     assert "Секретный текст" not in caplog.text
+
+
+
+def test_verification_email_contains_the_link(monkeypatch):
+    sent = []
+    monkeypatch.setattr(mailer, "send_email", lambda *args: sent.append(args))
+    link = "http://localhost:8000/app/verify.html#token=abc"
+    mailer.send_email_verification("a@example.com", link)
+    to, subject, body = sent[0]
+    assert to == "a@example.com"
+    assert subject
+    assert link in body

@@ -10,7 +10,7 @@ from app.schemas import ContentSource, ContentStatus, SortOrder
 WEB = Path(__file__).resolve().parent.parent / "web"
 PAGES = [
     "index.html", "login.html", "register.html", "forgot.html", "reset.html",
-    "item.html", "categories.html", "add.html", "bookmark.html",
+    "item.html", "categories.html", "add.html", "bookmark.html", "verify.html",
 ]
 HTML_FILES = sorted(WEB.glob("*.html"))
 JS_FILES = sorted((WEB / "js").glob("*.js"))
@@ -184,3 +184,17 @@ def test_add_page_reads_the_fragment_and_never_saves_by_itself():
     assert "location.search" not in add
     assert "requestSubmit" not in add
     assert ".submit()" not in add
+
+
+
+
+def test_verify_page_confirms_by_post_and_hides_the_token():
+    text = (WEB / "js" / "verify.js").read_text(encoding="utf-8")
+    assert "/auth/email-verification/confirm" in text
+    assert "replaceState" in text
+    assert "location.search" not in text.replace("location.pathname + location.search", "")
+
+
+def test_topbar_offers_to_verify_the_email():
+    text = (WEB / "js" / "session.js").read_text(encoding="utf-8")
+    assert "/auth/email-verification/request" in text

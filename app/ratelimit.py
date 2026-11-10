@@ -37,6 +37,9 @@ REGISTER_IP = Rule("register_ip", 5, timedelta(hours=1))
 RESET_EMAIL = Rule("reset_email", 3, timedelta(hours=1))
 RESET_IP = Rule("reset_ip", 10, timedelta(hours=1))
 
+VERIFY_USER = Rule("verify_user", 3, timedelta(hours=1))
+VERIFY_IP = Rule("verify_ip", 10, timedelta(hours=1))
+
 
 def client_ip(request: Request) -> str:
     """Адрес клиента для счётчиков. IPv6 сводится к сети /64.

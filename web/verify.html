@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Подтверждение e-mail в Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <div class="auth-layout">
+    <aside class="brand-panel">
+      <a class="brand-name" href="./">Teleiosis</a>
+      <img class="brand-squiggle" src="img/logo-cream.png" width="328" height="317" alt="">
+      <p class="brand-line">Один шаг, и напоминания будут приходить на ваш адрес.</p>
+    </aside>
+    <main class="auth-main">
+      <div class="auth-card">
+        <h1>Подтверждение e-mail</h1>
+        <p id="error" class="message message-error" role="alert" hidden></p>
+        <p id="info" class="message message-info" role="status" hidden></p>
+        <form id="verify-form" class="card" method="post">
+          <p class="lead">Нажмите кнопку, чтобы подтвердить, что этот адрес принадлежит вам.</p>
+          <button class="button" type="submit">Подтвердить адрес</button>
+        </form>
+        <div class="footer-links">
+          <a id="to-library" href="./" hidden>Перейти в библиотеку</a>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/verify.js"></script>
+</body>
+</html>

@@ -238,3 +238,9 @@ class PasswordResetConfirm(BaseModel):
     # Формат токена проверяет обработчик: любая ошибка даёт одинаковый 400
     token: Annotated[str, StringConstraints(min_length=1, max_length=256)]
     password: Annotated[str, StringConstraints(min_length=10, max_length=128)]
+
+class EmailVerificationConfirm(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Формат токена проверяет обработчик: любая ошибка даёт одинаковый 400
+    token: Annotated[str, StringConstraints(min_length=1, max_length=256)]

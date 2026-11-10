@@ -236,3 +236,29 @@ class PasswordResetToken(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class EmailVerificationToken(Base):
+    """Одноразовый токен подтверждения e-mail. Хранится только хэш токена;
+    после использования строка удаляется."""
+
+    __tablename__ = "email_verification_tokens"
+    __table_args__ = (
+        CheckConstraint(
+            "char_length(token_hash) = 64", name="ck_email_verification_hash_len"
+        ),
+        CheckConstraint(
+            "expires_at > created_at", name="ck_email_verification_expiry"
+        ),
+        Index("ix_email_verification_user", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    token_hash: Mapped[str] = mapped_column(Text, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
