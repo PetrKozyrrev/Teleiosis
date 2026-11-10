@@ -103,11 +103,14 @@ def register(data: RegisterRequest, request: Request, response: Response, db: Db
 
     # Хэшируем до обращения к БД: время ответа не зависит от того, занят ли адрес
     password_hash = hash_password(data.password)
+    # Пояс передаём только если он известен: иначе работает значение БД (UTC)
+    extra = {"timezone": data.timezone} if data.timezone else {}
     user = User(
         email=data.email,
         password_hash=password_hash,
         consent_at=datetime.now(timezone.utc),
         consent_version=CONSENT_VERSION,
+        **extra,
     )
     db.add(user)
     try:

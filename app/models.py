@@ -1,9 +1,10 @@
-from datetime import datetime, time
+from datetime import date, datetime, time
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -53,6 +54,9 @@ class User(Base):
     timezone: Mapped[str] = mapped_column(Text, server_default="UTC")
     reminders_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"))
     reminder_time: Mapped[time] = mapped_column(Time, server_default=text("'09:00'"))
+    # Локальная дата (в поясе пользователя) последней отправленной подборки.
+    # Защита от двойной отправки: см. decisions.md от 10.11.2026
+    last_digest_on: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

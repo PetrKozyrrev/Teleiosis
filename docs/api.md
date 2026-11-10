@@ -34,6 +34,7 @@
 |---|---|---|
 | GET /health | Проверка работы, без авторизации | 200 |
 | GET /me | Текущий пользователь (при входе ботом создаётся при первом обращении) | 200, 401, 422 |
+| PATCH /me/settings | Изменить настройки `{timezone?, reminders_enabled?, reminder_time?}` (хотя бы одно поле; `reminder_time` строго `ЧЧ:ММ`; `reminders_enabled` только true/false; пояс из базы IANA, иначе 422; лишние поля 422) | 200, 401, 403, 422 |
 | POST /categories | Создать категорию `{name}` (1-50 символов после обрезки пробелов) | 201, 401, 409, 422 |
 | GET /categories | Список своих категорий по алфавиту | 200, 401 |
 | PATCH /categories/{id} | Переименовать `{name}` | 200, 401, 404, 409, 422 |
@@ -52,7 +53,7 @@
 | POST /contents/{id}/open | Фиксирует открытие исходной ссылки (счётчик +1, время последнего открытия); `updated_at` и статус не меняются | 204, 401, 404, 422 |
 
 ## Поля ответов
-- **Пользователь (UserOut):** `id`, `telegram_id` (для пользователей сайта `null`), `email` (для пользователей из Telegram `null`), `username`, `timezone`. Поля настроек напоминаний (`reminders_enabled`, `reminder_time`) в ответ пока не входят.
+- **Пользователь (UserOut):** `id`, `telegram_id` (для пользователей сайта `null`), `email` (для пользователей из Telegram `null`), `username`, `timezone`, `reminders_enabled`, `reminder_time` (строка `ЧЧ:ММ`), `email_verified_at` (`null`, пока адрес не подтверждён).
 - **Категория:** id, name, created_at, contents_count (сколько материалов пользователя в категории).
 - **Материал (ContentOut):** `id`, `category_id`, `title`, `url`, `description`, `note`, `content_type`, `source`, `image_url`, `status`, `studied_at`, `created_at`, `updated_at`, `last_opened_at` (null, пока ссылку не открывали), `open_count`.
 
@@ -84,6 +85,7 @@
 - `consent` должен быть `true`, иначе 422. Сохраняются `consent_at` и `consent_version` (пока `draft-1`, заменить версией текста от юриста).
 - Занятый e-mail (без учёта регистра): 409 `{"detail": "Email already registered"}`. Принятый компромисс: ответ позволяет узнать, что адрес зарегистрирован; закрывается ограничением частоты (подшаг 6.4).
 - Лишние поля дают 422. Ответ с `Cache-Control: no-store`.
+- `timezone` (необязательно): часовой пояс IANA из браузера. Неизвестное значение молча заменяется на UTC, регистрацию не блокирует.
 
 ## Ограничение частоты запросов
 | Действие | Что считается | Лимит | Окно |
