@@ -251,3 +251,19 @@ dialog::backdrop { background: rgba(59, 48, 43, 0.5); }
 
 /* ---------- плашка подтверждения e-mail ---------- */
 .verify-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; border-radius: 0; }
+
+
+/* ---------- прогресс ---------- */
+.stats-strip { margin: 0 0 4px; color: var(--muted); }
+.totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 0; }
+.totals div { padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.totals dt { font-size: 0.875rem; color: var(--muted); }
+.totals dd { margin: 0; font-size: 1.5rem; font-weight: 600; }
+progress { display: block; width: 100%; height: 14px; accent-color: var(--olive); }
+.table-wrap { overflow-x: auto; }
+.days { width: 100%; border-collapse: collapse; }
+.days caption { padding-bottom: 8px; text-align: left; font-size: 0.9375rem; color: var(--muted); }
+.days th, .days td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+.days th[scope="col"]:not(:first-child), .days td { text-align: right; }
+.topics { margin: 0; padding-left: 1.25rem; }
+.topics li { margin-bottom: 6px; }

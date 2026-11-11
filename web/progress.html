@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Прогресс — Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <header class="topbar">
+    <a class="topbar-brand" href="./">
+      <img src="img/icon.png" width="36" height="36" alt="">
+      <span>Teleiosis</span>
+    </a>
+    <nav class="topnav" aria-label="Разделы">
+      <a href="./">Библиотека</a>
+      <a href="categories.html">Категории</a>
+      <a href="progress.html" aria-current="page">Прогресс</a>
+      <a href="settings.html">Настройки</a>
+    </nav>
+    <div class="topbar-user">
+      <span class="user-email" id="user-email"></span>
+      <button class="button-quiet" id="logout" type="button">Выйти</button>
+    </div>
+  </header>
+  <p id="error" class="message message-error" role="alert" hidden></p>
+  <p id="boot-error" class="message message-error" role="alert" hidden></p>
+  <main class="page" id="main" hidden>
+    <h1>Прогресс</h1>
+    <p class="lead">Важно не сколько вы сохранили, а сколько изучили и к скольким вернулись.</p>
+    <p id="stats-error" class="message message-error" role="alert" hidden></p>
+
+    <div class="empty" id="empty" hidden>
+      <h3>Пока нечего показывать</h3>
+      <p>Сохраните первый материал в <a href="./">библиотеке</a>, и здесь появится статистика.</p>
+    </div>
+
+    <div id="content" hidden>
+      <section class="section" aria-labelledby="totals-title">
+        <h2 id="totals-title">Материалы</h2>
+        <dl class="totals">
+          <div><dt>Всего</dt><dd id="t-total"></dd></div>
+          <div><dt>Изучено</dt><dd id="t-studied"></dd></div>
+          <div><dt>Запланировано</dt><dd id="t-planned"></dd></div>
+          <div><dt>Не просмотрено</dt><dd id="t-unseen"></dd></div>
+          <div><dt>Неактуально</dt><dd id="t-irrelevant"></dd></div>
+        </dl>
+      </section>
+
+      <section class="card section" aria-labelledby="studied-title">
+        <h2 id="studied-title">Доля изученных</h2>
+        <p id="studied-text"></p>
+        <progress id="studied-bar" aria-labelledby="studied-title" max="1" value="0"></progress>
+      </section>
+
+      <section class="card section" aria-labelledby="returns-title">
+        <h2 id="returns-title">Возвраты к материалам</h2>
+        <p class="hint">Доля материалов со ссылкой, оригинал которых вы открывали хотя бы раз.</p>
+        <p id="returns-text"></p>
+        <progress id="returns-bar" aria-labelledby="returns-title" max="1" value="0"></progress>
+      </section>
+
+      <section class="section" aria-labelledby="week-title">
+        <h2 id="week-title">За 7 дней</h2>
+        <p id="week-text"></p>
+        <div class="table-wrap">
+          <table class="days">
+            <caption>Сегодня и шесть предыдущих дней по вашему часовому поясу</caption>
+            <thead>
+              <tr><th scope="col">День</th><th scope="col">Добавлено</th><th scope="col">Изучено</th></tr>
+            </thead>
+            <tbody id="days-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="topics-title">
+        <h2 id="topics-title">Популярные категории</h2>
+        <p class="hint" id="topics-empty" hidden>Назначьте материалам категории, и здесь появится рейтинг.</p>
+        <ol class="topics" id="topics"></ol>
+      </section>
+    </div>
+  </main>
+  <script src="js/boot.js"></script>
+  <script type="module" src="js/progress.js"></script>
+</body>
+</html>

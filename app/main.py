@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import account, auth, categories, contents, email_verification, password_reset, users
+from app.routers import account, auth, categories, contents, email_verification, password_reset, stats, users
 
 # Путь строится от файла, а не от текущей папки: сервер можно запускать откуда угодно
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -42,6 +42,7 @@ app.include_router(categories.router)
 app.include_router(contents.router)
 app.include_router(email_verification.router)
 app.include_router(account.router)
+app.include_router(stats.router)
 
 
 @app.get("/health")

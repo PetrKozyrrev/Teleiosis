@@ -11,7 +11,7 @@ WEB = Path(__file__).resolve().parent.parent / "web"
 PAGES = [
     "index.html", "login.html", "register.html", "forgot.html", "reset.html",
     "item.html", "categories.html", "add.html", "bookmark.html", "verify.html",
-    "settings.html",
+    "settings.html", "progress.html",
 ]
 HTML_FILES = sorted(WEB.glob("*.html"))
 JS_FILES = sorted((WEB / "js").glob("*.js"))
@@ -131,8 +131,8 @@ def test_filters_and_labels_match_the_api():
     for value in get_args(ContentStatus) + get_args(ContentSource):
         assert re.search(rf"\b{value}:", cards), value
 
-AUTH_PAGES = ["index.html", "item.html", "categories.html", "add.html", "bookmark.html", "settings.html"]
-NAV_PAGES = ["index.html", "item.html", "categories.html", "bookmark.html", "settings.html"]
+AUTH_PAGES = ["index.html", "item.html", "categories.html", "add.html", "bookmark.html", "settings.html", "progress.html"]
+NAV_PAGES = ["index.html", "item.html", "categories.html", "bookmark.html", "settings.html", "progress.html"]
 
 
 @pytest.mark.parametrize("page", AUTH_PAGES)
@@ -142,7 +142,7 @@ def test_authenticated_pages_have_the_load_guard(page):
     assert 'id="boot-error"' in html
 
 
-@pytest.mark.parametrize("script", ["index.js", "item.js", "categories.js", "add.js", "bookmark.js", "settings.js"])
+@pytest.mark.parametrize("script", ["index.js", "item.js", "categories.js", "add.js", "bookmark.js", "settings.js", "progress.js"])
 def test_page_scripts_mark_themselves_ready(script):
     assert "markReady()" in (WEB / "js" / script).read_text(encoding="utf-8")
 
@@ -158,6 +158,7 @@ def test_authenticated_pages_have_navigation(page):
     assert 'href="categories.html"' in html
     assert 'href="./"' in html
     assert 'href="settings.html"' in html
+    assert 'href="progress.html"' in html
 
 
 def test_library_reads_the_category_from_the_address():
@@ -216,3 +217,19 @@ def test_settings_page_talks_to_the_right_endpoints():
     text = (WEB / "js" / "settings.js").read_text(encoding="utf-8")
     assert '"/me/settings"' in text
     assert '"/auth/change-password"' in text
+
+
+
+def test_progress_page_uses_native_progress_elements():
+    html = (WEB / "progress.html").read_text(encoding="utf-8")
+    assert html.count("<progress") == 2
+    assert "<table" in html
+
+
+def test_stats_module_calls_the_stats_endpoint():
+    assert '"/stats"' in (WEB / "js" / "stats.js").read_text(encoding="utf-8")
+
+
+def test_library_shows_the_stats_strip():
+    assert 'id="stats-strip"' in (WEB / "index.html").read_text(encoding="utf-8")
+    assert "loadStats" in (WEB / "js" / "index.js").read_text(encoding="utf-8")

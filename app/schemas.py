@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, time
+from datetime import date, datetime, time
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -259,3 +259,36 @@ class ChangePasswordRequest(BaseModel):
         if self.new_password == self.current_password:
             raise ValueError("New password must differ from the current one")
         return self
+
+
+
+class StatusCounts(BaseModel):
+    unseen: int
+    planned: int
+    studied: int
+    irrelevant: int
+
+
+class DayStat(BaseModel):
+    day: date
+    added: int
+    studied: int
+
+
+class CategoryStat(BaseModel):
+    id: int
+    name: str
+    count: int
+
+
+class StatsOut(BaseModel):
+    total: int
+    by_status: StatusCounts
+    studied_share: float | None
+    with_url: int
+    opened: int
+    return_share: float | None
+    added_7d: int
+    studied_7d: int
+    top_categories: list[CategoryStat]
+    days: list[DayStat]
