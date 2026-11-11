@@ -11,7 +11,7 @@ WEB = Path(__file__).resolve().parent.parent / "web"
 PAGES = [
     "index.html", "login.html", "register.html", "forgot.html", "reset.html",
     "item.html", "categories.html", "add.html", "bookmark.html", "verify.html",
-    "settings.html", "progress.html",
+    "settings.html", "progress.html", "unsubscribe.html",
 ]
 HTML_FILES = sorted(WEB.glob("*.html"))
 JS_FILES = sorted((WEB / "js").glob("*.js"))
@@ -233,3 +233,10 @@ def test_stats_module_calls_the_stats_endpoint():
 def test_library_shows_the_stats_strip():
     assert 'id="stats-strip"' in (WEB / "index.html").read_text(encoding="utf-8")
     assert "loadStats" in (WEB / "js" / "index.js").read_text(encoding="utf-8")
+
+
+
+def test_unsubscribe_page_posts_and_hides_the_token():
+    text = (WEB / "js" / "unsubscribe.js").read_text(encoding="utf-8")
+    assert '"/auth/unsubscribe"' in text
+    assert "replaceState" in text

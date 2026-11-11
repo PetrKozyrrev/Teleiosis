@@ -63,3 +63,4 @@ def web_settings(monkeypatch):
     monkeypatch.setattr(settings, "app_origin", helpers.ORIGIN)
     monkeypatch.setattr(settings, "cookie_secure", False)
     monkeypatch.setattr(settings, "email_backend", "console")
+    monkeypatch.setattr(settings, "secret_key", "test-secret-key-" + "x" * 32)

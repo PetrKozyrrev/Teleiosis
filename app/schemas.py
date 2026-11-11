@@ -292,3 +292,11 @@ class StatsOut(BaseModel):
     studied_7d: int
     top_categories: list[CategoryStat]
     days: list[DayStat]
+
+
+
+class UnsubscribeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Формат токена проверяет обработчик: любая ошибка даёт одинаковый 400
+    token: Annotated[str, StringConstraints(min_length=1, max_length=256)]

@@ -111,3 +111,34 @@ def test_verification_email_contains_the_link(monkeypatch):
     assert to == "a@example.com"
     assert subject
     assert link in body
+
+
+
+def test_console_backend_returns_true_and_prints_headers(capsys):
+    headers = {"List-Unsubscribe": "<https://example.com/u>"}
+    assert mailer.send_email("a@example.com", "Тема", "Текст", headers=headers) is True
+    assert "List-Unsubscribe: <https://example.com/u>" in capsys.readouterr().out
+
+
+def test_smtp_success_returns_true_and_sets_headers(smtp):
+    headers = {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+    assert mailer.send_email("a@example.com", "Тема", "Текст", headers=headers) is True
+    message = smtp.instances[0].message
+    assert message["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+
+
+def test_smtp_failure_returns_false(smtp):
+    smtp.fail = True
+    assert mailer.send_email("a@example.com", "Тема", "Текст") is False
+
+
+def test_bad_header_value_returns_false_and_does_not_raise(smtp):
+    headers = {"X-Test": "first line\nsecond line"}
+    assert mailer.send_email("a@example.com", "Тема", "Текст", headers=headers) is False
+    assert smtp.instances == [] or smtp.instances[0].message is None
+
+
+def test_wrappers_return_the_send_result(smtp):
+    assert mailer.send_password_reset("a@example.com", "http://x/#token=a") is True
+    smtp.fail = True
+    assert mailer.send_email_verification("a@example.com", "http://x/#token=a") is False

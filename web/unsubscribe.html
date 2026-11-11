@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Отписка от напоминаний — Teleiosis</title>
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <noscript><p class="noscript">Для работы Teleiosis нужен включённый JavaScript.</p></noscript>
+  <div class="auth-layout">
+    <aside class="brand-panel">
+      <a class="brand-name" href="./">Teleiosis</a>
+      <img class="brand-squiggle" src="img/logo-cream.png" width="328" height="317" alt="">
+      <p class="brand-line">Напоминания можно отключить в один клик и включить обратно в настройках.</p>
+    </aside>
+    <main class="auth-main">
+      <div class="auth-card">
+        <h1>Отписка от напоминаний</h1>
+        <p id="error" class="message message-error" role="alert" hidden></p>
+        <p id="info" class="message message-info" role="status" hidden></p>
+        <form id="unsubscribe-form" class="card" method="post">
+          <p class="lead">Нажмите кнопку, и письма с напоминаниями перестанут приходить на ваш адрес.</p>
+          <button class="button" type="submit">Отключить напоминания</button>
+        </form>
+        <div class="footer-links">
+          <a id="to-settings" href="settings.html" hidden>Включить обратно в настройках</a>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="js/unsubscribe.js"></script>
+</body>
+</html>

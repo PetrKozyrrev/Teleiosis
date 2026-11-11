@@ -28,6 +28,7 @@ alembic upgrade head
 | COOKIE_SECURE | `false` в разработке (http://localhost), `true` на боевом сервере |
 | EMAIL_BACKEND | `console` (по умолчанию, письма печатаются в терминал с uvicorn) или `smtp`. В `prod` допустим только `smtp` |
 | SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_SECURITY | Почтовый сервер (`starttls`, `ssl` или `none`); нужны при `EMAIL_BACKEND=smtp`, хост и отправитель обязательны |
+| SECRET_KEY | Секрет подписи ссылок отписки, не короче 32 символов. В `prod` обязателен; в dev без него отписка и воркер напоминаний не работают. Смена ключа делает недействительными все выданные ссылки. Создать: `printf '\nSECRET_KEY=%s\n' "$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" >> .env` |
 
 Для работы API и будущего сайта достаточно переменных PostgreSQL, DATABASE_URL и TEST_DATABASE_URL.
 

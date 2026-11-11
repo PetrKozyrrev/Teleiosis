@@ -4,6 +4,8 @@ from urllib.parse import urlsplit
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+MIN_SECRET_KEY_LENGTH = 32
+
 
 class Settings(BaseSettings):
     # hide_input_in_errors: при ошибке настроек в сообщение не попадают значения
@@ -19,12 +21,16 @@ class Settings(BaseSettings):
     # Если не задан или короткий, вход ботом отключён.
     bot_api_key: str = ""
 
-    # dev или prod. В prod обязательны HTTPS, Secure-cookie и настоящая почта.
+    # dev или prod. В prod обязательны HTTPS, Secure-cookie, настоящая почта и SECRET_KEY.
     app_env: Literal["dev", "prod"] = "dev"
     # Адрес сайта в браузере. Изменяющие запросы по cookie принимаются только
     # с этого origin. Открывать сайт нужно именно по этому адресу.
     app_origin: str = "http://localhost:8000"
     cookie_secure: bool = False
+
+    # Секрет для подписи ссылок отписки (HMAC), не короче 32 символов.
+    # Только в окружении. Смена ключа делает недействительными все выданные ссылки.
+    secret_key: str = ""
 
     # Почта. console: письма печатаются в терминал (только для разработки,
     # в письмах есть ссылки с токенами). smtp: настоящая отправка.
@@ -58,6 +64,11 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "EMAIL_BACKEND must be smtp when APP_ENV=prod "
                     "(console mode prints reset links)"
+                )
+            if len(self.secret_key) < MIN_SECRET_KEY_LENGTH:
+                raise ValueError(
+                    f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters "
+                    "when APP_ENV=prod"
                 )
         if self.email_backend == "smtp" and not (self.smtp_host and self.smtp_from):
             raise ValueError("SMTP_HOST and SMTP_FROM are required when EMAIL_BACKEND=smtp")

@@ -13,26 +13,35 @@ logger = logging.getLogger(__name__)
 SMTP_TIMEOUT = 10  # секунд
 
 
-def send_email(to: str, subject: str, body: str) -> None:
-    """Никогда не бросает исключений: сбой почты не должен ломать запрос.
-    В лог попадает только тип ошибки, без адреса и без текста письма."""
+def send_email(
+    to: str, subject: str, body: str, headers: dict[str, str] | None = None
+) -> bool:
+    """Возвращает True, если письмо принято почтовым сервером (в режиме console
+    всегда True). Никогда не бросает исключений: сбой почты не должен ломать запрос.
+    В лог попадает только тип ошибки, без адреса и без текста письма.
+    headers: дополнительные заголовки (например, List-Unsubscribe)."""
+    extra = headers or {}
+
     if settings.email_backend == "console":
+        extra_lines = "".join(f"{name}: {value}\n" for name, value in extra.items())
         print(
             "\n===== DEV EMAIL (EMAIL_BACKEND=console) =====\n"
-            f"To: {to}\nSubject: {subject}\n\n{body}\n"
+            f"To: {to}\nSubject: {subject}\n{extra_lines}\n{body}\n"
             "=============================================\n",
             flush=True,
         )
-        return
+        return True
 
-    message = EmailMessage()
-    message["From"] = settings.smtp_from
-    message["To"] = to
-    message["Subject"] = subject
-    message.set_content(body)
-
-    context = ssl.create_default_context()
     try:
+        message = EmailMessage()
+        message["From"] = settings.smtp_from
+        message["To"] = to
+        message["Subject"] = subject
+        for name, value in extra.items():
+            message[name] = value  # перевод строки в значении даст ValueError
+        message.set_content(body)
+
+        context = ssl.create_default_context()
         if settings.smtp_security == "ssl":
             server = smtplib.SMTP_SSL(
                 settings.smtp_host, settings.smtp_port, timeout=SMTP_TIMEOUT, context=context
@@ -49,10 +58,12 @@ def send_email(to: str, subject: str, body: str) -> None:
             server.send_message(message)
     except Exception as exc:  # намеренно широко: почта не должна ломать запрос
         logger.error("email send failed: %s", type(exc).__name__)
+        return False
+    return True
 
 
-def send_password_reset(to: str, link: str) -> None:
-    send_email(
+def send_password_reset(to: str, link: str) -> bool:
+    return send_email(
         to,
         "Teleiosis: восстановление доступа",
         "Вы (или кто-то другой) запросили сброс пароля для аккаунта Teleiosis.\n\n"
@@ -63,8 +74,9 @@ def send_password_reset(to: str, link: str) -> None:
         "пароль не изменится.",
     )
 
-def send_email_verification(to: str, link: str) -> None:
-    send_email(
+
+def send_email_verification(to: str, link: str) -> bool:
+    return send_email(
         to,
         "Teleiosis: подтверждение e-mail",
         "Этот адрес указан при регистрации в Teleiosis.\n\n"
