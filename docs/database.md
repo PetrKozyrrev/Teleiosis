@@ -16,6 +16,7 @@
 | timezone | TEXT | NOT NULL, по умолчанию 'UTC' |
 | reminders_enabled | BOOLEAN | NOT NULL, по умолчанию true |
 | reminder_time | TIME | NOT NULL, по умолчанию '09:00' |
+| last_digest_on | DATE | NULL (локальная дата последней отправленной подборки; защита от двойной отправки) |
 | created_at | TIMESTAMPTZ | NOT NULL, по умолчанию now() |
 
 Дополнительно CHECK (email IS NOT NULL OR telegram_id IS NOT NULL): у пользователя есть хотя бы один способ входа. Уникальность не мешает нескольким значениям NULL, поэтому пользователи без Telegram или без e-mail не конфликтуют. Приложение само приводит e-mail к нижнему регистру, а БД это проверяет. В хэше пароля лежит строка Argon2id целиком (соль внутри). Telegram ID превышает размер INTEGER, поэтому BIGINT. Настройки напоминаний хранятся в users (связь 1:1).
@@ -89,7 +90,7 @@ CHECK (status IN ('pending','sent','cancelled')). У материала не б�
 | Поле | Тип | Ограничения |
 |---|---|---|
 | id | BIGINT, identity | PK |
-| bucket | TEXT | NOT NULL (название счётчика: login_ip, login_email_ip, register_ip, reset_email, reset_ip) |
+| bucket | TEXT | NOT NULL (название счётчика: login_ip, login_email_ip, register_ip, reset_email, reset_ip, verify_user, verify_ip, password_user) |
 | key_hash | TEXT | NOT NULL, CHECK длина 64 (SHA-256 от адреса или e-mail) |
 | created_at | TIMESTAMPTZ | NOT NULL, now() |
 
@@ -105,6 +106,17 @@ CHECK (status IN ('pending','sent','cancelled')). У материала не б�
 | expires_at | TIMESTAMPTZ | NOT NULL, CHECK expires_at > created_at |
 
 Токен сброса пароля живёт 1 час. Сам токен не хранится, только хэш. После использования строка удаляется (поля «использован» нет). Новый запрос удаляет прежние токены пользователя и все просроченные.
+
+## email_verification_tokens
+| Поле | Тип | Ограничения |
+|---|---|---|
+| id | BIGINT, identity | PK |
+| user_id | BIGINT | NOT NULL, FK users(id), ON DELETE CASCADE |
+| token_hash | TEXT | NOT NULL, UNIQUE, CHECK длина 64 (hex SHA-256) |
+| created_at | TIMESTAMPTZ | NOT NULL, now() |
+| expires_at | TIMESTAMPTZ | NOT NULL, CHECK expires_at > created_at |
+
+Токен подтверждения e-mail живёт 24 часа. Сам токен не хранится, только хэш. После использования строка удаляется. Новый запрос удаляет прежние токены пользователя и все просроченные.
 
 ## user_activity
 | Поле | Тип | Ограничения |
@@ -127,21 +139,19 @@ CHECK (status IN ('pending','sent','cancelled')). У материала не б�
 | rate_limit_events | (created_at) | Быстрое удаление устаревших записей |
 | password_reset_tokens | (user_id) | Каскадное удаление и замена прежних токенов |
 | categories | UNIQUE (user_id, lower(name)) | Уникальность названий без учёта регистра |
-| reminders | UNIQUE (content_id) WHERE status = 'pending' | Один ожидающий на материал
+| reminders | UNIQUE (content_id) WHERE status = 'pending' | Один ожидающий на материал |
+| email_verification_tokens | (user_id) | Каскадное удаление и замена прежних токенов |
 
 Поиск по названию в MVP работает через ILIKE с экранированием % и _. На сотнях материалов на пользователя этого достаточно, отдельные индексы под поиск не нужны.
 
 ## Правила удаления
 | Что удаляем | Что происходит |
 |---|---|
-| Пользователь | Удаляются его категории, материалы, напоминания, сессии, токены сброса пароля |
+| Пользователь | Удаляются его категории, материалы, напоминания, сессии, токены сброса пароля и подтверждения e-mail, активные дни |
 | Материал | Удаляются его напоминания |
 | Категория | Материалы остаются, category_id становится NULL («Без категории») |
 
-## Запланировано на этапе 7 (не применено; решения от 10.11.2026 в decisions.md)
-Названия предварительные, окончательно утверждаются перед написанием каждой миграции.
-- users: `last_digest_on` (DATE, NULL): локальная дата последней отправленной подборки, защита от двойной отправки. Позже `last_seen_at` (TIMESTAMPTZ, NULL) для метрик возврата.
-- email_verification_tokens: по образцу password_reset_tokens (хэш токена, срок, каскадное удаление).
-- reminders: частичный уникальный индекс (content_id) WHERE status = 'pending', у материала не больше одного ожидающего напоминания.
+## Запланировано на этапе 8
+Изменений схемы не планируется. Удаление аккаунта и выгрузка данных работают поверх существующих таблиц (выгрузка должна включать `user_activity`).
 
 Каждая миграция проверяется вручную: `alembic upgrade head` и `alembic downgrade -1` (тесты строят БД из моделей и расхождение с миграциями не ловят).
