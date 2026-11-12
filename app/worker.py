@@ -1,6 +1,6 @@
 """Воркер напоминаний. Запуск: python -m app.worker (во втором терминале).
 
-Раз в минуту проверяет, кому пора отправить ежедневную подборку.
+Раз в минуту отправляет ежедневные подборки и напоминания по материалам.
 Рассчитан на один процесс: второй экземпляр не стартует (advisory-блокировка PostgreSQL).
 После изменений кода его нужно перезапускать вручную."""
 
@@ -14,6 +14,7 @@ from sqlalchemy import text
 from app.config import MIN_SECRET_KEY_LENGTH, settings
 from app.db import SessionLocal, engine
 from app.digest import process_due_users
+from app.reminders import process_due_reminders
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,17 @@ def main() -> None:
 
     while not stop.is_set():
         try:
+            now = datetime.now(timezone.utc)
             with SessionLocal() as db:
-                report = process_due_users(db, datetime.now(timezone.utc))
-            if report.sent or report.failed:
-                logger.info("Подборки: отправлено %s, не отправлено %s", report.sent, report.failed)
+                digests = process_due_users(db, now)
+                reminders = process_due_reminders(db, now)
+            if digests.sent or digests.failed or reminders.sent or reminders.failed or reminders.cancelled:
+                logger.info(
+                    "Подборки: отправлено %s, не отправлено %s. "
+                    "Напоминания: отправлено %s, не отправлено %s, отменено %s",
+                    digests.sent, digests.failed,
+                    reminders.sent, reminders.failed, reminders.cancelled,
+                )
         except Exception as exc:  # проход не должен убивать воркер
             logger.error("worker pass failed: %s", type(exc).__name__)
         stop.wait(INTERVAL_SECONDS)

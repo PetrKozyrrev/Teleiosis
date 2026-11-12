@@ -61,6 +61,28 @@
         <p class="hint"><a href="categories.html">Управление категориями</a></p>
       </section>
 
+            <section class="card section" aria-labelledby="reminder-title">
+        <h2 id="reminder-title">Напоминание</h2>
+        <p id="reminder-error" class="message message-error" role="alert" hidden></p>
+        <p id="reminder-status" aria-live="polite"></p>
+        <p class="hint" id="reminder-hint" hidden></p>
+        <div class="actions-row" role="group" aria-label="Быстрый выбор времени">
+          <button class="button-quiet" type="button" data-preset="1">Завтра</button>
+          <button class="button-quiet" type="button" data-preset="3">Через 3 дня</button>
+          <button class="button-quiet" type="button" data-preset="7">Через неделю</button>
+        </div>
+        <p class="hint" id="preset-hint"></p>
+        <form id="reminder-form" method="post">
+          <div class="field">
+            <label class="label" for="reminder-at">Своё время</label>
+            <input class="input" id="reminder-at" name="reminder_at" type="datetime-local" required>
+          </div>
+          <div class="actions-row">
+            <button class="button button-inline" type="submit">Сохранить напоминание</button>
+            <button class="button-quiet button-danger-quiet" id="reminder-clear" type="button" hidden>Убрать напоминание</button>
+          </div>
+        </form>
+      </section>
       <section class="card section" aria-labelledby="edit-heading">
         <h2 id="edit-heading">Правка</h2>
         <p id="edit-error" class="message message-error" role="alert" hidden></p>

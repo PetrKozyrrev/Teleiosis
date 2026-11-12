@@ -72,7 +72,7 @@
 | status | TEXT | NOT NULL, по умолчанию 'pending', CHECK |
 | created_at | TIMESTAMPTZ | NOT NULL, now() |
 
-CHECK (status IN ('pending','sent','cancelled')). Защиты от дублей нет; модель напоминаний будет выбрана на этапе 7.
+CHECK (status IN ('pending','sent','cancelled')). У материала не больше одного ожидающего напоминания (частичный уникальный индекс). Отмена ставит cancelled, отправка sent; строки не удаляются (история). Подборка отдельной таблицы не имеет: считается из users.
 
 ## auth_sessions
 | Поле | Тип | Ограничения |
@@ -119,6 +119,7 @@ CHECK (status IN ('pending','sent','cancelled')). Защиты от дублей
 | rate_limit_events | (created_at) | Быстрое удаление устаревших записей |
 | password_reset_tokens | (user_id) | Каскадное удаление и замена прежних токенов |
 | categories | UNIQUE (user_id, lower(name)) | Уникальность названий без учёта регистра |
+| reminders | UNIQUE (content_id) WHERE status = 'pending' | Один ожидающий на материал
 
 Поиск по названию в MVP работает через ILIKE с экранированием % и _. На сотнях материалов на пользователя этого достаточно, отдельные индексы под поиск не нужны.
 

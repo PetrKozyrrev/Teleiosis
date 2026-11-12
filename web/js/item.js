@@ -7,7 +7,10 @@ import {
 
 const id = new URLSearchParams(location.search).get("id") ?? "";
 const path = `/contents/${encodeURIComponent(id)}`;
+const reminderPath = `${path}/reminder`;
+let user = null;
 let item = null;
+let reminder = null;
 let categoryList = [];
 let categories = new Map();
 
@@ -20,6 +23,21 @@ const categorySelect = $("#item-category");
 const titleInput = $("#edit-title");
 const noteInput = $("#edit-note");
 const statusButtons = [...document.querySelectorAll(".status-button")];
+
+const reminderError = $("#reminder-error");
+const reminderStatus = $("#reminder-status");
+const reminderHint = $("#reminder-hint");
+const reminderInput = $("#reminder-at");
+const reminderClear = $("#reminder-clear");
+const presetButtons = [...document.querySelectorAll("[data-preset]")];
+
+const dateTimeFormat = new Intl.DateTimeFormat("ru-RU", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 function showMissing() {
   $("#item").hidden = true;
@@ -168,7 +186,7 @@ async function removeItem() {
 function setupDelete() {
   const dialog = $("#delete-dialog");
   $("#delete").addEventListener("click", () => {
-    $("#delete-text").textContent = `«${item.title}» будет удалён вместе с заметкой. Это нельзя отменить.`;
+    $("#delete-text").textContent = `«${item.title}» будет удалён вместе с заметкой и напоминанием. Это нельзя отменить.`;
     if (typeof dialog.showModal === "function") dialog.showModal();
     else if (window.confirm("Удалить материал? Это нельзя отменить.")) removeItem();
   });
@@ -221,8 +239,124 @@ function setupEdit() {
   });
 }
 
+// ---------- напоминание ----------
+
+function formatDateTime(iso) {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "" : dateTimeFormat.format(date);
+}
+
+// Значение для datetime-local строится из ЛОКАЛЬНЫХ частей даты:
+// toISOString() даёт UTC и может сдвинуть день.
+function toInputValue(date) {
+  const pad = (number) => String(number).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
+// Через N дней в ваше обычное время подборки (из настроек)
+function presetDate(days) {
+  const [hours, minutes] = (user.reminder_time ?? "09:00").split(":").map(Number);
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
+
+function renderReminder() {
+  reminderStatus.textContent = reminder
+    ? `Напомним: ${formatDateTime(reminder.scheduled_at)}.`
+    : "Напоминание не задано.";
+  reminderClear.hidden = reminder === null;
+
+  let hint = "";
+  if (!user.email_verified_at) hint = "Письмо придёт только после подтверждения e-mail.";
+  else if (!user.reminders_enabled) hint = "Напоминания отключены в настройках, письмо не придёт.";
+  reminderHint.textContent = hint;
+  reminderHint.hidden = !hint;
+}
+
+async function loadReminder() {
+  try {
+    reminder = await api("GET", reminderPath);
+  } catch (e) {
+    if (redirectIfUnauthorized(e)) return;
+    showError(reminderError, describeError(e));
+  }
+}
+
+let reminderBusy = false;
+
+async function saveReminder(date) {
+  if (reminderBusy) return;
+  hideMessage(reminderError);
+  if (Number.isNaN(date.getTime())) {
+    showError(reminderError, "Укажите дату и время.");
+    return;
+  }
+  if (date.getTime() <= Date.now()) {
+    showError(reminderError, "Время должно быть в будущем.");
+    return;
+  }
+  reminderBusy = true;
+  try {
+    reminder = await api("PUT", reminderPath, { scheduled_at: date.toISOString() });
+    renderReminder();
+  } catch (e) {
+    if (redirectIfUnauthorized(e)) return;
+    if (e instanceof ApiError && e.status === 404) {
+      showMissing();
+      return;
+    }
+    showError(
+      reminderError,
+      describeError(e, {
+        409: "Не получилось сохранить: возможно, достигнут лимит в 100 напоминаний. Уберите лишние и повторите.",
+        422: "Время должно быть в будущем и не дальше чем через год.",
+      }),
+    );
+  } finally {
+    reminderBusy = false;
+  }
+}
+
+async function clearReminder() {
+  if (reminderBusy) return;
+  hideMessage(reminderError);
+  reminderBusy = true;
+  try {
+    await api("DELETE", reminderPath);
+    reminder = null;
+    renderReminder();
+  } catch (e) {
+    if (redirectIfUnauthorized(e)) return;
+    if (e instanceof ApiError && e.status === 404) {
+      showMissing();
+      return;
+    }
+    showError(reminderError, describeError(e));
+  } finally {
+    reminderBusy = false;
+  }
+}
+
+function setupReminder() {
+  reminderInput.min = toInputValue(new Date());
+  $("#preset-hint").textContent =
+    `Быстрый выбор ставит время подборки из настроек (${user.reminder_time}) по часам вашего браузера.`;
+  presetButtons.forEach((button) =>
+    button.addEventListener("click", () => saveReminder(presetDate(Number(button.dataset.preset)))),
+  );
+  reminderClear.addEventListener("click", clearReminder);
+  onSubmit($("#reminder-form"), async () => {
+    await saveReminder(new Date(reminderInput.value));
+  });
+}
+
 async function main() {
-  const user = await requireUser();
+  user = await requireUser();
   initTopbar(user);
   $("#main").hidden = false;
   markReady();
@@ -242,9 +376,12 @@ async function main() {
     throw e;
   }
   await loadCategories();
+  await loadReminder();
   render();
   fillForm();
   fillCategorySelect();
+  renderReminder();
+  setupReminder();
   $("#item").hidden = false;
 
   statusButtons.forEach((button) =>

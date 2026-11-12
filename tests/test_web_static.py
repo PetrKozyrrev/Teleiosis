@@ -240,3 +240,15 @@ def test_unsubscribe_page_posts_and_hides_the_token():
     text = (WEB / "js" / "unsubscribe.js").read_text(encoding="utf-8")
     assert '"/auth/unsubscribe"' in text
     assert "replaceState" in text
+
+
+
+def test_item_page_has_the_reminder_block():
+    html = (WEB / "item.html").read_text(encoding="utf-8")
+    assert 'id="reminder-form"' in html
+    assert 'type="datetime-local"' in html
+    assert html.count("data-preset=") == 3
+    script = (WEB / "js" / "item.js").read_text(encoding="utf-8")
+    assert "/reminder" in script
+    assert "toISOString" in script  # на сервер уходит абсолютный момент
+    assert "getFullYear" in script  # значение поля строится из локальных частей

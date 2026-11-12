@@ -3,6 +3,7 @@ from datetime import date, datetime, time
 from typing import Annotated, Literal
 
 from pydantic import (
+    AwareDatetime,
     BaseModel,
     ConfigDict,
     Field,
@@ -300,3 +301,28 @@ class UnsubscribeRequest(BaseModel):
 
     # Формат токена проверяет обработчик: любая ошибка даёт одинаковый 400
     token: Annotated[str, StringConstraints(min_length=1, max_length=256)]
+
+
+
+class ReminderSet(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Момент с часовым поясом (например 2026-11-15T06:30:00Z): без пояса время неоднозначно
+    scheduled_at: AwareDatetime
+
+    @field_validator("scheduled_at", mode="before")
+    @classmethod
+    def only_strings(cls, value):
+        # Числа pydantic принял бы за unix-время
+        if not isinstance(value, str):
+            raise ValueError("scheduled_at must be an ISO 8601 string")
+        return value
+
+
+class ReminderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    content_id: int
+    scheduled_at: datetime
+    status: str

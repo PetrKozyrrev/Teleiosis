@@ -153,6 +153,13 @@ class Reminder(Base):
             postgresql_where=text("status = 'pending'"),
         ),
         Index("ix_reminders_content", "content_id"),
+        # У материала не больше одного ожидающего напоминания
+        Index(
+            "uq_reminders_content_pending",
+            "content_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
