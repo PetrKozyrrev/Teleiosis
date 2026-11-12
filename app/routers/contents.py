@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Path, Query, Response, status
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
+from app.activity import record_activity
 from app.deps import CurrentUser, DbSession
 from app.metadata import fetch_metadata
 from app.models import Content
@@ -117,6 +118,7 @@ def create_content(data: ContentCreate, db: DbSession, user: CurrentUser):
         if existing_id is None:
             raise
         raise already_saved(existing_id)
+    record_activity(db, user)
     db.refresh(content)
     return content
 
@@ -201,6 +203,7 @@ def update_content(
         )
 
     db.commit()
+    record_activity(db, user)
     db.refresh(content)
     return content
 
@@ -211,6 +214,7 @@ def delete_content(content_id: ContentId, db: DbSession, user: CurrentUser):
     db.delete(content)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 @router.post("/{content_id}/open", status_code=status.HTTP_204_NO_CONTENT)
 def record_open(content_id: ContentId, db: DbSession, user: CurrentUser):
@@ -230,4 +234,5 @@ def record_open(content_id: ContentId, db: DbSession, user: CurrentUser):
         # Чужой и несуществующий материал выглядят одинаково
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Content not found")
     db.commit()
+    record_activity(db, user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -65,6 +65,9 @@ alembic downgrade -1
 alembic upgrade head
 ```
 
+## Метрики закрытого тестирования
+`python -m app.metrics`: отчёт с агрегатами (регистрации, активация, возвраты, доля изученных, напоминания) без персональных данных. Активный день определяется таблицей `user_activity`.
+
 ## Частые проблемы
 - Бот: `TelegramNetworkError` или тайм-аут: Telegram недоступен напрямую (VPN, прокси). aiohttp не читает переменные http_proxy, адрес задаётся в TELEGRAM_PROXY.
 - Бот: `terminated by other getUpdates request`: запущено два экземпляра. `pkill -f "bot.main"`, подождать 30 секунд, запустить один.

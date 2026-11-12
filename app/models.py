@@ -269,3 +269,21 @@ class EmailVerificationToken(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+
+
+class UserActivity(Base):
+    """Активный день пользователя: в этот (местный) день он сделал хотя бы одно
+    действие с материалами. Одна строка на пользователя и день. Нужна для метрик
+    возврата; удаляется вместе с аккаунтом."""
+
+    __tablename__ = "user_activity"
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        autoincrement=False,
+    )
+    day: Mapped[date] = mapped_column(Date, primary_key=True)

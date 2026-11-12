@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
+from app.activity import record_activity
 from app.deps import CurrentUser, DbSession
 from app.models import Reminder
 from app.routers.contents import ContentId, get_own_content
@@ -74,6 +75,7 @@ def set_reminder(
         raise HTTPException(
             status.HTTP_409_CONFLICT, "Reminder was changed at the same time, repeat"
         )
+    record_activity(db, user)
     db.refresh(reminder)
     return reminder
 
