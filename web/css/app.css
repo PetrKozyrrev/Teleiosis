@@ -36,6 +36,7 @@
   --fs-stat: 1.5rem;
   --fs-h1: 1.75rem;
   --fs-h1-wide: 2rem;
+  --fs-display: 2rem;
 
   /* Отступы */
   --space-1: 4px;
@@ -139,6 +140,7 @@ a { color: var(--clay); text-underline-offset: 3px; }
 
 /* ---------- формы ---------- */
 .card { padding: var(--space-6); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.card h2 { font-size: var(--fs-xl); }
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
 .label { font-weight: 600; font-size: var(--fs-md); }
 .input {
@@ -187,7 +189,7 @@ textarea.input { min-height: 88px; }
 .button:hover:not(:disabled) { background: var(--clay-dark); }
 .button:disabled { opacity: 0.6; cursor: not-allowed; }
 
-/* Второстепенная кнопка с заливкой (пока не используется, нужна в R5) */
+/* Второстепенная кнопка с заливкой (пока не используется) */
 .button-secondary { background: var(--olive); color: var(--surface); }
 .button-secondary:hover:not(:disabled) { background: var(--olive-dark); }
 
@@ -365,8 +367,11 @@ textarea.input { resize: vertical; }
 
 /* ---------- карточка материала ---------- */
 .section { margin-top: var(--space-5); }
-.item-heading { overflow-wrap: anywhere; }
-.item-description { overflow-wrap: anywhere; }
+.item-heading { margin-bottom: var(--space-2); overflow-wrap: anywhere; }
+.item-heading + .item-meta { margin-bottom: var(--space-4); }
+#item-meta { gap: var(--space-1) var(--space-2); }
+#item-meta span + span::before { content: "·"; margin-right: var(--space-2); }
+.item-description { color: var(--muted); overflow-wrap: anywhere; }
 .status-group { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .status-button {
   min-height: var(--tap);
@@ -402,6 +407,7 @@ dialog::backdrop { background: var(--overlay); }
 .category-main .item-title,
 .category-main .hint { margin: 0; }
 .category-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.category-actions a { display: inline-flex; align-items: center; min-height: var(--tap); }
 .rename-form { display: flex; flex: 1; flex-wrap: wrap; gap: var(--space-2); }
 .rename-form .input { flex: 1 1 200px; width: auto; }
 
@@ -417,14 +423,52 @@ dialog::backdrop { background: var(--overlay); }
 /* ---------- прогресс ---------- */
 .stats-strip { margin: 0 0 var(--space-1); color: var(--muted); }
 .totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-3); margin: 0; }
-.totals div { padding: var(--space-3); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.totals div { padding: var(--space-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .totals dt { font-size: var(--fs-sm); color: var(--muted); }
-.totals dd { margin: 0; font-size: var(--fs-stat); font-weight: 600; font-variant-numeric: tabular-nums; }
-progress { display: block; width: 100%; height: 14px; accent-color: var(--olive); }
+.totals dd { margin: 0; font-family: var(--font-display); font-size: var(--fs-display); line-height: 1.2; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Плитка «Изучено» (вторая): главная ценность продукта */
+.totals div:nth-child(2) { background: var(--olive); border-color: var(--olive); color: var(--surface); }
+.totals div:nth-child(2) dt { color: var(--surface); }
+
+/* Полосы: скруглённые, с рамкой, чтобы пустая полоса была видна */
+progress {
+  display: block;
+  width: 100%;
+  height: 14px;
+  overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--oat);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-pill);
+  accent-color: var(--olive);
+}
+progress::-webkit-progress-bar { background: var(--oat); }
+progress::-webkit-progress-value { background: var(--olive); border-radius: var(--radius-pill); }
+progress::-moz-progress-bar { background: var(--olive); border-radius: var(--radius-pill); }
+
 .table-wrap { overflow-x: auto; }
 .days { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .days caption { padding-bottom: var(--space-2); text-align: left; font-size: var(--fs-md); color: var(--muted); }
 .days th, .days td { padding: var(--space-2) 10px; text-align: left; border-bottom: 1px solid var(--border); }
+.days thead th { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); border-bottom-color: var(--field-border); }
 .days th[scope="col"]:not(:first-child), .days td { text-align: right; }
-.topics { margin: 0; padding-left: 1.25rem; }
-.topics li { margin-bottom: 6px; }
+.days tbody tr:last-child { background: var(--surface); font-weight: 600; }
+
+.topics { margin: 0; padding: 0; list-style: none; counter-reset: topic; }
+.topics li { display: flex; align-items: center; gap: var(--space-3); counter-increment: topic; }
+.topics li::before {
+  content: counter(topic);
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--olive);
+  border: 1px solid var(--olive);
+  border-radius: 50%;
+}
+.topics a { display: inline-flex; align-items: center; min-height: var(--tap); }
