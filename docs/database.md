@@ -90,7 +90,7 @@ CHECK (status IN ('pending','sent','cancelled')). У материала не б�
 | Поле | Тип | Ограничения |
 |---|---|---|
 | id | BIGINT, identity | PK |
-| bucket | TEXT | NOT NULL (название счётчика: login_ip, login_email_ip, register_ip, reset_email, reset_ip, verify_user, verify_ip, password_user) |
+| bucket | TEXT | NOT NULL (название счётчика: login_ip, login_email_ip, register_ip, reset_email, reset_ip, verify_user, verify_ip, password_user,export_user) |
 | key_hash | TEXT | NOT NULL, CHECK длина 64 (SHA-256 от адреса или e-mail) |
 | created_at | TIMESTAMPTZ | NOT NULL, now() |
 
