@@ -187,7 +187,7 @@ textarea.input { min-height: 88px; }
 .button:hover:not(:disabled) { background: var(--clay-dark); }
 .button:disabled { opacity: 0.6; cursor: not-allowed; }
 
-/* Второстепенная кнопка с заливкой (пока не используется, нужна в R4-R5) */
+/* Второстепенная кнопка с заливкой (пока не используется, нужна в R5) */
 .button-secondary { background: var(--olive); color: var(--surface); }
 .button-secondary:hover:not(:disabled) { background: var(--olive-dark); }
 
@@ -214,10 +214,11 @@ textarea.input { min-height: 88px; }
 
 /* Движение только для тех, кто его не отключал */
 @media (prefers-reduced-motion: no-preference) {
-  .button, .button-quiet, .status-button, .input, .topnav a {
+  .button, .button-quiet, .status-button, .input, .topnav a, .item {
     transition: background-color var(--duration-fast) var(--ease),
       border-color var(--duration-fast) var(--ease),
-      color var(--duration-fast) var(--ease);
+      color var(--duration-fast) var(--ease),
+      box-shadow var(--duration-fast) var(--ease);
   }
   .button:active:not(:disabled),
   .button-quiet:active:not(:disabled) { transform: translateY(1px); }
@@ -294,27 +295,78 @@ textarea.input { resize: vertical; }
 }
 
 .count { margin: var(--space-2) 0 var(--space-3); font-size: var(--fs-md); color: var(--muted); }
-.retry { margin-bottom: var(--space-3); }
+.retry { min-width: 160px; margin-bottom: var(--space-3); }
+
 .items { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+
+/* Загрузка первой страницы: серая заглушка карточки (список в это время пуст) */
+.items[aria-busy="true"]:empty::before {
+  content: "";
+  display: block;
+  min-height: 116px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(var(--border), var(--border)) 16px 18px / 38% 10px no-repeat,
+    linear-gradient(var(--border), var(--border)) 16px 44px / 72% 16px no-repeat,
+    linear-gradient(var(--border), var(--border)) 16px 76px / 52% 10px no-repeat,
+    var(--surface);
+}
+@keyframes pulse {
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .items[aria-busy="true"]:empty::before { animation: pulse 1.4s ease-in-out infinite; }
+}
+
 .item { padding: var(--space-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.item:focus-within { border-color: var(--field-border); }
+@media (hover: hover) {
+  .item:hover { border-color: var(--field-border); box-shadow: var(--shadow-sm); }
+}
 .item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin-bottom: 6px; font-size: var(--fs-sm); color: var(--muted); }
 .source { display: inline-flex; align-items: center; gap: 6px; }
 .source img { width: 18px; height: 18px; }
-.chip { padding: 1px 10px; font-size: var(--fs-xs); color: var(--espresso); border: 1px solid var(--field-border); border-radius: var(--radius-pill); }
+
+/* Чип статуса: слово несёт смысл, точка и фон только помогают */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 10px;
+  font-size: var(--fs-xs);
+  color: var(--espresso);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-pill);
+}
+.chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+}
 .chip-planned { background: var(--beach); border-color: var(--beach); }
 .chip-studied { color: var(--surface); background: var(--olive); border-color: var(--olive); }
 .chip-irrelevant { color: var(--muted); border-style: dashed; }
+
 .item-title { margin: 0 0 6px; font-size: var(--fs-lg); line-height: 1.35; overflow-wrap: anywhere; }
+.item-title a { color: var(--espresso); text-decoration-color: var(--border); text-decoration-thickness: 2px; }
+.item-title a:hover { color: var(--clay); text-decoration-color: currentColor; }
 .item-text { display: -webkit-box; margin: 0 0 6px; overflow: hidden; color: var(--muted); overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .item-note { margin: 0; padding-left: 10px; border-left: 3px solid var(--beach); overflow-wrap: anywhere; white-space: pre-line; }
+.item-links { margin: var(--space-1) 0 calc(var(--space-2) * -1); font-size: var(--fs-md); }
+.item-links a { display: inline-flex; align-items: center; min-height: var(--tap); }
+
 .empty h3 { margin: 0 0 var(--space-2); font-size: var(--fs-xl); }
-.more { display: block; margin: var(--space-4) auto 0; }
+.library .empty { text-align: center; }
+.more { display: block; min-width: 200px; margin: var(--space-4) auto 0; }
 
 /* ---------- карточка материала ---------- */
 .section { margin-top: var(--space-5); }
 .item-heading { overflow-wrap: anywhere; }
 .item-description { overflow-wrap: anywhere; }
-.item-links { margin: var(--space-2) 0 0; font-size: var(--fs-md); }
 .status-group { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .status-button {
   min-height: var(--tap);
