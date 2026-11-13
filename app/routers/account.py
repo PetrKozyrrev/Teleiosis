@@ -1,15 +1,25 @@
+from typing import Annotated
+
 from fastapi import APIRouter, HTTPException, Request, Response, status
+from pydantic import BaseModel, ConfigDict, StringConstraints
 from sqlalchemy import delete
 
-from app.cookies import cookie_name
+from app.cookies import clear_session_cookie, cookie_name
 from app.deps import CurrentUser, DbSession
-from app.models import AuthSession, PasswordResetToken
+from app.models import AuthSession, PasswordResetToken, User
 from app.passwords import hash_password, verify_password
 from app.ratelimit import PASSWORD_USER, check_limits, clear, make_key, record
 from app.schemas import ChangePasswordRequest
 from app.sessions import hash_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+class DeleteAccountRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Пароль не обрезается: пробелы по краям тоже часть пароля
+    password: Annotated[str, StringConstraints(min_length=1, max_length=128)]
 
 
 def current_token(request: Request) -> str | None:
@@ -53,5 +63,36 @@ def change_password(
     clear(db, PASSWORD_USER, user_key)
 
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@router.post("/delete-account", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(data: DeleteAccountRequest, db: DbSession, user: CurrentUser):
+    """Безвозвратно удаляет аккаунт и все данные пользователя после проверки пароля.
+
+    Категории, материалы, напоминания, сессии, токены и активные дни удаляет сама
+    база (внешние ключи с ON DELETE CASCADE). Журнал rate_limit_events хранит только
+    хэши и сам очищается за пару часов."""
+    if user.password_hash is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Account has no password")
+
+    # Те же правила, что у смены пароля: лимит до хэширования, 400 вместо 401
+    user_key = make_key(str(user.id))
+    check_limits(db, (PASSWORD_USER, user_key))
+    if not verify_password(data.password, user.password_hash):
+        record(db, PASSWORD_USER, user_key)
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is incorrect")
+
+    db.execute(
+        delete(User)
+        .where(User.id == user.id)
+        .execution_options(synchronize_session=False)
+    )
+    db.commit()
+    clear(db, PASSWORD_USER, user_key)
+
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    clear_session_cookie(response)
     response.headers["Cache-Control"] = "no-store"
     return response
