@@ -509,3 +509,36 @@ progress::-moz-progress-bar { background: var(--olive); border-radius: var(--rad
   border-radius: 50%;
 }
 .topics a { display: inline-flex; align-items: center; min-height: var(--tap); }
+
+/* ---------- R7: иллюстрации пустых состояний и мягкое движение ---------- */
+.empty { text-align: center; }
+
+.library .empty::before,
+.section .empty::before,
+.page > .empty::before {
+  content: "";
+  display: block;
+  width: 160px;
+  max-width: 100%;
+  height: 120px;
+  margin: 0 auto var(--space-4);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+/* Библиотека пуста, список категорий пуст */
+.library .empty::before,
+.section .empty::before { background-image: url("../img/empty-library.svg"); }
+/* Ничего не найдено: у этого блока видна кнопка «Сбросить фильтры» */
+.library .empty:has(#reset-filters:not([hidden]))::before { background-image: url("../img/empty-search.svg"); }
+/* «Прогресс» без материалов */
+.page > .empty::before { background-image: url("../img/empty-progress.svg"); }
+
+@keyframes soft-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .message { animation: soft-in var(--duration-base) var(--ease) both; }
+  dialog[open] { animation: soft-in var(--duration-base) var(--ease) both; }
+}
