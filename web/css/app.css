@@ -542,3 +542,17 @@ progress::-moz-progress-bar { background: var(--olive); border-radius: var(--rad
   .message { animation: soft-in var(--duration-base) var(--ease) both; }
   dialog[open] { animation: soft-in var(--duration-base) var(--ease) both; }
 }
+
+/* ---------- R8: ссылка «Перейти к содержимому» ---------- */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: var(--space-4);
+  z-index: 10;
+  padding: var(--space-3) var(--space-4);
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--espresso);
+  border-radius: var(--radius-sm);
+}
+.skip-link:focus { top: var(--space-2); }

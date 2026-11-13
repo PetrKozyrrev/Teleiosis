@@ -252,3 +252,9 @@ def test_item_page_has_the_reminder_block():
     assert "/reminder" in script
     assert "toISOString" in script  # на сервер уходит абсолютный момент
     assert "getFullYear" in script  # значение поля строится из локальных частей
+
+@pytest.mark.parametrize("page", ["index.html", "item.html", "categories.html", "add.html", "bookmark.html", "settings.html", "progress.html"])
+def test_pages_with_main_have_the_skip_link(page):
+    html = (WEB / page).read_text(encoding="utf-8")
+    assert 'class="skip-link" href="#main"' in html
+    assert 'id="main"' in html
