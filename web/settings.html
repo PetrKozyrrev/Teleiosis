@@ -83,7 +83,42 @@
         <button class="button button-inline" type="submit">Сменить пароль</button>
       </form>
     </section>
+
+    <section class="card section" aria-labelledby="export-heading">
+      <h2 id="export-heading">Ваши данные</h2>
+      <p>Скачайте копию всего, что вы сохранили: профиль, материалы, категории, напоминания и активные дни. Файл в формате JSON, пароль и сессии в него не входят.</p>
+      <p id="export-error" class="message message-error" role="alert" hidden></p>
+      <p id="export-info" class="message message-info" role="status" hidden></p>
+      <button class="button-quiet" id="export-data" type="button">Скачать данные</button>
+      <p class="hint">Файл содержит ваш e-mail и все материалы. Храните его в надёжном месте.</p>
+    </section>
+
+    <section class="card section section-danger" aria-labelledby="delete-heading">
+      <h2 id="delete-heading">Удаление аккаунта</h2>
+      <p>Аккаунт и все ваши материалы, категории и напоминания будут удалены безвозвратно. Отменить это нельзя. Сначала можно скачать данные выше.</p>
+      <button class="button-quiet button-danger-quiet" id="delete-open" type="button">Удалить аккаунт</button>
+    </section>
   </main>
+
+  <dialog id="delete-account-dialog" aria-labelledby="delete-account-heading">
+    <form id="delete-form" method="dialog">
+      <h2 id="delete-account-heading">Удалить аккаунт?</h2>
+      <p>Все данные будут стёрты без возможности восстановления. Для подтверждения введите пароль.</p>
+      <p id="delete-error" class="message message-error" role="alert" hidden></p>
+      <div class="field">
+        <label class="label" for="delete-password">Пароль</label>
+        <div class="password-row">
+          <input class="input" id="delete-password" name="password" type="password" autocomplete="current-password" required>
+          <button class="button-quiet" id="toggle-delete" type="button" aria-controls="delete-password" aria-label="Показать пароль">Показать</button>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="button-quiet" id="delete-cancel" type="button">Отмена</button>
+        <button class="button button-danger button-inline" type="submit">Удалить навсегда</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="js/boot.js"></script>
   <script type="module" src="js/settings.js"></script>
 </body>

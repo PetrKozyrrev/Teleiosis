@@ -556,3 +556,9 @@ progress::-moz-progress-bar { background: var(--olive); border-radius: var(--rad
   border-radius: var(--radius-sm);
 }
 .skip-link:focus { top: var(--space-2); }
+
+
+/* ---------- 8.1c: данные и удаление аккаунта ---------- */
+.section-danger { border-color: var(--error); }
+.section-danger h2 { color: var(--error); }
+#delete-account-dialog .field { margin-top: var(--space-4); }

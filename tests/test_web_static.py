@@ -258,3 +258,22 @@ def test_pages_with_main_have_the_skip_link(page):
     html = (WEB / page).read_text(encoding="utf-8")
     assert 'class="skip-link" href="#main"' in html
     assert 'id="main"' in html
+
+def test_settings_page_has_export_and_delete_blocks():
+    html = (WEB / "settings.html").read_text(encoding="utf-8")
+    assert 'id="export-data"' in html
+    assert 'id="delete-open"' in html
+    assert 'id="delete-form" method="dialog"' in html
+    assert 'type="password"' in html and 'id="delete-password"' in html
+
+
+def test_settings_script_uses_export_and_delete_endpoints():
+    text = (WEB / "js" / "settings.js").read_text(encoding="utf-8")
+    assert '"/me/export"' in text
+    assert '"/auth/delete-account"' in text
+    assert "revokeObjectURL" in text
+
+
+def test_settings_keeps_the_skip_link():
+    html = (WEB / "settings.html").read_text(encoding="utf-8")
+    assert 'class="skip-link" href="#main"' in html

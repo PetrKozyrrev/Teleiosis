@@ -157,6 +157,83 @@ onSubmit(passwordForm, async () => {
   }
 });
 
+// ---------- выгрузка данных ----------
+
+const exportButton = $("#export-data");
+const exportError = $("#export-error");
+const exportInfo = $("#export-info");
+
+// Файл собирается в браузере из ответа API: ошибки (например, 429) показываются
+// текстом, а не открываются страницей с сырым JSON.
+exportButton.addEventListener("click", async () => {
+  hideMessage(exportError);
+  hideMessage(exportInfo);
+  exportButton.disabled = true;
+  try {
+    const data = await api("GET", "/me/export");
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = el("a", { attrs: { href: url, download: "teleiosis-export.json" } });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    showInfo(exportInfo, "Файл teleiosis-export.json сохранён в папку загрузок.");
+  } catch (e) {
+    if (redirectIfUnauthorized(e)) return;
+    showError(exportError, describeError(e));
+  } finally {
+    exportButton.disabled = false;
+  }
+});
+
+// ---------- удаление аккаунта ----------
+
+const deleteDialog = $("#delete-account-dialog");
+const deleteForm = $("#delete-form");
+const deleteError = $("#delete-error");
+const deletePassword = $("#delete-password");
+attachPasswordToggle($("#toggle-delete"), deletePassword);
+
+$("#delete-open").addEventListener("click", () => {
+  hideMessage(deleteError);
+  if (typeof deleteDialog.showModal === "function") deleteDialog.showModal();
+  else deleteDialog.setAttribute("open", "");
+  deletePassword.focus();
+});
+
+$("#delete-cancel").addEventListener("click", () => deleteDialog.close());
+
+// Закрытие (кнопка, Esc) стирает пароль из поля и прежнюю ошибку
+deleteDialog.addEventListener("close", () => {
+  deleteForm.reset();
+  deletePassword.type = "password";
+  $("#toggle-delete").textContent = "Показать";
+  hideMessage(deleteError);
+});
+
+// Отправка перехвачена: при ошибке окно остаётся открытым
+onSubmit(deleteForm, async () => {
+  hideMessage(deleteError);
+  const password = deletePassword.value;
+  if (!password) {
+    showError(deleteError, "Введите пароль.");
+    deletePassword.focus();
+    return;
+  }
+  try {
+    await api("POST", "/auth/delete-account", { password });
+    location.replace("login.html");
+  } catch (e) {
+    if (redirectIfUnauthorized(e)) return;
+    showError(
+      deleteError,
+      describeError(e, { 400: "Пароль неверный. Аккаунт не удалён." }),
+    );
+    deletePassword.focus();
+  }
+});
+
 async function main() {
   user = await requireUser();
   initTopbar(user);
