@@ -28,15 +28,17 @@
   </header>
   <p id="error" class="message message-error" role="alert" hidden></p>
   <p id="boot-error" class="message message-error" role="alert" hidden></p>
-  <main class="page" id="main" hidden>
-    <p><a href="./">Назад в библиотеку</a></p>
+  <main class="page page-item" id="main" hidden>
+    <p class="back-link"><a href="./">Назад в библиотеку</a></p>
     <p id="missing" class="message message-error" role="alert" hidden></p>
-    <article id="item" hidden>
-      <h1 class="item-heading" id="item-title"></h1>
-      <div class="item-meta" id="item-meta"></div>
-      <p id="item-error" class="message message-error" role="alert" hidden></p>
-      <p><a class="button button-inline" id="item-link" target="_blank" rel="noopener noreferrer" hidden>Открыть оригинал</a></p>
-      <p class="item-description" id="item-description" hidden></p>
+    <article class="item-detail-grid" id="item" hidden>
+      <div class="card item-overview">
+        <h1 class="item-heading" id="item-title"></h1>
+        <div class="item-meta" id="item-meta"></div>
+        <p id="item-error" class="message message-error" role="alert" hidden></p>
+        <p><a class="button button-inline" id="item-link" target="_blank" rel="noopener noreferrer" hidden>Открыть оригинал</a></p>
+        <p class="item-description" id="item-description" hidden></p>
+      </div>
 
       <section class="card section" aria-labelledby="status-title">
         <h2 id="status-title">Статус</h2>
@@ -62,7 +64,7 @@
         <p class="hint"><a href="categories.html">Управление категориями</a></p>
       </section>
 
-            <section class="card section" aria-labelledby="reminder-title">
+      <section class="card section" aria-labelledby="reminder-title">
         <h2 id="reminder-title">Напоминание</h2>
         <p id="reminder-error" class="message message-error" role="alert" hidden></p>
         <p id="reminder-status" aria-live="polite"></p>
@@ -101,7 +103,7 @@
         </form>
       </section>
 
-      <section class="section">
+      <section class="section item-footer">
         <p class="hint" id="opens"></p>
         <button class="button-quiet button-danger-quiet" id="delete" type="button">Удалить материал</button>
       </section>

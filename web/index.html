@@ -29,15 +29,18 @@
   <p id="error" class="message message-error" role="alert" hidden></p>
   <p id="boot-error" class="message message-error" role="alert" hidden></p>
   <main class="page" id="main" hidden>
-    <h1>Библиотека</h1>
-    <p class="stats-strip" id="stats-strip" hidden></p>
+    <div class="library-heading">
+      <h1>Библиотека</h1>
+      <p class="lead">Сохраняйте полезное. Возвращайтесь к важному.</p>
+      <p class="stats-strip" id="stats-strip" hidden></p>
+    </div>
 
     <section class="card quick-add" aria-labelledby="add-title">
       <h2 id="add-title">Добавить материал</h2>
       <p id="add-error" class="message message-error" role="alert" hidden></p>
       <p id="add-info" class="message message-info" role="status" hidden></p>
       <form id="add-form" method="post">
-        <div class="field">
+        <div class="field quick-add-content">
           <label class="label" for="add-input">Ссылка или заметка</label>
           <textarea class="input" id="add-input" name="content" rows="2" maxlength="10000" aria-describedby="add-hint" required></textarea>
           <p class="hint" id="add-hint">К ссылке можно добавить пару слов через пробел: они станут заметкой. Ctrl+Enter сохраняет.</p>

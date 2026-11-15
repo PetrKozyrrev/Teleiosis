@@ -28,7 +28,7 @@
   </header>
   <p id="error" class="message message-error" role="alert" hidden></p>
   <p id="boot-error" class="message message-error" role="alert" hidden></p>
-  <main class="page" id="main" hidden>
+  <main class="page page-progress" id="main" hidden>
     <h1>Прогресс</h1>
     <p class="lead">Важно не сколько вы сохранили, а сколько изучили и к скольким вернулись.</p>
     <p id="stats-error" class="message message-error" role="alert" hidden></p>
@@ -38,8 +38,8 @@
       <p>Сохраните первый материал в <a href="./">библиотеке</a>, и здесь появится статистика.</p>
     </div>
 
-    <div id="content" hidden>
-      <section class="section" aria-labelledby="totals-title">
+    <div class="progress-grid" id="content" hidden>
+      <section class="section progress-totals" aria-labelledby="totals-title">
         <h2 id="totals-title">Материалы</h2>
         <dl class="totals">
           <div><dt>Всего</dt><dd id="t-total"></dd></div>
@@ -63,7 +63,7 @@
         <progress id="returns-bar" aria-labelledby="returns-title" max="1" value="0"></progress>
       </section>
 
-      <section class="section" aria-labelledby="week-title">
+      <section class="card section" aria-labelledby="week-title">
         <h2 id="week-title">За 7 дней</h2>
         <p id="week-text"></p>
         <div class="table-wrap">
@@ -77,7 +77,7 @@
         </div>
       </section>
 
-      <section class="section" aria-labelledby="topics-title">
+      <section class="card section" aria-labelledby="topics-title">
         <h2 id="topics-title">Популярные категории</h2>
         <p class="hint" id="topics-empty" hidden>Назначьте материалам категории, и здесь появится рейтинг.</p>
         <ol class="topics" id="topics"></ol>
