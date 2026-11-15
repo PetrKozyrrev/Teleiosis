@@ -1,76 +1,33 @@
-"""Помощники для тестов: генерация подписанного initData и вход по токену.
+"""Помощники тестов: пользователи с e-mail и сессии сайта."""
 
-Подпись считается здесь независимо от app/telegram_auth.py,
-чтобы тест не проверял код его же копией.
-"""
+from sqlalchemy import select
 
-import hashlib
-import hmac
-import json
-import time
-from urllib.parse import urlencode
-
-from app.deps import get_or_create_user
+from app.models import User
 from app.sessions import create_session
 
-# Тестовая сессия БД и выданные в ней токены. Выставляется в conftest.py.
-_state: dict = {"session": None, "headers": {}}
-
-USER = {"id": 42, "first_name": "Иван", "username": "ivan_1"}
-
-# Адрес сайта в тестах: тестовые настройки (conftest.py) задают тот же origin
 ORIGIN = "http://localhost:8000"
-
-
-def sign(fields: dict[str, str], bot_token: str) -> str:
-    check_string = "\n".join(f"{k}={v}" for k, v in sorted(fields.items()))
-    secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
-    return hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
-
-
-def build_init_data(
-    bot_token: str,
-    *,
-    user: dict | None = USER,
-    auth_date: int | None = None,
-    extra: dict[str, str] | None = None,
-    drop: tuple[str, ...] = (),
-) -> str:
-    """Строка initData с корректной подписью.
-
-    user=None: без поля user. extra: добавить или заменить поля до подписи.
-    drop: убрать поля до подписи.
-    """
-    date = int(time.time()) if auth_date is None else auth_date
-    fields = {"auth_date": str(date), "query_id": "AAH-test"}
-    if user is not None:
-        fields["user"] = json.dumps(user, separators=(",", ":"), ensure_ascii=False)
-    fields.update(extra or {})
-    for name in drop:
-        fields.pop(name, None)
-    fields["hash"] = sign(fields, bot_token)
-    return urlencode(fields)
-
+_state: dict = {"session": None, "headers": {}}
 
 
 def bind_session(session) -> None:
-    """Вызывается из conftest.py: запоминает сессию БД текущего теста."""
+    """Каждый тест получает отдельную сессию БД и кэш учётных данных."""
     _state["session"] = session
     _state["headers"] = {}
 
 
-def auth_headers(telegram_id: int) -> dict[str, str]:
-    """Заголовок входа по токену для пользователя с этим Telegram ID.
-
-    Создаёт пользователя и настоящую сессию в тестовой БД (теми же функциями,
-    что и боевой код). Повторный вызов в том же тесте возвращает тот же токен.
-    """
+def auth_headers(user_key: int) -> dict[str, str]:
+    """Cookie и Origin для тестового пользователя user{user_key}@example.com."""
     session = _state["session"]
     if session is None:
         raise RuntimeError("auth_headers нужен тест с фикстурой session или client")
     cache = _state["headers"]
-    if telegram_id not in cache:
-        user = get_or_create_user(session, telegram_id)
+    if user_key not in cache:
+        email = f"user{user_key}@example.com"
+        user = session.scalar(select(User).where(User.email == email))
+        if user is None:
+            user = User(email=email)
+            session.add(user)
+            session.flush()
         token, _ = create_session(session, user)
-        cache[telegram_id] = {"Authorization": f"Bearer {token}"}
-    return dict(cache[telegram_id])
+        cache[user_key] = {"Cookie": f"session={token}", "Origin": ORIGIN}
+    return dict(cache[user_key])

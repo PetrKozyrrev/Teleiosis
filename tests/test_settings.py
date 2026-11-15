@@ -4,12 +4,12 @@ from app.models import User
 from tests.helpers import ORIGIN, auth_headers as auth
 
 
-def patch(client, telegram_id=1, **body):
-    return client.patch("/me/settings", json=body, headers=auth(telegram_id))
+def patch(client, user_key=1, **body):
+    return client.patch("/me/settings", json=body, headers=auth(user_key))
 
 
-def me(client, telegram_id=1):
-    return client.get("/me", headers=auth(telegram_id)).json()
+def me(client, user_key=1):
+    return client.get("/me", headers=auth(user_key)).json()
 
 
 def test_requires_auth(client):

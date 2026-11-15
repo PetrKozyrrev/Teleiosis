@@ -43,7 +43,7 @@ def session(engine):
 def client(session):
     """API-клиент, который работает в тестовой сессии (откатывается после теста).
 
-    Dev-вход здесь не включается: тесты входят по токену (tests.helpers.auth_headers).
+    Тесты используют e-mail-аккаунты и cookie-сессии (tests.helpers.auth_headers).
     """
     app.dependency_overrides[get_db] = lambda: session
     with TestClient(app) as test_client:

@@ -186,7 +186,7 @@ def test_confirm_closes_all_sessions_of_that_user_only(client, session, outbox):
     other = make_user(session, email="other@example.com")
     login(client)
     old_cookie = client.cookies.get("session")
-    bearer, _ = create_session(session, user)
+    other_token, _ = create_session(session, user)
     create_session(session, other)
     assert count(session, AuthSession) == 3
 
@@ -195,7 +195,7 @@ def test_confirm_closes_all_sessions_of_that_user_only(client, session, outbox):
 
     client.cookies.clear()
     assert client.get("/me", headers={"Cookie": f"session={old_cookie}"}).status_code == 401
-    assert client.get("/me", headers={"Authorization": f"Bearer {bearer}"}).status_code == 401
+    assert client.get("/me", headers={"Cookie": f"session={other_token}"}).status_code == 401
 
 
 def test_token_is_single_use(client, session, outbox):

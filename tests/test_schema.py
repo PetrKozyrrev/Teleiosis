@@ -5,8 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from app.models import Category, Content, Reminder, User
 
 
-def make_user(session, telegram_id=1):
-    user = User(telegram_id=telegram_id)
+def make_user(session, user_key=1):
+    user = User(email=f"user{user_key}@example.com")
     session.add(user)
     session.flush()
     return user
@@ -32,10 +32,10 @@ def test_defaults(session):
     assert content.source == "other"
 
 
-def test_telegram_id_unique(session):
-    make_user(session, telegram_id=5)
+def test_email_unique(session):
+    make_user(session, user_key=5)
     with pytest.raises(IntegrityError):
-        make_user(session, telegram_id=5)
+        make_user(session, user_key=5)
 
 
 def test_duplicate_url_rejected(session):

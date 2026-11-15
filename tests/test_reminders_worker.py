@@ -110,16 +110,13 @@ def test_not_sent_twice(session):
 def test_blocked_users_wait_until_they_can_receive_mail(session):
     unverified = make_user(session, "a@example.com", verified=False)
     disabled = make_user(session, "b@example.com", enabled=False)
-    telegram_only = User(telegram_id=5)
-    session.add(telegram_only)
-    session.flush()
     rows = [
         add_reminder(session, user, add_content(session, user), NOW - timedelta(minutes=1))
-        for user in (unverified, disabled, telegram_only)
+        for user in (unverified, disabled)
     ]
     outbox = Outbox()
     assert run(session, outbox).sent == 0
-    assert [status_of(session, row) for row in rows] == ["pending"] * 3
+    assert [status_of(session, row) for row in rows] == ["pending"] * 2
 
     unverified.email_verified_at = NOW
     disabled.reminders_enabled = True

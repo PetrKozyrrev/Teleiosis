@@ -5,18 +5,18 @@ from sqlalchemy.exc import IntegrityError
 from tests.helpers import auth_headers as auth
 
 
-def save(client, telegram_id=1, **body):
-    response = client.post("/contents", json=body, headers=auth(telegram_id))
+def save(client, user_key=1, **body):
+    response = client.post("/contents", json=body, headers=auth(user_key))
     assert response.status_code == 201, response.text
     return response.json()
 
 
-def open_it(client, content_id, telegram_id=1):
-    return client.post(f"/contents/{content_id}/open", headers=auth(telegram_id))
+def open_it(client, content_id, user_key=1):
+    return client.post(f"/contents/{content_id}/open", headers=auth(user_key))
 
 
-def get(client, content_id, telegram_id=1):
-    return client.get(f"/contents/{content_id}", headers=auth(telegram_id))
+def get(client, content_id, user_key=1):
+    return client.get(f"/contents/{content_id}", headers=auth(user_key))
 
 
 def test_new_material_has_no_openings(client):
@@ -61,7 +61,7 @@ def test_open_requires_auth(client):
 
 def test_other_user_cannot_open_and_count_stays(client):
     item = save(client, 1, url="https://example.com/a")
-    assert open_it(client, item["id"], telegram_id=2).status_code == 404
+    assert open_it(client, item["id"], user_key=2).status_code == 404
     assert get(client, item["id"], 1).json()["open_count"] == 0
 
 

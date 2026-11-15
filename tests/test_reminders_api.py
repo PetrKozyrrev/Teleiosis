@@ -8,8 +8,8 @@ from app.models import Reminder
 from tests.helpers import ORIGIN, auth_headers as auth
 
 
-def save(client, telegram_id=1, **body):
-    response = client.post("/contents", json=body, headers=auth(telegram_id))
+def save(client, user_key=1, **body):
+    response = client.post("/contents", json=body, headers=auth(user_key))
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -18,17 +18,17 @@ def future(**delta):
     return (datetime.now(timezone.utc) + timedelta(**delta)).isoformat()
 
 
-def put(client, content_id, when, telegram_id=1, **extra):
+def put(client, content_id, when, user_key=1, **extra):
     body = {"scheduled_at": when, **extra}
-    return client.put(f"/contents/{content_id}/reminder", json=body, headers=auth(telegram_id))
+    return client.put(f"/contents/{content_id}/reminder", json=body, headers=auth(user_key))
 
 
-def get(client, content_id, telegram_id=1):
-    return client.get(f"/contents/{content_id}/reminder", headers=auth(telegram_id))
+def get(client, content_id, user_key=1):
+    return client.get(f"/contents/{content_id}/reminder", headers=auth(user_key))
 
 
-def delete(client, content_id, telegram_id=1):
-    return client.delete(f"/contents/{content_id}/reminder", headers=auth(telegram_id))
+def delete(client, content_id, user_key=1):
+    return client.delete(f"/contents/{content_id}/reminder", headers=auth(user_key))
 
 
 def count(session, **filters):
@@ -140,11 +140,11 @@ def test_missing_and_extra_fields_rejected(client):
 
 def test_other_user_cannot_touch_reminders(client, session):
     item = save(client, 1, note="x")
-    put(client, item["id"], future(days=1), telegram_id=1)
-    assert get(client, item["id"], telegram_id=2).status_code == 404
-    assert put(client, item["id"], future(days=1), telegram_id=2).status_code == 404
-    assert delete(client, item["id"], telegram_id=2).status_code == 404
-    assert get(client, item["id"], telegram_id=1).json() is not None
+    put(client, item["id"], future(days=1), user_key=1)
+    assert get(client, item["id"], user_key=2).status_code == 404
+    assert put(client, item["id"], future(days=1), user_key=2).status_code == 404
+    assert delete(client, item["id"], user_key=2).status_code == 404
+    assert get(client, item["id"], user_key=1).json() is not None
     assert count(session) == 1
 
 
@@ -171,8 +171,8 @@ def test_limit_counts_each_user_separately(client, monkeypatch):
     monkeypatch.setattr(reminders_module, "MAX_PENDING_PER_USER", 1)
     mine = save(client, 1, note="x")
     theirs = save(client, 2, note="y")
-    assert put(client, mine["id"], future(days=1), telegram_id=1).status_code == 200
-    assert put(client, theirs["id"], future(days=1), telegram_id=2).status_code == 200
+    assert put(client, mine["id"], future(days=1), user_key=1).status_code == 200
+    assert put(client, theirs["id"], future(days=1), user_key=2).status_code == 200
 
 
 def test_deleting_the_material_removes_its_reminder(client, session):

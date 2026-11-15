@@ -5,8 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from app.models import Content, Reminder, User
 
 
-def make_user(session, telegram_id=1):
-    user = User(telegram_id=telegram_id)
+def make_user(session, user_key=1):
+    user = User(email=f"user{user_key}@example.com")
     session.add(user)
     session.flush()
     return user

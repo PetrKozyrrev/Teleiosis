@@ -6,10 +6,8 @@
 | Поле | Тип | Ограничения |
 |---|---|---|
 | id | BIGINT, identity | PK |
-| telegram_id | BIGINT | NULL, UNIQUE (нужен только пользователям из Telegram, заморожено) |
-| username | TEXT | NULL |
-| email | TEXT | NULL, UNIQUE, CHECK email = lower(email), длина не больше 254 |
-| password_hash | TEXT | NULL, CHECK: хэш возможен только при заданном e-mail |
+| email | TEXT | NOT NULL, UNIQUE, CHECK email = lower(email), длина не больше 254 |
+| password_hash | TEXT | NULL; регистрация всегда записывает Argon2id-хэш |
 | email_verified_at | TIMESTAMPTZ | NULL |
 | consent_at | TIMESTAMPTZ | NULL |
 | consent_version | TEXT | NULL, CHECK: consent_at и consent_version задаются парой |
@@ -19,7 +17,7 @@
 | last_digest_on | DATE | NULL (локальная дата последней отправленной подборки; защита от двойной отправки) |
 | created_at | TIMESTAMPTZ | NOT NULL, по умолчанию now() |
 
-Дополнительно CHECK (email IS NOT NULL OR telegram_id IS NOT NULL): у пользователя есть хотя бы один способ входа. Уникальность не мешает нескольким значениям NULL, поэтому пользователи без Telegram или без e-mail не конфликтуют. Приложение само приводит e-mail к нижнему регистру, а БД это проверяет. В хэше пароля лежит строка Argon2id целиком (соль внутри). Telegram ID превышает размер INTEGER, поэтому BIGINT. Настройки напоминаний хранятся в users (связь 1:1).
+E-mail обязателен и уникален, приложение приводит его к нижнему регистру, а БД проверяет регистр. Хэш пароля содержит параметры Argon2id и соль. Настройки напоминаний хранятся в users. Telegram-идентификаторы удалены миграцией j1f3a5b7c9d0; таблица auth_sessions продолжает обслуживать cookie-сессии сайта.
 
 ## categories
 | Поле | Тип | Ограничения |
@@ -152,6 +150,6 @@ CHECK (status IN ('pending','sent','cancelled')). У материала не б�
 | Категория | Материалы остаются, category_id становится NULL («Без категории») |
 
 ## Запланировано на этапе 8
-Изменений схемы не планируется. Удаление аккаунта и выгрузка данных работают поверх существующих таблиц (выгрузка должна включать `user_activity`).
+15.11.2026: миграция j1f3a5b7c9d0 переводит пользователей на обязательный e-mail и удаляет Telegram-поля. Удаление аккаунта и выгрузка данных работают поверх существующих таблиц (выгрузка должна включать `user_activity`).
 
 Каждая миграция проверяется вручную: `alembic upgrade head` и `alembic downgrade -1` (тесты строят БД из моделей и расхождение с миграциями не ловят).

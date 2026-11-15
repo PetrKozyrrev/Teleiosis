@@ -98,9 +98,6 @@ def add_content(session, user, status="unseen", **fields):
 def test_compute_metrics_and_report(session):
     active = make_site_user(session, "active@example.com", utc(2026, 10, 1))
     make_site_user(session, "quiet@example.com", utc(2026, 10, 1))
-    telegram = User(telegram_id=9)
-    session.add(telegram)
-    session.flush()
 
     for _ in range(3):
         add_content(session, active, "studied")
@@ -108,8 +105,6 @@ def test_compute_metrics_and_report(session):
         session, active, "unseen",
         url="https://example.com/a", url_normalized="https://example.com/a", open_count=1,
     )
-    for _ in range(5):  # материалы Telegram-пользователя в отчёт не входят
-        add_content(session, telegram, "studied")
 
     session.add_all(
         [

@@ -76,7 +76,7 @@ function addVerifyBanner(user) {
 
 // Шапка страниц после входа: e-mail пользователя, кнопка «Выйти», плашка подтверждения
 export function initTopbar(user) {
-  $("#user-email").textContent = user.email ?? user.username ?? "";
+  $("#user-email").textContent = user.email;
   $("#logout").addEventListener("click", async () => {
     try {
       await api("POST", "/auth/logout");

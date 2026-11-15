@@ -39,7 +39,6 @@ def select_due_reminders(db: Session, now: datetime, limit: int):
             Reminder.scheduled_at <= now,
             User.reminders_enabled.is_(True),
             User.email_verified_at.is_not(None),
-            User.email.is_not(None),
         )
         .order_by(Reminder.scheduled_at, Reminder.id)
         .limit(limit)

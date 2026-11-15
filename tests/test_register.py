@@ -21,7 +21,7 @@ def test_register_creates_user(client, session):
     assert response.headers["cache-control"] == "no-store"
     body = response.json()
     assert body["email"] == "ivan@example.com"
-    assert body["telegram_id"] is None
+    assert "telegram_id" not in body
     assert "password" not in body
     assert "password_hash" not in body
 

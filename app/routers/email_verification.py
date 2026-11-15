@@ -72,8 +72,6 @@ def request_verification(
     db: DbSession,
     user: CurrentUser,
 ):
-    if user.email is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Account has no e-mail address")
     if user.email_verified_at is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "E-mail is already verified")
 

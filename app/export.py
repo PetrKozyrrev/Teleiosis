@@ -43,8 +43,6 @@ def build_export(db: Session, user: User, now: datetime | None = None) -> dict:
         "user": {
             "id": user.id,
             "email": user.email,
-            "telegram_id": user.telegram_id,
-            "username": user.username,
             "email_verified_at": _iso(user.email_verified_at),
             "consent_at": _iso(user.consent_at),
             "consent_version": user.consent_version,

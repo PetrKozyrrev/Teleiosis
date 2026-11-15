@@ -2,14 +2,14 @@ from app.models import Content
 from tests.helpers import auth_headers as auth
 
 
-def save(client, telegram_id=1, **body):
-    response = client.post("/contents", json=body, headers=auth(telegram_id))
+def save(client, user_key=1, **body):
+    response = client.post("/contents", json=body, headers=auth(user_key))
     assert response.status_code == 201, response.text
     return response.json()
 
 
-def listing(client, telegram_id=1, **params):
-    return client.get("/contents", params=params, headers=auth(telegram_id))
+def listing(client, user_key=1, **params):
+    return client.get("/contents", params=params, headers=auth(user_key))
 
 
 def titles(response):

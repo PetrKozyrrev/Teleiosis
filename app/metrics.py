@@ -64,7 +64,7 @@ def return_windows(users, activity: dict[int, set[date]], now: datetime) -> list
 
 
 def compute_metrics(db: Session, now: datetime) -> dict:
-    site_ids = select(User.id).where(User.email.is_not(None))
+    site_ids = select(User.id)
     users = db.execute(
         select(
             User.id,
@@ -73,7 +73,6 @@ def compute_metrics(db: Session, now: datetime) -> dict:
             User.email_verified_at,
             User.reminders_enabled,
         )
-        .where(User.email.is_not(None))
         .order_by(User.id)
     ).all()
 

@@ -10,33 +10,33 @@ from tests.helpers import auth_headers as auth
 NOW = datetime(2026, 11, 11, 12, 0, tzinfo=timezone.utc)
 
 
-def save(client, telegram_id=1, **body):
-    response = client.post("/contents", json=body, headers=auth(telegram_id))
+def save(client, user_key=1, **body):
+    response = client.post("/contents", json=body, headers=auth(user_key))
     assert response.status_code == 201, response.text
     return response.json()
 
 
-def set_status(client, content_id, status, telegram_id=1):
+def set_status(client, content_id, status, user_key=1):
     response = client.patch(
-        f"/contents/{content_id}", json={"status": status}, headers=auth(telegram_id)
+        f"/contents/{content_id}", json={"status": status}, headers=auth(user_key)
     )
     assert response.status_code == 200, response.text
 
 
-def make_category(client, name, telegram_id=1):
-    response = client.post("/categories", json={"name": name}, headers=auth(telegram_id))
+def make_category(client, name, user_key=1):
+    response = client.post("/categories", json={"name": name}, headers=auth(user_key))
     assert response.status_code == 201, response.text
     return response.json()["id"]
 
 
-def stats(client, telegram_id=1):
-    response = client.get("/stats", headers=auth(telegram_id))
+def stats(client, user_key=1):
+    response = client.get("/stats", headers=auth(user_key))
     assert response.status_code == 200, response.text
     return response.json()
 
 
-def user_of(session, telegram_id=1):
-    return session.scalar(select(User).where(User.telegram_id == telegram_id))
+def user_of(session, user_key=1):
+    return session.scalar(select(User).where(User.email == f"user{user_key}@example.com"))
 
 
 def set_created(session, content_id, moment):

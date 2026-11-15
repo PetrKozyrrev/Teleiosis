@@ -5,14 +5,14 @@ from app.ratelimit import Rule
 from tests.helpers import ORIGIN, auth_headers as auth
 
 
-def save(client, telegram_id=1, **body):
-    response = client.post("/contents", json=body, headers=auth(telegram_id))
+def save(client, user_key=1, **body):
+    response = client.post("/contents", json=body, headers=auth(user_key))
     assert response.status_code == 201, response.text
     return response.json()
 
 
-def export(client, telegram_id=1):
-    return client.get("/me/export", headers=auth(telegram_id))
+def export(client, user_key=1):
+    return client.get("/me/export", headers=auth(user_key))
 
 
 def test_requires_auth(client):
@@ -30,7 +30,7 @@ def test_headers(client):
 def test_empty_account(client):
     body = export(client).json()
     assert body["version"] == 1
-    assert body["user"]["telegram_id"] == 1
+    assert body["user"]["email"] == "user1@example.com"
     assert body["categories"] == []
     assert body["contents"] == []
     assert body["reminders"] == []

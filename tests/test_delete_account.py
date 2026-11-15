@@ -161,12 +161,12 @@ def test_account_without_password_cannot_be_deleted(client, session):
     assert count(session, User) == 1
 
 
-def test_bearer_session_can_delete(client, session):
+def test_explicit_cookie_session_can_delete(client, session):
     user = User(email=EMAIL, password_hash=hash_password(PASSWORD))
     session.add(user)
     session.flush()
     token, _ = create_session(session, user)
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {"Cookie": f"session={token}", "Origin": ORIGIN}
 
     assert delete_account(client, headers=headers).status_code == 204
     assert count(session, User) == 0

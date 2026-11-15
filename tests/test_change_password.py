@@ -137,7 +137,7 @@ def test_account_without_password_cannot_change_it(client):
     assert response.json() == {"detail": "Account has no password"}
 
 
-def test_bearer_session_is_kept_too(client, session):
+def test_explicit_cookie_session_is_kept_too(client, session):
     user = User(email=EMAIL)
     from app.passwords import hash_password
 
@@ -146,7 +146,7 @@ def test_bearer_session_is_kept_too(client, session):
     session.flush()
     token, _ = create_session(session, user)
     create_session(session, user)
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {"Cookie": f"session={token}", "Origin": ORIGIN}
 
     assert change(client, headers=headers).status_code == 204
     assert client.get("/me", headers=headers).status_code == 200

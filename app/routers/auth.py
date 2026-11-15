@@ -1,14 +1,12 @@
-import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.config import settings
 from app.cookies import clear_session_cookie, cookie_name, set_session_cookie
 from app.csrf import require_same_origin
-from app.deps import DbSession, get_or_create_user
+from app.deps import DbSession
 from app.emails import normalize_email
 from app.models import User
 from app.passwords import hash_password, needs_rehash, verify_dummy, verify_password
@@ -23,16 +21,11 @@ from app.ratelimit import (
     record,
 )
 from app.schemas import (
-    AuthRequest,
-    AuthResponse,
     LoginRequest,
     RegisterRequest,
     UserOut,
 )
 from app.sessions import create_session, delete_session
-from app.telegram_auth import InitDataError, validate_init_data
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -60,32 +53,6 @@ def start_session(request: Request, response: Response, db: DbSession, user: Use
     token, _ = create_session(db, user)
     set_session_cookie(response, token)
     response.headers["Cache-Control"] = "no-store"
-
-
-@router.post("/telegram", response_model=AuthResponse)
-def login_with_telegram(data: AuthRequest, response: Response, db: DbSession):
-    if not settings.bot_token:
-        # Ошибка настройки сервера, а не чужая попытка входа
-        logger.error("BOT_TOKEN is not configured: Mini App login is unavailable")
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE, "Login is temporarily unavailable"
-        )
-
-    try:
-        verified = validate_init_data(data.init_data, settings.bot_token)
-    except InitDataError as exc:
-        # В лог только короткая причина: без initData и без токена
-        logger.warning("initData rejected: %s", exc)
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
-
-    user = get_or_create_user(db, verified.telegram_id, verified.username)
-    if user.username != verified.username:
-        user.username = verified.username
-        db.commit()
-
-    token, expires_at = create_session(db, user)
-    response.headers["Cache-Control"] = "no-store"
-    return {"token": token, "expires_at": expires_at, "user": user}
 
 
 @router.post(

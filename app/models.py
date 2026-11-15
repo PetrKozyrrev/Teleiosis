@@ -24,16 +24,8 @@ from app.db import Base
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
-        CheckConstraint(
-            "email IS NOT NULL OR telegram_id IS NOT NULL",
-            name="ck_users_login_method",
-        ),
         CheckConstraint("email = lower(email)", name="ck_users_email_lower"),
         CheckConstraint("char_length(email) <= 254", name="ck_users_email_len"),
-        CheckConstraint(
-            "password_hash IS NULL OR email IS NOT NULL",
-            name="ck_users_password_needs_email",
-        ),
         CheckConstraint(
             "(consent_at IS NULL) = (consent_version IS NULL)",
             name="ck_users_consent_pair",
@@ -41,11 +33,8 @@ class User(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    # Нужен только пользователям, пришедшим из Telegram (бот заморожен)
-    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
-    username: Mapped[str | None] = mapped_column(Text)
     # Вход на сайте. Адрес всегда в нижнем регистре (проверяет CHECK в БД)
-    email: Mapped[str | None] = mapped_column(Text, unique=True)
+    email: Mapped[str] = mapped_column(Text, unique=True)
     password_hash: Mapped[str | None] = mapped_column(Text)
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Согласие на обработку персональных данных: когда и какая версия текста
@@ -178,7 +167,7 @@ class Reminder(Base):
     content: Mapped["Content"] = relationship(back_populates="reminders")
 
 class AuthSession(Base):
-    """Серверная сессия Mini App. Хранится только хэш токена, не сам токен."""
+    """Серверная сессия сайта. Хранится только хэш токена, не сам токен."""
 
     __tablename__ = "auth_sessions"
     __table_args__ = (

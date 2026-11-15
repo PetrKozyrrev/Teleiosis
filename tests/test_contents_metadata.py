@@ -3,8 +3,8 @@ from app.metadata import Metadata
 from tests.helpers import auth_headers as auth
 
 
-def save(client, telegram_id=1, **body):
-    return client.post("/contents", json=body, headers=auth(telegram_id))
+def save(client, user_key=1, **body):
+    return client.post("/contents", json=body, headers=auth(user_key))
 
 
 def stub(monkeypatch, result):

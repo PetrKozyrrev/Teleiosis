@@ -282,10 +282,7 @@ def test_each_user_is_judged_in_their_own_timezone(session):
 def test_users_who_cannot_receive_mail_are_skipped(session):
     unverified = make_user(session, "a@example.com", verified=False)
     disabled = make_user(session, "b@example.com", enabled=False)
-    telegram_only = User(telegram_id=5, timezone="Europe/Moscow")
-    session.add(telegram_only)
-    session.flush()
-    for user in (unverified, disabled, telegram_only):
+    for user in (unverified, disabled):
         add_content(session, user)
     outbox = Outbox()
     assert run(session, outbox).sent == 0

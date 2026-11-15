@@ -23,14 +23,8 @@ class DeleteAccountRequest(BaseModel):
 
 
 def current_token(request: Request) -> str | None:
-    """Токен сессии этого запроса: cookie сайта или Bearer. Источник один:
-    get_current_user уже отказал бы, если бы их было два."""
-    token = request.cookies.get(cookie_name())
-    if token is None:
-        scheme, _, value = request.headers.get("authorization", "").partition(" ")
-        if scheme.lower() == "bearer":
-            token = value.strip()
-    return token
+    """Токен текущей сессии сайта из HttpOnly cookie."""
+    return request.cookies.get(cookie_name())
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

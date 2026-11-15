@@ -9,8 +9,8 @@ HASH_B = "b" * 64
 IN_A_DAY = text("now() + interval '1 day'")
 
 
-def make_user(session, telegram_id=1):
-    user = User(telegram_id=telegram_id)
+def make_user(session, user_key=1):
+    user = User(email=f"user{user_key}@example.com")
     session.add(user)
     session.flush()
     return user

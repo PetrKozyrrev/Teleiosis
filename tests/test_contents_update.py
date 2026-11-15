@@ -4,18 +4,18 @@ from app.models import Reminder
 from tests.helpers import auth_headers as auth
 
 
-def save(client, telegram_id=1, **body):
-    response = client.post("/contents", json=body, headers=auth(telegram_id))
+def save(client, user_key=1, **body):
+    response = client.post("/contents", json=body, headers=auth(user_key))
     assert response.status_code == 201, response.text
     return response.json()
 
 
-def patch(client, content_id, telegram_id=1, **body):
-    return client.patch(f"/contents/{content_id}", json=body, headers=auth(telegram_id))
+def patch(client, content_id, user_key=1, **body):
+    return client.patch(f"/contents/{content_id}", json=body, headers=auth(user_key))
 
 
-def get(client, content_id, telegram_id=1):
-    return client.get(f"/contents/{content_id}", headers=auth(telegram_id))
+def get(client, content_id, user_key=1):
+    return client.get(f"/contents/{content_id}", headers=auth(user_key))
 
 
 def test_requires_auth(client):

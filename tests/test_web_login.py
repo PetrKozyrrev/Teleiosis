@@ -9,7 +9,7 @@ from app.config import settings
 from app.models import AuthSession, User
 from app.passwords import hash_password, needs_rehash, verify_password
 from app.sessions import SESSION_ABSOLUTE, SESSION_IDLE
-from tests.helpers import ORIGIN, auth_headers
+from tests.helpers import ORIGIN
 
 EMAIL = "ivan@example.com"
 PASSWORD = "correct horse battery"
@@ -219,27 +219,6 @@ def test_cookie_requests_are_checked_for_origin(client, session):
     category_id = created.json()["id"]
     assert client.delete(f"/categories/{category_id}").status_code == 403
     assert client.get("/categories").status_code == 200  # чтение без Origin
-
-
-def test_bearer_requests_need_no_origin(client):
-    headers = auth_headers(1)
-    assert client.post("/categories", json={"name": "A"}, headers=headers).status_code == 201
-
-
-# ---------- один способ входа за запрос ----------
-
-
-def test_cookie_with_bearer_is_rejected(client, session):
-    make_user(session)
-    login(client)
-    assert client.get("/me", headers=auth_headers(5)).status_code == 401
-
-
-def test_cookie_with_bot_key_is_rejected(client, session):
-    make_user(session)
-    login(client)
-    headers = {"X-Bot-Key": "k" * 40, "X-Telegram-Id": "1"}
-    assert client.get("/me", headers=headers).status_code == 401
 
 
 @pytest.mark.parametrize("value", ["A" * 43, "short"])

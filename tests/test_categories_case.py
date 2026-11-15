@@ -5,22 +5,22 @@ from app.models import Category, User
 from tests.helpers import auth_headers as auth
 
 
-def create(client, name, telegram_id=1):
-    return client.post("/categories", json={"name": name}, headers=auth(telegram_id))
+def create(client, name, user_key=1):
+    return client.post("/categories", json={"name": name}, headers=auth(user_key))
 
 
-def rename(client, category_id, name, telegram_id=1):
+def rename(client, category_id, name, user_key=1):
     return client.patch(
-        f"/categories/{category_id}", json={"name": name}, headers=auth(telegram_id)
+        f"/categories/{category_id}", json={"name": name}, headers=auth(user_key)
     )
 
 
-def listing(client, telegram_id=1):
-    return client.get("/categories", headers=auth(telegram_id)).json()
+def listing(client, user_key=1):
+    return client.get("/categories", headers=auth(user_key)).json()
 
 
-def save(client, telegram_id=1, **body):
-    response = client.post("/contents", json=body, headers=auth(telegram_id))
+def save(client, user_key=1, **body):
+    response = client.post("/contents", json=body, headers=auth(user_key))
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -43,8 +43,8 @@ def test_different_names_are_fine(client):
 
 
 def test_same_name_for_another_user_is_fine(client):
-    assert create(client, "Бизнес", telegram_id=1).status_code == 201
-    assert create(client, "бизнес", telegram_id=2).status_code == 201
+    assert create(client, "Бизнес", user_key=1).status_code == 201
+    assert create(client, "бизнес", user_key=2).status_code == 201
 
 
 def test_rename_to_name_taken_in_other_case_conflicts(client):
@@ -62,7 +62,7 @@ def test_rename_to_other_case_of_itself_is_allowed(client):
 
 
 def test_database_enforces_case_insensitive_uniqueness(session):
-    user = User(telegram_id=1)
+    user = User(email="user1@example.com")
     session.add(user)
     session.flush()
     session.add(Category(user_id=user.id, name="Бизнес"))
@@ -110,8 +110,8 @@ def test_rename_returns_current_count(client):
 
 
 def test_count_does_not_include_other_users_materials(client):
-    mine = create(client, "A", telegram_id=1).json()
-    theirs = create(client, "A", telegram_id=2).json()
+    mine = create(client, "A", user_key=1).json()
+    theirs = create(client, "A", user_key=2).json()
     save(client, 2, note="чужая", category_id=theirs["id"])
     assert [c["contents_count"] for c in listing(client, 1)] == [0]
     assert mine["id"] != theirs["id"]

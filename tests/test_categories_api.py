@@ -1,7 +1,7 @@
 from tests.helpers import auth_headers as auth
 
-def create(client, name, telegram_id=1):
-    return client.post("/categories", json={"name": name}, headers=auth(telegram_id))
+def create(client, name, user_key=1):
+    return client.post("/categories", json={"name": name}, headers=auth(user_key))
 
 
 def test_requires_auth(client):
@@ -33,8 +33,8 @@ def test_duplicate_name_conflict(client):
 
 
 def test_same_name_for_different_users_allowed(client):
-    assert create(client, "Бизнес", telegram_id=1).status_code == 201
-    assert create(client, "Бизнес", telegram_id=2).status_code == 201
+    assert create(client, "Бизнес", user_key=1).status_code == 201
+    assert create(client, "Бизнес", user_key=2).status_code == 201
 
 
 def test_rename(client):
@@ -63,7 +63,7 @@ def test_delete(client):
 
 
 def test_other_user_cannot_see_or_change_category(client):
-    category_id = create(client, "Секрет", telegram_id=1).json()["id"]
+    category_id = create(client, "Секрет", user_key=1).json()["id"]
 
     # Пользователь 2 не видит чужую категорию в списке
     assert client.get("/categories", headers=auth(2)).json() == []

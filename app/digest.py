@@ -136,7 +136,6 @@ def process_due_users(
         .where(
             User.reminders_enabled.is_(True),
             User.email_verified_at.is_not(None),
-            User.email.is_not(None),
         )
         .order_by(User.id)
     ).all()

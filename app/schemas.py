@@ -19,7 +19,6 @@ from app.timezones import is_valid_timezone
 from app.urls import clean_url
 
 MAX_BIGINT = 9_223_372_036_854_775_807
-MAX_INIT_DATA_LENGTH = 8192
 
 # Время напоминания: ровно ЧЧ:ММ, без секунд и без часового пояса
 TIME_RE = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
@@ -33,9 +32,7 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    telegram_id: int | None
-    email: str | None
-    username: str | None
+    email: str
     timezone: str
     reminders_enabled: bool
     reminder_time: time
@@ -172,20 +169,6 @@ class ContentUpdate(BaseModel):
             if name in self.model_fields_set and getattr(self, name) is None:
                 raise ValueError(f"{name} cannot be null")
         return self
-
-class AuthRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    init_data: Annotated[
-        str, StringConstraints(min_length=1, max_length=MAX_INIT_DATA_LENGTH)
-    ]
-
-
-class AuthResponse(BaseModel):
-    token: str
-    token_type: Literal["bearer"] = "bearer"
-    expires_at: datetime
-    user: UserOut
 
 class RegisterRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")

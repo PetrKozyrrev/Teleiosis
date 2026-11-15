@@ -106,10 +106,10 @@ def test_new_request_invalidates_previous_token(client, session, outbox):
     assert confirm(client, second).status_code == 204
 
 
-def test_account_without_email_cannot_request(client, outbox):
+def test_email_account_can_request(client, outbox):
     response = client.post("/auth/email-verification/request", headers=auth(1))
-    assert response.status_code == 400
-    assert outbox == []
+    assert response.status_code == 202
+    assert outbox[0][0] == "user1@example.com"
 
 
 def test_already_verified_gets_conflict_and_no_mail(client, session, outbox):
