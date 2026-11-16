@@ -1,0 +1,130 @@
+name: Backend and deployment checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: teleiosis_ci
+          POSTGRES_PASSWORD: ci-only-not-a-secret
+          POSTGRES_DB: teleiosis_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U teleiosis_ci -d teleiosis_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql+psycopg://teleiosis_ci:ci-only-not-a-secret@127.0.0.1:5432/teleiosis_migration_test
+      TEST_DATABASE_URL: postgresql+psycopg://teleiosis_ci:ci-only-not-a-secret@127.0.0.1:5432/teleiosis_test
+      APP_ENV: dev
+      EMAIL_BACKEND: console
+      SECRET_KEY: ci-only-signing-key-with-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Create disposable migration database
+        run: docker exec "${{ job.services.postgres.id }}" createdb -U teleiosis_ci teleiosis_migration_test
+      - name: Real Alembic entrypoint and schema parity
+        run: python scripts/check_migrations.py
+      - name: Python and web regression suite
+        run: python -m pytest -q
+      - name: Shell syntax and whitespace
+        run: |
+          for script in deploy/*.sh; do sh -n "$script"; done
+          git diff --check
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMPOSE_PROJECT_NAME: teleiosis-ci
+      TELEIOSIS_ENV_FILE: /tmp/teleiosis-ci.env
+      TELEIOSIS_IMAGE: teleiosis:ci
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Prepare synthetic configuration
+        run: |
+          umask 077
+          cat > "$TELEIOSIS_ENV_FILE" <<'ENV'
+          DOMAIN=example.invalid
+          TLS_EMAIL=ci@example.invalid
+          POSTGRES_USER=teleiosis
+          POSTGRES_PASSWORD=ci-only-app
+          POSTGRES_ADMIN_PASSWORD=ci-only-admin
+          POSTGRES_DB=teleiosis
+          DATABASE_URL=postgresql+psycopg://teleiosis:ci-only-app@db:5432/teleiosis
+          SECRET_KEY=ci-only-signing-key-with-at-least-32-characters
+          SMTP_HOST=smtp.example.invalid
+          SMTP_FROM=ci@example.invalid
+          ENV
+      - run: sh deploy/compose.sh config --quiet
+      - run: sh deploy/compose.sh build api
+      - name: Start isolated database and migrate explicitly
+        run: |
+          sh deploy/compose.sh up -d --wait db
+          sh deploy/compose.sh run --rm migrate
+      - name: Start API and worker
+        run: sh deploy/compose.sh up -d --wait api worker
+      - name: Production API smoke
+        run: |
+          sh deploy/compose.sh exec -T api python - <<'PY'
+          import urllib.request
+          from urllib.error import HTTPError
+          assert urllib.request.urlopen('http://127.0.0.1:8000/ready').status == 200
+          for path in ('/docs', '/redoc', '/openapi.json'):
+              try:
+                  urllib.request.urlopen('http://127.0.0.1:8000' + path)
+              except HTTPError as error:
+                  assert error.code == 404
+              else:
+                  raise AssertionError(path)
+          PY
+      - name: Backup and restore drill
+        run: |
+          sh deploy/compose.sh exec -T api python - <<'PY'
+          from app.db import SessionLocal
+          from app.models import User, Content
+          with SessionLocal() as db:
+              user = User(email='backup-fixture@example.com')
+              db.add(user)
+              db.flush()
+              db.add(Content(user_id=user.id, title='CI backup fixture', note='ci-backup-marker'))
+              db.commit()
+          PY
+          sh deploy/backup.sh /tmp/teleiosis-ci.dump
+          sh deploy/restore-check.sh /tmp/teleiosis-ci.dump teleiosis_restore_test_ci
+          sh deploy/compose.sh exec -T db psql -U teleiosis_admin -d teleiosis_restore_test_ci --set=ON_ERROR_STOP=1 <<'SQL'
+          DO $$ BEGIN
+              IF (SELECT count(*) FROM contents WHERE note = 'ci-backup-marker') <> 1 THEN
+                  RAISE EXCEPTION 'Backup fixture was not restored';
+              END IF;
+          END $$;
+          SQL
+      - name: Validate HTTPS proxy configuration without issuing certificates
+        run: sh deploy/compose.sh run --rm --no-deps proxy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: Verify process restart
+        run: |
+          sh deploy/compose.sh restart api worker
+          sh deploy/compose.sh up -d --wait api worker
+      - name: Stop disposable CI stack
+        if: always()
+        run: sh deploy/compose.sh down --volumes --remove-orphans

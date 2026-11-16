@@ -1,0 +1,14 @@
+# Allowlist: .env, .git, other/, backups and local tools never enter build context.
+**
+!Dockerfile
+!requirements.txt
+!alembic.ini
+!app/
+!app/**
+!web/
+!web/**
+!migrations/
+!migrations/**
+**/__pycache__/
+**/*.pyc
+**/*:Zone.Identifier

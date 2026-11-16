@@ -45,6 +45,9 @@ class Settings(BaseSettings):
         if (
             parts.scheme not in ("http", "https")
             or not parts.netloc
+            or not parts.hostname
+            or parts.username is not None
+            or parts.password is not None
             or parts.path
             or parts.query
             or parts.fragment
@@ -61,6 +64,8 @@ class Settings(BaseSettings):
                     "EMAIL_BACKEND must be smtp when APP_ENV=prod "
                     "(console mode prints reset links)"
                 )
+            if self.smtp_security == "none":
+                raise ValueError("SMTP_SECURITY must be starttls or ssl when APP_ENV=prod")
             if len(self.secret_key) < MIN_SECRET_KEY_LENGTH:
                 raise ValueError(
                     f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters "

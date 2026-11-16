@@ -1,0 +1,18 @@
+{
+	email {$TLS_EMAIL}
+	admin off
+}
+
+{$DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		-Server
+	}
+	@private path /docs /docs/* /redoc /redoc/* /openapi.json /ready
+	respond @private 404
+	reverse_proxy api:8000
+	# Access log intentionally disabled: reset/unsubscribe URLs may contain tokens.
+}

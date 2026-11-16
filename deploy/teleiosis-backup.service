@@ -1,0 +1,10 @@
+[Unit]
+Description=Teleiosis PostgreSQL backup (no automatic deletion)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/teleiosis
+UMask=0077
+ExecStart=/bin/sh -ec 'mkdir -p /var/lib/teleiosis/backups; exec sh deploy/backup.sh "/var/lib/teleiosis/backups/teleiosis-$(date -u +%%Y%%m%%dT%%H%%M%%SZ).dump"'

@@ -67,6 +67,18 @@ def test_prod_requires_real_email_backend():
         make(**{**PROD, "email_backend": "console"})
 
 
+def test_prod_requires_encrypted_smtp():
+    with pytest.raises(ValidationError):
+        make(**{**PROD, "smtp_security": "none"})
+
+
+@pytest.mark.parametrize("origin", ["https://user:secret@example.ru", "https://user@example.ru"])
+def test_origin_rejects_credentials_without_leaking_them(origin):
+    with pytest.raises(ValidationError) as exc:
+        make(app_origin=origin)
+    assert "secret" not in str(exc.value)
+
+
 @pytest.mark.parametrize("secret", ["", "short", "s" * 31])
 def test_prod_requires_a_long_secret_key(secret):
     with pytest.raises(ValidationError):

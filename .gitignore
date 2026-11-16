@@ -4,6 +4,12 @@ venv/
 
 # Секреты
 .env
+.env.*
+!.env.example
+!deploy/.env.example
+backups/
+*.dump
+*.dump.partial
 
 # Python
 __pycache__/

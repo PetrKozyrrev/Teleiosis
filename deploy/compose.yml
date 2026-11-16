@@ -1,0 +1,135 @@
+name: teleiosis
+
+x-app: &app
+  image: ${TELEIOSIS_IMAGE:-teleiosis:local}
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  environment:
+    DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+    APP_ENV: prod
+    APP_ORIGIN: https://${DOMAIN:?Set DOMAIN}
+    COOKIE_SECURE: "true"
+    SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+    EMAIL_BACKEND: smtp
+    SMTP_HOST: ${SMTP_HOST:?Set SMTP_HOST}
+    SMTP_PORT: ${SMTP_PORT:-587}
+    SMTP_USER: ${SMTP_USER:-}
+    SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    SMTP_FROM: ${SMTP_FROM:?Set SMTP_FROM}
+    SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp:size=32m,mode=1777
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging: &logging
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+  networks: [backend, edge]
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: teleiosis_admin
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      APP_DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      APP_DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db.sh:/docker-entrypoint-initdb.d/10-app-user.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+    networks:
+      backend:
+        ipv4_address: 172.30.61.2
+
+  migrate:
+    <<: *app
+    profiles: [tools]
+    command: [alembic, upgrade, head]
+    restart: "no"
+    healthcheck:
+      disable: true
+    networks:
+      backend:
+        ipv4_address: 172.30.61.12
+      edge:
+        ipv4_address: 172.30.60.12
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    # Доверять proxy-заголовкам только от Caddy в выделенной сети.
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --proxy-headers, --forwarded-allow-ips, "172.30.60.2", --no-access-log]
+    networks:
+      backend:
+        ipv4_address: 172.30.61.10
+      edge:
+        ipv4_address: 172.30.60.10
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    <<: *app
+    command: [python, -m, app.worker]
+    healthcheck:
+      disable: true
+    networks:
+      backend:
+        ipv4_address: 172.30.61.11
+      edge:
+        ipv4_address: 172.30.60.11
+    depends_on:
+      db:
+        condition: service_healthy
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL:?Set TLS_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+    networks:
+      edge:
+        ipv4_address: 172.30.60.2
+    depends_on:
+      api:
+        condition: service_healthy
+
+networks:
+  backend:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.61.0/24
+  edge:
+    ipam:
+      config:
+        - subnet: 172.30.60.0/24
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

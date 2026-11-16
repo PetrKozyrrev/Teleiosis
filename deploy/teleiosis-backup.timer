@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Teleiosis backup at 03:00 Moscow time
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Europe/Moscow
+Persistent=true
+Unit=teleiosis-backup.service
+
+[Install]
+WantedBy=timers.target

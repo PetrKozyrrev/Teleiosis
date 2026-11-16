@@ -1,0 +1,32 @@
+# Review on the target Linux host BEFORE enabling public access.
+# Not installed automatically. See docs/deployment.md. Requires nftables,
+# Docker bridge filtering, IPv4-only compose networks and unchanged static IPs.
+# Validate with `nft -c -f ...`; do not flush the host's existing ruleset.
+table inet teleiosis_egress {
+    set app_v4 {
+        type ipv4_addr
+        elements = { 172.30.60.10, 172.30.60.11, 172.30.60.12,
+                     172.30.61.10, 172.30.61.11, 172.30.61.12 }
+    }
+    set non_public_v4 {
+        type ipv4_addr
+        flags interval
+        auto-merge
+        elements = { 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8,
+                     169.254.0.0/16, 172.16.0.0/12, 192.0.0.0/24,
+                     192.0.2.0/24, 192.168.0.0/16, 198.18.0.0/15,
+                     198.51.100.0/24, 203.0.113.0/24, 224.0.0.0/4,
+                     240.0.0.0/4 }
+    }
+    chain forward {
+        type filter hook forward priority -10; policy accept;
+        ct state established,related accept
+        ip saddr @app_v4 ip daddr 172.30.61.2 tcp dport 5432 accept
+        ip saddr @app_v4 ip daddr @non_public_v4 counter drop
+    }
+    chain input {
+        type filter hook input priority -10; policy accept;
+        ct state established,related accept
+        ip saddr @app_v4 counter drop
+    }
+}
