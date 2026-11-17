@@ -1,5 +1,7 @@
 # Запуск проекта
 
+Мобильный каркас Android/iOS: отдельная инструкция [mobile/README.md](../mobile/README.md). Здесь описывается существующий backend/сайт.
+
 
 ## Первый запуск
 ```bash
@@ -19,10 +21,11 @@ alembic upgrade head
 | POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB | Контейнер PostgreSQL |
 | DATABASE_URL | Рабочая база (читает API) |
 | TEST_DATABASE_URL | Тестовая база teleiosis_test (должна отличаться от рабочей) |
-| APP_ENV | `dev` (по умолчанию) или `prod`. В `prod` сервер не запустится без COOKIE_SECURE=true и адреса https:// |
+| APP_ENV | `dev` (по умолчанию), `staging` или `prod`. В staging/prod обязательны COOKIE_SECURE=true, https:// и длинный SECRET_KEY |
 | APP_ORIGIN | Адрес сайта в браузере (по умолчанию http://localhost:8000). Сайт нужно открывать именно по этому адресу: с http://127.0.0.1:8000 изменяющие запросы будут отклонены |
 | COOKIE_SECURE | `false` в разработке (http://localhost), `true` на боевом сервере |
-| EMAIL_BACKEND | `console` (по умолчанию, письма печатаются в терминал с uvicorn) или `smtp`. В `prod` допустим только `smtp` |
+| EMAIL_BACKEND | `console` только dev; `smtp` для доставки; `capture` только staging, закрытые MIME-файлы без отправки. В prod допустим только smtp |
+| CAPTURE_EMAIL_DIR | Абсолютный приватный каталог для staging/capture, по умолчанию /var/lib/teleiosis/captured-mail; владелец — uid процесса, права 0700 |
 | SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM, SMTP_SECURITY | Почтовый сервер (`starttls`, `ssl`; `none` только в dev); нужны при `EMAIL_BACKEND=smtp`, хост и отправитель обязательны |
 | SECRET_KEY | Секрет подписи ссылок отписки, не короче 32 символов. В `prod` обязателен; в dev без него отписка и воркер напоминаний не работают. Смена ключа делает недействительными все выданные ссылки. Создать: `printf '\nSECRET_KEY=%s\n' "$(python -c 'import secrets; print(secrets.token_urlsafe(48))')" >> .env` |
 
@@ -76,3 +79,5 @@ GitHub workflow .github/workflows/backend.yml запускает Python suite, �
 Основные сценарии проверяются на реальных устройствах, а не только Expo Go/эмуляторе. Отдельно проверить Android без Google-сервисов, если такая поддержка согласована, и условия выбранного push SDK. Не передавать реальные пользовательские данные в зарубежный CI/логи/артефакты. Signing-ключи и токены провайдеров не добавлять в репозиторий.
 
 `other/mobile_context.md` сохранён локально по запросу пользователя, но other/ исключён .gitignore. Общая дорожная карта и решения хранятся также в отслеживаемой docs/; игнорирование other/ не менялось.
+
+На сервере подготовлен отдельный [staging с перехватом писем](staging.md): TELEIOSIS_STAGING=1 подключает compose.staging.yml и принудительно задаёт staging/capture. Не выставлять APP_ENV=dev для публичного сервера и не ослаблять production SMTP/TLS-проверки ради отсутствующей почты. Gateway-пароль, DB-секреты и SECRET_KEY генерируются только на сервере; их не выводят в конфигурационных отчётах.

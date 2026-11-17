@@ -1,8 +1,114 @@
 # Progress
 
+## Блок 2 — мобильный каркас, 16.11.2026
+
+Пользователь отдельно разрешил переход к mobile. Публичный HTTPS/SMTP блока 1 отложены; приложение сейчас не обращается к API. Подтверждены Samsung S25 с возможностью USB-подключения и отсутствие аккаунтов магазинов. Mac/iPhone/macOS CI и покрытие без GMS пока не подтверждены. **17.11.2026 пользователь подтвердил установку и работу каркаса на S25, разрешил коммит и переход к блоку 3. Полная приёмка платформенных пунктов блока 2 остаётся открытой.**
+
+- [x] mobile/: Expo SDK 58/RN 0.88.1/React 19.3.0, TypeScript, Expo Router, вкладки Библиотека/Прогресс/Настройки, отдельные диагностические экраны. Палитра/иконка из web, Inter/Manrope локально. Нет auth/API/продуктовой библиотеки, персистентной очереди и push.
+- [x] Android text/plain share: raw preview без fetch/resolve/открытия URL; PDF только URL, неподдерживаемые вложения не принимаются, явная очистка и ошибки. iOS эксперимент включается только MOBILE_IOS_SHARE_PROBE=1; штатная конфигурация без extension.
+- [x] Отдельный SecureStore probe: запись/read-back, чтение после restart, удаление с проверкой отсутствия, device-only keychain service; без настоящих токенов/логирования содержимого.
+- [x] TypeScript и lint проходят; **19 тестов в 3 suites** проходят: валидация share, cold/warm route, повтор/очистка/native errors, warm AppState refresh/unsubscribe, storage read-back/delete/errors. Нативные API в этих тестах mocked.
+- [x] Expo Doctor **20/20**, SDK dependency check; JS/Hermes export для двух ОС. Сгенерированы Android/iOS и opt-in iOS extension, проверены permissions/backup/отсутствие extension в штатной сборке; затем iOS возвращён к штатной конфигурации. Это не iOS binary/runtime.
+- [x] Воспроизводимый helper автономного arm64 APK с тестовой подписью, workflow JS/native-config checks + ручная APK job. GitHub Actions удалённо не запускался. Ключи/нативные папки/артефакты исключены из Git; store signing и облачные Expo-сервисы не подключены.
+- [x] APK собран: **BUILD SUCCESSFUL in 6m 50s**, 785 tasks (753 executed/32 up-to-date). `mobile/artifacts/teleiosis-0.1.0-android-arm64-preview.apk`, 30 059 279 байт (~28.7 MiB), SHA-256 `a2ff8aa4755438e2bf6855b1a48b6439ec970f38fc4388dbbe351a00a52944b0`. apksigner подтвердил v2-подпись **Android Debug**; aapt подтвердил ru.teleiosis.mobile.dev/0.1.0/code1, API24/target36/compile37, arm64. zipalign проверил 16-KiB archive alignment (не ELF/runtime-тест); встроены JS и 5 TTF (4 Inter/Manrope + Ionicons), файлы .env/ключей в APK не найдены. Оригинальные лицензии шрифтов включены в офлайн-экран.
+- [x] Повторные проверки итоговых исходников: typecheck/lint, **19 passed in 1.803s**, export Android/iOS успешен, generated native config boundaries проходят. SDK Doctor20/20; shell/YAML/lockfile parity/локальные Markdown-ссылки/diff проверены. Backend suite повторно не запускался.
+- [x] Установка и запуск каркаса на S25 подтверждены пользователем 17.11.2026.
+- [ ] Samsung runtime: навигация/back, настоящий cold/warm share, SecureStore/restart, поворот/крупный шрифт/TalkBack. ADB в итоге запущен, `List of devices attached` пуст: телефон из этой WSL-среды не обнаружен. Отдельный порт15037 ранее истёк по timeout; это не проверка телефона.
+
+Первая APK-попытка остановилась на Maven read timeout, вторая остановлена нами для настройки уже существующего сетевого proxy среды; успешная третья получила React AAR через этот proxy. JDK/SDK/NDK/Gradle и transient Gradle proxy находятся в /tmp, не в исходниках. В итоговом APK нет mic/photo/external-storage/POST_NOTIFICATIONS разрешений; остаются INTERNET, dev-client SYSTEM_ALERT_WINDOW/VIBRATE и библиотечные USE_BIOMETRIC/USE_FINGERPRINT SecureStore (probe не запрашивает биометрию). Это тестовая конфигурация, окончательный manifest пересматривается перед выпуском.
+- [ ] iOS build/device и production Share Extension; предложен стандартный Swift compose + App Group inbox без unsupported открытия host app. Нужен отдельный proof на Mac/iPhone до закрытия платформенного риска.
+- [ ] Push SDK: официальные исходники RuStore 6.9.1 изучены (commit c23260a660f943d7f09a828a48e5b4d513b21a95); есть старая Gradle/RN инфраструктура и ветка newArchEnabled, совместимость RN 0.88/AGP 9.2.1 не доказана. SDK не подключён; APNs не проверен. Доставка относится к блоку 7.
+- [ ] npm audit: 23 позиции (22 moderate/1 low), корневые advisories glob/minimatch/deepmerge в инструментах Expo/Jest. Совместимый audit fix применён; небезопасный force со сменой/понижением SDK/Jest не применялся. Нужен разбор до выпуска.
+
+Изменения mobile-блока: новый mobile/ (код, конфигурация, lockfile, tests, build/check scripts, README, адаптированный AGENTS официального шаблона), .github/workflows/mobile.yml, docs/mobile_testing.md; обновлены README.md, docs/mobile_plan.md, architecture.md, decisions.md, setup.md, progress.md и локальный ignored other/mobile_context.md. app/, web/, миграции, существующие Python-тесты и сервер в этом блоке не менялись; предыдущие незакоммиченные изменения блока 1 сохранены. Python suite повторно не запускался: изменений backend нет; последний серверный результат блока 1 — 741 passed.
+
+Инструкция установки/проверки: [mobile/README.md](../mobile/README.md). Матрица и границы приёмки: [mobile_testing.md](mobile_testing.md). 17.11.2026 разрешён следующий блок 3 (auth); оставшиеся пункты блока 2 сохраняются в матрице и не считаются пройденными.
+
+<details>
+<summary>Полный список файлов мобильного блока 2 (без сгенерированных/ignored сборок)</summary>
+
+```text
+mobile/.gitignore
+mobile/.npmrc
+mobile/.nvmrc
+mobile/AGENTS.md
+mobile/LICENSE
+mobile/README.md
+mobile/app.config.ts
+mobile/assets/android-icon-background.png
+mobile/assets/android-icon-foreground.png
+mobile/assets/android-icon-monochrome.png
+mobile/assets/favicon.png
+mobile/assets/icon.png
+mobile/assets/splash-icon.png
+mobile/eslint.config.js
+mobile/jest.config.js
+mobile/package-lock.json
+mobile/package.json
+mobile/scripts/build-android-preview.sh
+mobile/scripts/check-native-config.py
+mobile/src/app/(tabs)/_layout.tsx
+mobile/src/app/(tabs)/index.tsx
+mobile/src/app/(tabs)/progress.tsx
+mobile/src/app/(tabs)/settings.tsx
+mobile/src/app/+native-intent.ts
+mobile/src/app/+not-found.tsx
+mobile/src/app/_layout.tsx
+mobile/src/app/licenses.tsx
+mobile/src/app/probe.tsx
+mobile/src/app/share-probe.tsx
+mobile/src/components/ui.tsx
+mobile/src/fontLicenses.ts
+mobile/src/platform/share.ts
+mobile/src/platform/storageProbe.ts
+mobile/src/theme.ts
+mobile/tests/share.test.ts
+mobile/tests/shareScreen.test.tsx
+mobile/tests/storageProbe.test.ts
+mobile/tsconfig.json
+.github/workflows/mobile.yml
+docs/mobile_testing.md
+README.md
+docs/mobile_plan.md
+docs/architecture.md
+docs/decisions.md
+docs/setup.md
+docs/progress.md
+other/mobile_context.md (ignored)
+```
+
+</details>
+
+## Блок 1 — закрытый staging/capture, 16.11.2026
+
+После вопроса об отсутствии почтового ящика на техническом домене и сообщения «Что дальше» подготовлен явный тестовый режим без внешней доставки. Публичный запуск ещё не выполнен: private preview только на 127.0.0.1:8443, нужен review временных ограничений перед включением домена. Позже пользователь явно разрешил переход к мобильному блоку 2 с этими открытыми зависимостями; это не закрывает приёмку блока 1.
+
+- [x] APP_ENV=staging / EMAIL_BACKEND=capture: HTTPS/Secure-cookie/SECRET_KEY и закрытые docs сохраняются; prod требует SMTP/TLS, console только dev. Overlay принудительно выбирает capture для API/worker/migrate.
+- [x] Атомарные MIME-файлы в отдельном capture_mail volume: каталог 0700/uid 10001, файлы 0600, без сети/токенов в логах, отказ при ошибках и мягкий лимит 1000 без удаления старых писем. Чтение только оператором по SSH; нет публичного почтового API/UI.
+- [x] Отдельный Basic Auth gateway, пароль/секреты сгенерированы только на сервере (0600), предупреждение о перехвате на `/`, /app/ сохраняет собственную cookie-авторизацию. Gateway Authorization не передаётся API.
+- [x] Полный регресс с новым кодом на сервере: **741 passed in 58.47s**. Изолированная временная PostgreSQL, без реальных данных и опубликованных портов; временный тестовый контейнер/сеть удалены после проверки.
+- [x] Private HTTPS smoke с проверкой внутреннего CA: gateway/401/предупреждение/private routes, регистрация/категория/материал, verify/reset по приватным MIME-ссылкам и отзыв сессии, реальный worker reminder/digest, stats/export/delete. Синтетический аккаунт и его письма удалены. Первый smoke остановился до записи из-за отсутствующего staging-маркера у шлюзового 401; условие уточнено, маркер обязателен после успешного входа до записи.
+- [x] DNS с сервера: A соответствует VM; AAAA и CAA на домене/родителе не найдены. Это не выдача публичного сертификата.
+- [x] Итоговый Caddyfile.staging прошёл offline `caddy validate` без сети/выдачи сертификатов; все Compose-профили принудительно staging/capture проверены через закрытый config JSON без вывода секретов. Проверены syntax/diff и 44 локальные ссылки в 15 Markdown-файлах.
+- [x] Egress iptables-nft: управляемые DOCKER-USER/INPUT-цепочки, br_netfilter, systemd перед Docker. Реально проверены БД/публичный HTTPS (разрешены), private endpoint на своей bridge-сети и SSH host (отклонены со счётчиками). Cloud metadata не запрашивали; соответствующая deny-строка проверена конфигурационно.
+- [x] Backup 0600 создан на сервере, восстановлен в отдельную БД, ревизия j1f3a5b7c9d0 и synthetic marker совпали. Backup fixture удалён из основной staging-БД, restore-БД оставлена для инспекции.
+- [x] После restart Docker API ready, worker держит advisory lock, приватный capture работает; собственные firewall-правила сохранены. В основной staging-БД тестовых аккаунтов нет. Хост/SSH/агент Timeweb не перезапускались и не перенастраивались.
+- [ ] Публичный запуск proxy на 80/443 и фактический ACME/TLS для teleiosistest.tw1.ru — ещё не выполнены. Preview использует отдельные CA volumes и restart=no.
+- [ ] Реальная SMTP-доставка/спам/DNS отправителя, внешняя зашифрованная копия, политика сроков/реальных данных, GitHub Actions remote CI — не считать выполненными. Backup timer пока не включён, полного reboot VM не было.
+
+Файлы этого продолжения: app/config.py, main.py, mailer.py; deploy/compose.yml, compose.sh, compose.staging.yml, .env.staging.example, Caddyfile.staging, egress-iptables.sh, teleiosis-egress.service, docker-egress.conf; .gitignore; tests/test_config.py, test_deployment_api.py, test_mail_capture.py; scripts/smoke_staging.py, captured_mail.py; docs/staging.md и синхронизация README/setup/api/requirements/decisions/mobile_plan/deployment/progress; локальный other/mobile_context.md. web/, зависимости и миграции не менялись.
+
+Следующее конкретное действие после review режима: `TELEIOSIS_STAGING=1 sh deploy/compose.sh up -d --wait proxy`, затем проверить публичный сертификат/HTTP→HTTPS и ограниченный вход. Перед публикацией не отключать TLS/Basic Auth и не объявлять capture внешней доставкой. Подробности: [staging.md](staging.md).
+
 ## Мобильное приложение — блок 1, 16.11.2026
 
 Статус: локальная инженерная часть проверена; полный блок не закрыт без ресурсов и серверной приёмки. Пользователь подтвердил начало блока; отдельным ответом сообщил, что хостинг/бюджет/домен/SMTP пока не выбраны. Блок 2 не начат.
+
+Продолжение 16.11.2026: основатель приобрёл пустой сервер Timeweb Cloud в Санкт-Петербурге, подтвердил root и host fingerprint через консоль; авторизованный SSH работает с отдельным ключом из игнорируемой deploy/.ssh/. ОС/ресурсы проверены: Ubuntu 24.04.5, 2 CPU, 3913 МБ RAM, диск 48 ГБ. Скриптом deploy/bootstrap-ubuntu.sh установлены Docker 29.10.0 / Compose 5.7.1 из официального репозитория, исходники без секретов переданы в /srv/teleiosis, образ teleiosis:staging-20261116 собран на сервере. Предустановленный агент Timeweb и SSH не менялись; хост не перезагружался. Постоянное приложение/proxy ещё не запускались. Основатель отдельно ответил «пока нет» про домен и SMTP. Технические реквизиты — локальный other/mobile_context.md, приватный ключ в документы не добавляется.
+
+Серверная проверка в отдельной internal Docker-сети без published ports: **733 passed in 56.19s**. Первый прогон дал 732 passed / 1 failed из-за Docker tmpfs noexec: fake-docker executable тестовой фикстуры не запускался. Повтор с exec только у временного тестового /tmp прошёл полностью; production-настройки не ослаблялись. Реальный scripts/check_migrations.py на другой новой БД: upgrade head → downgrade -1 → upgrade head и schema parity прошли. Source-тесты подключались read-only, секреты и рабочая БД не использовались. Временные серверные контейнер/сеть удаляются после проверки, образ/исходники остаются; remote pytest не приравнивается к запуску GitHub Actions или production-приёмке.
+
+Файлы серверного продолжения: deploy/bootstrap-ubuntu.sh; уточнение deploy/egress.nft.example; README.md, docs/deployment.md, infrastructure_options.md, mobile_plan.md, progress.md и локальный other/mobile_context.md. app/, web/, requirements и миграции в этом продолжении не менялись. После выбора домена/SMTP сначала подготовить конкретный сетевой rollout для iptables-nft, затем публичный HTTPS/почту; блок 2 не начинать.
 
 - [x] Dockerfile и .dockerignore (allowlist), отдельный deploy/compose.yml: API/worker/явные migrate/PostgreSQL/Caddy, private DB без host-порта, непривилегированный API, read-only filesystem, ограниченные логи.
 - [x] Init-db: приложение владеет своей БД без superuser; admin-credentials не передаются в API/worker. Старый compose разработки, web/, зависимости и миграции не изменены.
@@ -17,8 +123,8 @@
 - [x] После restart API отвечает /ready, worker снова удерживает singleton advisory lock. Это не проверка перезагрузки удалённого сервера и не доказательство доставки почты.
 - [x] `git diff --check`, синтаксис shell, YAML Compose/workflow и ссылки документации: 14 Markdown-файлов, 36 локальных ссылок без ошибок. Одноразовые контейнеры/сети/тома удалены после проверки; рабочий teleiosis_db не изменялся. Тестовый образ оставлен в локальном Docker cache.
 - [ ] Реальный GitHub CI: нет push/remote-запуска в этой сессии; не объявлять зелёным.
-- [ ] Реальный российский сервер, DNS/публичный HTTPS, SMTP-доставка и юридические условия внешнего теста — ожидают выбора основателя.
-- [ ] Egress на выбранном хосте: nft отсутствует в текущей среде, шаблон не применён; требуется проверка синтаксиса/сети и блокировки private/metadata после выбора сервера.
+- [ ] Российский сервер приобретён и подготовлен; DNS/публичный HTTPS, SMTP-доставка и юридические условия внешнего теста ещё не проверены. Домен и SMTP ожидают выбора основателя.
+- [ ] Egress на выбранном хосте: установлен Docker с iptables-nft backend, поэтому исторический native-nft шаблон не применять. Требуется backend-совместимая политика DOCKER-USER/INPUT и проверка private/metadata до публичного запуска; политика ещё не устанавливалась.
 - [ ] Backup timer на сервере: шаблон подготовлен, не установлен; systemd-analyze в текущей среде сообщил об отсутствующем docker.service. Расписание/сроки хранения/внешние зашифрованные копии требуют подтверждения.
 
 Файлы блока 1: Dockerfile, .dockerignore, .gitignore; app/main.py, config.py, db.py; .github/workflows/backend.yml; deploy/compose.yml, Caddyfile, .env.example, init-db.sh, compose.sh, backup.sh, restore-check.sh, egress.nft.example, teleiosis-backup.service/.timer; scripts/check_migrations.py; tests/test_config.py, test_deployment_api.py, test_deployment_scripts.py; docs/deployment.md, infrastructure_options.md и обновления README/архитектуры/API/плана/требований/решений/setup/progress; локальный other/mobile_context.md.

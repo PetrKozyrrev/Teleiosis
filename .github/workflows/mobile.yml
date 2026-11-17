@@ -1,0 +1,76 @@
+name: Mobile checks
+
+on:
+  push:
+    paths: ['mobile/**', '.github/workflows/mobile.yml']
+  pull_request:
+    paths: ['mobile/**', '.github/workflows/mobile.yml']
+  workflow_dispatch:
+    inputs:
+      android_apk:
+        description: 'Build an arm64 test APK with the template debug key'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: mobile
+
+env:
+  EXPO_NO_TELEMETRY: '1'
+  CI: '1'
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run check:dependencies
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run export:check
+      - name: Generate native projects without installing CocoaPods
+        run: npx --no-install expo prebuild --no-install
+      - name: Native permissions, backup and iOS extension boundaries
+        run: python3 scripts/check-native-config.py
+
+  android-preview:
+    if: github.event_name == 'workflow_dispatch' && inputs.android_apk
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci
+      - name: Android tools (runner SDK license configuration)
+        run: sdkmanager 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;27.1.12297006'
+      - run: sh scripts/build-android-preview.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: teleiosis-android-arm64-preview
+          path: mobile/artifacts/*.apk
+          retention-days: 7
