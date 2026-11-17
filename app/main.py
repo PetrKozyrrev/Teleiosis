@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -10,7 +12,7 @@ from app.config import settings
 from app.deps import DbSession
 from app.routers import (
     account, auth, categories, contents, email_verification, password_reset,
-    reminders, stats, unsubscribe, users,
+    reminders, stats, unsubscribe, users, mobile_auth, app_links,
 )
 
 # Путь строится от файла, а не от текущей папки: сервер можно запускать откуда угодно
@@ -38,10 +40,20 @@ def create_app() -> FastAPI:
         openapi_url=None if production else "/openapi.json",
     )
 
+    @application.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError):
+        if request.url.path.startswith("/mobile/") or "authorization" in request.headers:
+            # Validation errors must not echo passwords or one-time tokens.
+            errors = [{"loc": item["loc"], "type": item["type"], "msg": item["msg"]} for item in exc.errors()]
+            return JSONResponse({"detail": errors}, status_code=422, headers={"Cache-Control": "no-store"})
+        return await request_validation_exception_handler(request, exc)
+
     @application.middleware("http")
     async def add_web_headers(request: Request, call_next):
         response = await call_next(request)
         path = request.url.path
+        if path.startswith("/mobile/") or "authorization" in request.headers:
+            response.headers["Cache-Control"] = "no-store"
         if path == "/app" or path.startswith("/app/"):
             response.headers.update(WEB_HEADERS)
         return response
@@ -49,7 +61,7 @@ def create_app() -> FastAPI:
     for router in (
         users.router, auth.router, password_reset.router, categories.router,
         contents.router, email_verification.router, account.router, stats.router,
-        unsubscribe.router, reminders.router,
+        unsubscribe.router, reminders.router, mobile_auth.router, app_links.router,
     ):
         application.include_router(router)
 

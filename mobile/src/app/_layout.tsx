@@ -6,18 +6,24 @@ import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../theme';
+import { AuthProvider } from '../auth/context';
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({ Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Manrope_700Bold });
   if (!loaded && !error) return null;
-  return <>
+  return <AuthProvider>
     <StatusBar style="dark" />
     <Stack screenOptions={{ headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.surface }, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="probe" options={{ title: 'Проверка устройства' }} />
       <Stack.Screen name="licenses" options={{ title: 'Лицензии шрифтов' }} />
+      <Stack.Screen name="account" options={{ title: 'Аккаунт' }} />
+      <Stack.Screen name="sign-in" options={{ title: 'Вход и регистрация' }} />
+      <Stack.Screen name="reset-password" options={{ title: 'Восстановление доступа' }} />
+      <Stack.Screen name="email-action" options={{ title: 'Ссылка из письма' }} />
+      <Stack.Screen name="staging-access" options={{ title: 'Доступ к тестовому стенду' }} />
       <Stack.Screen name="share-probe" options={{ title: 'Входящий материал', presentation: 'modal' }} />
       <Stack.Screen name="+not-found" options={{ title: 'Страница не найдена' }} />
     </Stack>
-  </>;
+  </AuthProvider>;
 }

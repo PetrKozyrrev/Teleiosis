@@ -1,6 +1,6 @@
 # Закрытый стенд с перехватом почты
 
-Дата: 16.11.2026. Продолжение мобильного блока 1. Домен: teleiosistest.tw1.ru. Стенд подготовлен с приватным preview; публичный proxy ещё не включён. Реальная SMTP-доставка остаётся отдельной незакрытой приёмкой.
+Обновлено: 17.11.2026. Серверная среда блоков 1/3. Домен: teleiosistest.tw1.ru. Стенд подготовлен с приватным preview; публичный proxy ещё не включён. Реальная SMTP-доставка остаётся отдельной незакрытой приёмкой.
 
 ## Что изменилось
 
@@ -39,11 +39,13 @@ sh deploy/compose.sh up -d --wait api worker
 
 ## Защита входа
 
-deploy/Caddyfile.staging требует отдельный Basic Auth (`tester`, Argon2id hash в защищённой конфигурации). Пароль шлюза отличается от паролей приложения; открывает доступ к стенду, но не авторизует пользователя в Teleiosis. Вход в приложение остаётся e-mail/пароль. Gateway Authorization удаляется перед передачей API, чтобы не смешивать credentials.
+deploy/Caddyfile.staging требует отдельный Basic Auth (`tester`, Argon2id hash в защищённой конфигурации). Пароль шлюза отличается от паролей приложения; открывает доступ к стенду, но не авторизует пользователя в Teleiosis. Вход в приложение остаётся e-mail/пароль. Для браузера Gateway Authorization удаляется перед API. Для /mobile/* отдельный X-Staging-Authorization проверяется как Basic, затем удаляется; исходный Bearer восстанавливается для приложения. Два .well-known association endpoints публичны, пользовательских данных не содержат. Остальные private paths закрыты. Детали мобильного контракта и безопасного rollback — [mobile_auth.md](mobile_auth.md).
 
 На `/` выводится предупреждение о тестовом режиме и перехвате писем, приложение доступно по `/app/`. Успешные ответы помечены X-Teleiosis-Environment: staging, индексирование запрещено X-Robots-Tag. Access log отключён. Basic Auth разрешён только поверх HTTPS.
 
 Секреты шлюза находятся на сервере в `/srv/teleiosis/deploy/.env.staging-access`, 0600, файл исключён из Git общим правилом .env.*. Посмотреть его можно самостоятельно через доверенную веб-консоль/SSH; пароль не присылать в чат. Приватный SSH-ключ хранится только локально в игнорируемой deploy/.ssh/.
+
+17.11.2026 приватный API/worker обновлены до teleiosis:mobile-auth-20261117, БД k2a4b6c8d0e1. До изменения создан backup mobile-auth-before-20261117.dump (0600) и восстановлен в отдельную teleiosis_restore_test_mobile_20261117, j1/0 users/0 contents. Выполнен private HTTPS mobile auth smoke с capture и cleanup. Это не публичный HTTPS/SMTP или доказательство iOS/device lifecycle.
 
 ## Приватный preview и публичный запуск
 

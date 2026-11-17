@@ -28,3 +28,5 @@ def check_same_origin(request: Request) -> None:
 def require_same_origin(request: Request) -> None:
     """Зависимость для эндпоинтов, которые проверяют Origin всегда."""
     check_same_origin(request)
+    if "authorization" in request.headers:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Web authentication requires cookies")

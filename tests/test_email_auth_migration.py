@@ -15,21 +15,35 @@ from app.db import Base
 
 
 @pytest.fixture
-def migration_db(engine):
+def migration_db(engine, request):
     with engine.connect() as connection, connection.begin():
         schema = f"migration_test_{uuid4().hex}"
         connection.execute(text(f'CREATE SCHEMA "{schema}"'))
         connection.execute(text(f'SET LOCAL search_path TO "{schema}"'))
         scripts = ScriptDirectory.from_config(Config("alembic.ini"))
         revisions = list(reversed(list(scripts.walk_revisions())))
+        target = getattr(request, "param", "j1f3a5b7c9d0")
+        target_index = next(i for i, revision in enumerate(revisions) if revision.revision == target)
         context = MigrationContext.configure(connection)
         try:
             with Operations.context(context):
-                for revision in revisions[:-1]:
+                for revision in revisions[:target_index]:
                     revision.module.upgrade()
-                yield connection, revisions[-1].module
+                yield connection, revisions[target_index].module
         finally:
             connection.rollback()
+
+
+def assert_current_schema(connection):
+    # Keep this historical migration test pinned to its own revision while
+    # checking compatibility with all later migrations and current models.
+    scripts = ScriptDirectory.from_config(Config("alembic.ini"))
+    later = list(reversed(list(scripts.iterate_revisions("head", "j1f3a5b7c9d0"))))
+    for revision in later:
+        revision.module.upgrade()
+    assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
+    for revision in reversed(later):
+        revision.module.downgrade()
 
 
 def test_upgrade_matches_models_and_preserves_account_data(migration_db):
@@ -53,13 +67,13 @@ def test_upgrade_matches_models_and_preserves_account_data(migration_db):
     assert connection.scalar(text("SELECT email FROM users WHERE id = :id"), {"id": user_id}) == "ivan@example.com"
     assert connection.scalar(text("SELECT note FROM contents")) == "Keep me"
     assert connection.scalar(text("SELECT count(*) FROM auth_sessions")) == 1
-    assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
+    assert_current_schema(connection)
 
     migration.downgrade()
     assert "telegram_id" in {c["name"] for c in inspect(connection).get_columns("users")}
     assert connection.scalar(text("SELECT note FROM contents")) == "Keep me"
     migration.upgrade()
-    assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
+    assert_current_schema(connection)
 
 
 def test_upgrade_refuses_accounts_without_email_before_changing_schema(migration_db):

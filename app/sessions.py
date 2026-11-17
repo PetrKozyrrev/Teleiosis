@@ -3,9 +3,10 @@
 import hashlib
 import re
 import secrets
+from typing import Literal
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import AuthSession, User
@@ -23,7 +24,7 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def create_session(db: Session, user: User) -> tuple[str, datetime]:
+def create_session(db: Session, user: User, *, client_type: Literal["web", "mobile"] = "web") -> tuple[str, datetime]:
     """Создаёт сессию. Возвращает (токен, срок действия).
     Токен виден только здесь и в ответе клиенту, в БД его нет."""
     now = datetime.now(timezone.utc)
@@ -31,7 +32,8 @@ def create_session(db: Session, user: User) -> tuple[str, datetime]:
     # 1. Удаляем просроченные сессии этого пользователя
     db.execute(
         delete(AuthSession).where(
-            AuthSession.user_id == user.id, AuthSession.expires_at <= now
+            AuthSession.user_id == user.id,
+            or_(AuthSession.expires_at <= now, AuthSession.created_at <= now - SESSION_ABSOLUTE),
         )
     )
 
@@ -50,7 +52,7 @@ def create_session(db: Session, user: User) -> tuple[str, datetime]:
     expires_at = now + SESSION_IDLE
     db.add(
         AuthSession(
-            user_id=user.id, token_hash=hash_token(token), expires_at=expires_at
+            user_id=user.id, token_hash=hash_token(token), expires_at=expires_at, client_type=client_type
         )
     )
     db.commit()
@@ -68,7 +70,7 @@ def renew_session(db: Session, row: AuthSession, now: datetime) -> bool:
     return True
 
 
-def find_user_by_token(db: Session, token: str) -> User | None:
+def find_user_by_token(db: Session, token: str, *, client_type: Literal["web", "mobile"] = "web") -> User | None:
     """Пользователь по токену сессии или None. Просроченная сессия не подходит.
     Успешное обращение продлевает сессию."""
     if not TOKEN_RE.fullmatch(token):
@@ -77,7 +79,9 @@ def find_user_by_token(db: Session, token: str) -> User | None:
     row = db.scalar(
         select(AuthSession).where(
             AuthSession.token_hash == hash_token(token),
+            AuthSession.client_type == client_type,
             AuthSession.expires_at > now,
+            AuthSession.created_at > now - SESSION_ABSOLUTE,
         )
     )
     if row is None:
@@ -89,9 +93,9 @@ def find_user_by_token(db: Session, token: str) -> User | None:
     return user
 
 
-def delete_session(db: Session, token: str) -> None:
+def delete_session(db: Session, token: str, *, client_type: Literal["web", "mobile"] = "web") -> None:
     """Удаляет сессию по токену (если есть). Незнакомый токен не ошибка."""
     if not TOKEN_RE.fullmatch(token):
         return
-    db.execute(delete(AuthSession).where(AuthSession.token_hash == hash_token(token)))
+    db.execute(delete(AuthSession).where(AuthSession.token_hash == hash_token(token), AuthSession.client_type == client_type))
     db.commit()

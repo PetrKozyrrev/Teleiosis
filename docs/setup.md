@@ -1,6 +1,6 @@
 # Запуск проекта
 
-Мобильный каркас Android/iOS: отдельная инструкция [mobile/README.md](../mobile/README.md). Здесь описывается существующий backend/сайт.
+Мобильный Android/iOS клиент (каркас и auth): отдельная инструкция [mobile/README.md](../mobile/README.md). Здесь описывается существующий backend/сайт.
 
 
 ## Первый запуск
@@ -81,3 +81,5 @@ GitHub workflow .github/workflows/backend.yml запускает Python suite, �
 `other/mobile_context.md` сохранён локально по запросу пользователя, но other/ исключён .gitignore. Общая дорожная карта и решения хранятся также в отслеживаемой docs/; игнорирование other/ не менялось.
 
 На сервере подготовлен отдельный [staging с перехватом писем](staging.md): TELEIOSIS_STAGING=1 подключает compose.staging.yml и принудительно задаёт staging/capture. Не выставлять APP_ENV=dev для публичного сервера и не ослаблять production SMTP/TLS-проверки ради отсутствующей почты. Gateway-пароль, DB-секреты и SECRET_KEY генерируются только на сервере; их не выводят в конфигурационных отчётах.
+
+Мобильная авторизация и миграция k2a4b6c8d0e1, staging-доступ и rollback: [mobile_auth.md](mobile_auth.md). Не откатывать backend к версии без client_type, оставляя активные mobile-сессии.

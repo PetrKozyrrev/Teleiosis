@@ -23,8 +23,9 @@ class DeleteAccountRequest(BaseModel):
 
 
 def current_token(request: Request) -> str | None:
-    """Токен текущей сессии сайта из HttpOnly cookie."""
-    return request.cookies.get(cookie_name())
+    """Токен уже проверенной зависимости CurrentUser; transport не смешивается."""
+    authorization = request.headers.get("authorization")
+    return authorization.split(" ", 1)[1] if authorization else request.cookies.get(cookie_name())
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

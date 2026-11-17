@@ -12,14 +12,49 @@
 		X-Teleiosis-Environment staging
 		-Server
 	}
-	@private path /docs /docs/* /redoc /redoc/* /openapi.json /ready
-	respond @private 404
-	basic_auth argon2id {
-		tester {$STAGING_AUTH_HASH}
-	}
-	respond / "Тестовый стенд Teleiosis. Письма перехватываются администратором и не доставляются в ваш ящик. Используйте только тестовые данные. Библиотека: /app/" 200
-	reverse_proxy api:8000 {
-		# Gateway credentials must not become application credentials.
-		header_up -Authorization
+	route {
+		@private path /docs /docs/* /redoc /redoc/* /openapi.json /ready
+		respond @private 404
+		@association path /.well-known/assetlinks.json /.well-known/apple-app-site-association
+		handle @association {
+			reverse_proxy api:8000 {
+				header_up -Authorization
+				header_up -X-Staging-Authorization
+			}
+		}
+		handle /mobile/* {
+			header Cache-Control "no-store"
+			route {
+				# Validate the separate gateway credential, then restore Bearer.
+				vars mobile_authorization {http.request.header.Authorization}
+				request_header Authorization {http.request.header.X-Staging-Authorization}
+				basic_auth argon2id {
+					tester {$STAGING_AUTH_HASH}
+				}
+				@has_token expression `{http.vars.mobile_authorization} != ""`
+				handle @has_token {
+					reverse_proxy api:8000 {
+						header_up Authorization {http.vars.mobile_authorization}
+						header_up -X-Staging-Authorization
+					}
+				}
+				handle {
+					reverse_proxy api:8000 {
+						header_up -Authorization
+						header_up -X-Staging-Authorization
+					}
+				}
+			}
+		}
+		handle {
+			basic_auth argon2id {
+				tester {$STAGING_AUTH_HASH}
+			}
+			respond / "Тестовый стенд Teleiosis. Письма перехватываются администратором и не доставляются в ваш ящик. Используйте только тестовые данные. Библиотека: /app/" 200
+			reverse_proxy api:8000 {
+				header_up -Authorization
+				header_up -X-Staging-Authorization
+			}
+		}
 	}
 }

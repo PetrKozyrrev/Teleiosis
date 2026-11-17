@@ -17,7 +17,7 @@
 | last_digest_on | DATE | NULL (локальная дата последней отправленной подборки; защита от двойной отправки) |
 | created_at | TIMESTAMPTZ | NOT NULL, по умолчанию now() |
 
-E-mail обязателен и уникален, приложение приводит его к нижнему регистру, а БД проверяет регистр. Хэш пароля содержит параметры Argon2id и соль. Настройки напоминаний хранятся в users. Telegram-идентификаторы удалены миграцией j1f3a5b7c9d0; таблица auth_sessions продолжает обслуживать cookie-сессии сайта.
+E-mail обязателен и уникален, приложение приводит его к нижнему регистру, а БД проверяет регистр. Хэш пароля содержит параметры Argon2id и соль. Настройки напоминаний хранятся в users. Telegram-идентификаторы удалены миграцией j1f3a5b7c9d0; таблица auth_sessions обслуживает web-cookie и mobile Bearer, разделённые client_type миграцией k2a4b6c8d0e1.
 
 ## categories
 | Поле | Тип | Ограничения |
@@ -79,6 +79,7 @@ CHECK (status IN ('pending','sent','cancelled')). У материала не б�
 | id | BIGINT, identity | PK |
 | user_id | BIGINT | NOT NULL, FK users(id), ON DELETE CASCADE |
 | token_hash | TEXT | NOT NULL, UNIQUE, CHECK длина 64 (hex SHA-256) |
+| client_type | TEXT | NOT NULL, DEFAULT web, CHECK web/mobile; общий лимит сессий |
 | created_at | TIMESTAMPTZ | NOT NULL, now() |
 | expires_at | TIMESTAMPTZ | NOT NULL, CHECK expires_at > created_at |
 

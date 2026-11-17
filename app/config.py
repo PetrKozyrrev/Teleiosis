@@ -1,8 +1,9 @@
 from typing import Literal
 from pathlib import Path
 from urllib.parse import urlsplit
+import re
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIN_SECRET_KEY_LENGTH = 32
@@ -25,6 +26,9 @@ class Settings(BaseSettings):
     # с этого origin. Открывать сайт нужно именно по этому адресу.
     app_origin: str = "http://localhost:8000"
     cookie_secure: bool = False
+    mobile_application_id: str = "ru.teleiosis.mobile.dev"
+    mobile_android_cert_sha256: list[str] = Field(default_factory=list)
+    mobile_apple_team_id: str = ""
 
     # Секрет для подписи ссылок отписки (HMAC), не короче 32 символов.
     # Только в окружении. Смена ключа делает недействительными все выданные ссылки.
@@ -42,6 +46,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def check_web_settings(self):
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+", self.mobile_application_id):
+            raise ValueError("Invalid mobile application ID")
+        if any(not re.fullmatch(r"(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}", value) for value in self.mobile_android_cert_sha256):
+            raise ValueError("Android app-link certificates must be SHA-256 fingerprints")
+        if self.mobile_apple_team_id and not re.fullmatch(r"[A-Z0-9]{10}", self.mobile_apple_team_id):
+            raise ValueError("Apple team ID must have 10 uppercase alphanumeric characters")
         origin = self.app_origin.strip().lower().rstrip("/")
         parts = urlsplit(origin)
         if (

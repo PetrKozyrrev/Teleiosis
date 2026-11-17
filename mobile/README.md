@@ -1,6 +1,6 @@
 # Телеосис: мобильное приложение
 
-Блок 2 утверждённого [плана](../docs/mobile_plan.md). Отдельное Android/iOS-приложение; backend и веб-MVP сохраняются. Текущая сборка показывает каркас и платформенные проверки. Авторизации, запросов к API, продуктовой библиотеки, офлайн-очереди и push-доставки здесь ещё нет.
+Блоки 2/3 утверждённого [плана](../docs/mobile_plan.md). В 0.2.0 добавлены вход/регистрация, восстановление/подтверждение, защищённая сессия и профиль. Backend и веб-MVP сохраняются; библиотека, офлайн-очередь и push — следующие блоки. [Контракт, проверки и открытая приёмка auth](../docs/mobile_auth.md).
 
 ## Стек и запуск
 
@@ -12,6 +12,8 @@
 ```sh
 cd mobile
 npm ci
+# Только публичные настройки, без паролей/токенов:
+cp .env.example .env
 npm run typecheck
 npm run lint
 npm test
@@ -37,25 +39,25 @@ npm start
 
 ```sh
 sdkmanager 'platform-tools' 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;27.1.12297006'
-sh scripts/build-android-preview.sh
+EXPO_PUBLIC_API_ORIGIN=https://teleiosistest.tw1.ru EXPO_PUBLIC_STAGING_GATE=1 sh scripts/build-android-preview.sh
 ```
 
-Результат: `artifacts/teleiosis-0.1.0-android-arm64-preview.apk` и SHA-256 в выводе. Это arm64-сборка с упакованным JS, работающая без Metro и сервера. Gradle-вариант Release использует **тестовый debug key шаблона**: APK предназначен для локальной проверки, не для магазина. Нет production signing key, IPA или AAB. Файлы сборок и ключи исключены из Git. Окончательную подпись и приложение магазина готовим в блоке выпуска.
+Результат: `artifacts/teleiosis-0.2.0-android-arm64-preview.apk` и SHA-256 в выводе. Это arm64-сборка с упакованным JS, работающая без Metro и сервера. Gradle-вариант Release использует **тестовый debug key шаблона**: APK предназначен для локальной проверки, не для магазина. Нет production signing key, IPA или AAB. Файлы сборок и ключи исключены из Git. Окончательную подпись и приложение магазина готовим в блоке выпуска.
 
-Локальная сборка 16.11.2026: 30 059 279 байт, SHA-256 `a2ff8aa4755438e2bf6855b1a48b6439ec970f38fc4388dbbe351a00a52944b0`. Проверены APK v2 signature (Android Debug), manifest API24/target36/arm64, встроенный JS/выбранные шрифты и 16-KiB archive alignment; установка/ELF/runtime ещё не проверены. Изначальный Maven timeout устранён настройкой существующего сетевого proxy среды только в /tmp Gradle home. В среде с обязательным proxy для Java нужен собственный transient Gradle proxy config; не добавлять его адреса/доступы в репозиторий.
+Локальная сборка 17.11.2026: 30 154 531 байт, SHA-256 `040f2e94adb97e6d7bdb26b1c72b0804bf868ebfb9da80b20996697cf2488d44`. Проверены v2 Android Debug signature (тот же сертификат, что 0.1), API24/target36/arm64, встроенный JS и 16-KiB archive alignment. Typecheck/lint, 64 теста, экспорт обеих ОС и association config проходят. Установка 0.1 на S25 подтверждена; 0.2 ещё не проверена на телефоне. Публичный API пока выключен: вход с телефона проверяется после согласованного HTTPS-запуска, пароль шлюза вводится отдельно в приложении. Миграция/приватный API/smoke готовы: [mobile_auth.md](../docs/mobile_auth.md).
 
 Можно скопировать APK на телефон и открыть для установки либо при работающем USB/ADB:
 
 ```sh
 adb devices
-adb install -r artifacts/teleiosis-0.1.0-android-arm64-preview.apk
+adb install -r artifacts/teleiosis-0.2.0-android-arm64-preview.apk
 ```
 
 Для WSL2 проброс USB из Windows настраивается отдельно; наличие телефона не означает его видимость внутри WSL. Запуск из IDE не заменяет тест автономного APK. При несовпадении подписи обновление существующей установки не пройдёт; удаление приложения стирает его данные, поэтому не делать его автоматически.
 
 ## Что проверять на устройстве
 
-Записывать модель, версию ОС, версию APK/хеш и результат каждого пункта в [протокол](../docs/mobile_testing.md). Пока runtime-результаты открыты.
+Записывать модель, версию ОС, версию APK/хеш и результат каждого пункта в [протокол](../docs/mobile_testing.md). Установка/запуск 0.1 подтверждены на S25; специальные runtime-пункты и 0.2 ещё открыты.
 
 1. Открыть приложение; переключить Библиотеку → Прогресс → Настройки; открыть «Проверить устройство» и вернуться системной кнопкой/жестом.
 2. Проверка устройства → «Записать и проверить». Закрыть приложение, снова открыть → «Прочитать после перезапуска». Удалить запись; чтение должно подтвердить её отсутствие. Используется только отдельный несекретный маркер, не токен аккаунта.
@@ -102,6 +104,6 @@ CI: `.github/workflows/mobile.yml` — проверки JS и генерации
 
 Проверен исходный RuStore Push SDK 6.9.1 (официальный tag, commit `c23260a660f943d7f09a828a48e5b4d513b21a95`): исходники содержат ветку newArchEnabled, но dev-пример опирается на RN 0.72.17, модуль — на ReactContextBaseJavaModule, собственный Gradle classpath 7.2.2/kotlin-android. Совместимость с RN 0.88/AGP 9.2.1 не доказана. SDK не установлен/не инициализирован; нужен отдельный compile/device probe до выбора канала. APNs требует Apple-ресурсов. Google-сервисы для текущего каркаса не нужны; покрытие Android без GMS и дистрибьютор push ещё не согласованы.
 
-На момент установки npm audit сообщает 23 позиции (22 moderate, 1 low), исходные advisories — glob/minimatch/deepmerge в инструментах Expo/Jest. Совместимый `npm audit fix` применён, отчёт не обнулился. Предлагаемые force-исправления меняют/понижают SDK или Jest и не применялись. Не объявлять зависимости безопасными или блок 2 принятым до разбора и повторной проверки перед выпуском.
+На 17.11.2026 npm при установке сообщает 22 moderate позиции в дереве зависимостей инструментов (ранее 23 включая low). Совместимый `npm audit fix` применён, отчёт не обнулился. Предлагаемые force-исправления меняют/понижают SDK или Jest и не применялись. Не объявлять зависимости безопасными или блок 2 принятым до разбора и повторной проверки перед выпуском.
 
 Официальные источники, проверены 16.11.2026: [матрица Expo SDK 58](https://docs.expo.dev/versions/v58.0.0/), [Expo Router](https://docs.expo.dev/router/installation/), [входящий sharing](https://docs.expo.dev/versions/v58.0.0/sdk/sharing/), [SecureStore](https://docs.expo.dev/versions/v58.0.0/sdk/securestore/), [Apple Share Extensions](https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/Share.html), [RuStore React Native Push 6.9.1](https://www.rustore.ru/help/sdk/push-notifications/react/6-9-1).

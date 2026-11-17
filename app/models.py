@@ -167,7 +167,7 @@ class Reminder(Base):
     content: Mapped["Content"] = relationship(back_populates="reminders")
 
 class AuthSession(Base):
-    """Серверная сессия сайта. Хранится только хэш токена, не сам токен."""
+    """Сессия сайта или mobile. Хранится только хэш токена, не сам токен."""
 
     __tablename__ = "auth_sessions"
     __table_args__ = (
@@ -175,6 +175,7 @@ class AuthSession(Base):
             "char_length(token_hash) = 64", name="ck_auth_sessions_hash_len"
         ),
         CheckConstraint("expires_at > created_at", name="ck_auth_sessions_expiry"),
+        CheckConstraint("client_type IN ('web', 'mobile')", name="ck_auth_sessions_client_type"),
         Index("ix_auth_sessions_user", "user_id"),
     )
 
@@ -187,6 +188,8 @@ class AuthSession(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    client_type: Mapped[str] = mapped_column(Text, server_default="web")
 
 class RateLimitEvent(Base):
     """Журнал попыток для ограничения частоты запросов.

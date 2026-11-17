@@ -11,5 +11,7 @@ cd android
   -Dorg.gradle.internal.http.socketTimeout=300000 -Dorg.gradle.internal.http.connectionTimeout=60000
 cd "$mobile_dir"
 mkdir -p artifacts
-cp android/app/build/outputs/apk/release/app-release.apk artifacts/teleiosis-0.1.0-android-arm64-preview.apk
-sha256sum artifacts/teleiosis-0.1.0-android-arm64-preview.apk
+mobile_version=$(node -p "require('./package.json').version")
+artifact="artifacts/teleiosis-$mobile_version-android-arm64-preview.apk"
+cp android/app/build/outputs/apk/release/app-release.apk "$artifact"
+sha256sum "$artifact"

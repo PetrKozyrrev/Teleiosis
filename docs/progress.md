@@ -1,5 +1,97 @@
 # Progress
 
+## Блок 3 — auth/session, 17.11.2026
+
+Пользователь подтвердил установку/работу каркаса0.1 на Samsung S25 и разрешил коммит + следующий блок. Созданы `36bacc1` (staging/capture/egress) и `23b8a5f` (mobile shell). Код блока3, тесты/документация сохраняются отдельным коммитом. **Private API и APK0.2 готовы; публичная/device/iOS приёмка открыта. Блок4 не начат.**
+
+- [x] Единые account/password/consent/rate limits, отдельные web/mobile сессии и native namespace. Cookie/Bearer не подменяют друг друга; mixed не имеет fallback, web-CSRF сохраняется. Hash-only opaque tokens, idle14/absolute60days/10total. Reset отзывает все, change-password сохраняет текущую сессию обоих типов. NoStore/validation без password/token input.
+- [x] Миграция k2a4b6c8d0e1: defaultweb/check web-mobile; данные/старые web-сессии сохранены; downgrade отзывает mobile, чтобы старый код не принял их как cookie. Реальные upgrade/downgrade/upgrade/schema parity и миграционные сценарии проходят.
+- [x] Mobile0.2/code2: login/register/consent/account/forgot/reset/verify, SecureStore+origin binding+installation cache marker, проверка сервера при запуске/foreground, offline/gateway401/API401 разделены, известный401 не оставляет authenticated UI даже при failed wipe. Remote logout + явно выбранный local-only вариант. Token не в React state/router; one-time URL только в памяти30min с correlationid, без сырого query/fragment в navigation. Callback старого confirm не уничтожает новый link; post-confirm cleanup/refresh failure не объявляет серверную операцию неуспешной.
+- [x] Android/iOS association config и два metadata endpoints при явных cert/team; прежние web fallback страницы. Caddy native gate через X-Staging-Authorization для /mobile/*, Bearer сохраняется, пароль шлюза удаляется. API/приложение не используют CookieJar/Origin имитацию. В staging маршрутизация common native resources вне/mobile/* — задача подключения библиотеки блока4.
+- [x] **764 Python/API passed in66.89s** в отдельной временной PG16; реальные Alembic entrypoint и schema comparison прошли. Первый757pass/4fail исправлен:2testharness SECRET_KEY,2historicalmigrationfixture предполагалиhead; assertions не ослаблялись, fixture теперьpinnedj1 и есть отдельныйk2test.
+- [x] **64 mobile tests/9suites passed2.236s**, tsc/lint, экспорт JS/Hermes обеих ОС, native prebuild/config assertions (включая hostpaths/associatedDomains/backupfalse). Native mocks не заменяют реальные Keystore/Keychain/OS links.
+- [x] APK0.2: `mobile/artifacts/teleiosis-0.2.0-android-arm64-preview.apk`,30154531байт,SHA256 `040f2e94adb97e6d7bdb26b1c72b0804bf868ebfb9da80b20996697cf2488d44`. Полная сборка13m45s + финальная JS-инкрементальная38s (785tasks,25executed). apksigner v2 Android Debug/cert совпадает с0.1; manifest API24/target36/compile37/arm64/code2, zipalign-P16, JS и отсутствие env/keyfiles проверены. Store signing/публикации нет.
+- [x] Реальный изолированный Caddy HTTPS-test: gateway bypass rejection, Basic/Bearer isolation, anonymous mobile, browser compatibility, metadata без gateway и privatepaths404. Harness добавлен в backendCI; mobileCI проверяет default/configured native associations. GitHub workflow ещё не запускался.
+- [x] До rollout server backup `/var/lib/teleiosis/backups/mobile-auth-before-20261117.dump`0600, restore в `teleiosis_restore_test_mobile_20261117` (j1,0users/0contents). Новый image `teleiosis:mobile-auth-20261117`, id`sha256:0797aa153c2124ad89fba512ec0b9ea2edcff980645fdc779a021a437c6b4883`; прежний сохранён. Env rollback snapshot только на сервере0600. Миграция/API/worker/private proxy обновлены, всё ещё **127.0.0.1:8443**, preview CA/volumes отдельные, APP_ENVstaging/EMAIL_BACKENDcapture, egress present.
+- [x] Private HTTPS **реальный API**: register/login/session, native-token-as-cookie/web-token-as-Bearer/mixed rejection, captured verify/reset, one-time reuse rejection, глобальный session revoke иlogout; собственный синтетический аккаунт/MIME удалены. Дополнительно полноценный web smoke прошёл библиотеку/категории/verify/reset, реальный worker reminder+digest, stats/export/delete/cleanup. Association JSON без gateway через проверенный CA соответствует cert APK.
+- [ ] Public HTTPS/ACME для домена ещё не запущен, SMTP не доставляет в реальные ящики. На S25 подтверждён только0.1: 0.2/session restore/share/SecureStore/reinstall/verified App Links/ошибки сети ещё не проверены. Mac/iPhone/team/accounts остаются внешними зависимостями; iOS binary и production share/push не доказаны.
+- [ ] 22moderate npm advisories при установке: force со сменой/понижением SDK не применялся. Продуктовая библиотека/очередь/push, согласованный юридический текст, retention и off-VM backup остаются отдельными работами.
+
+Контракт, сборка, открытая приёмка и rollback: [mobile_auth.md](mobile_auth.md). При откате сначала отозвать mobile-сессии, не возвращать старый cookie-код поверх активных mobile tokens. Публичный proxy — только после согласования режима по [staging.md](staging.md); до этого APK не может войти с телефона в loopback API. По завершении этой подготовки остановиться на review; библиотека блока4 требует отдельного подтверждения.
+
+
+<details>
+<summary>Файлы блока 3</summary>
+
+```text
+.github/workflows/backend.yml
+.github/workflows/mobile.yml
+README.md
+app/config.py
+app/csrf.py
+app/deps.py
+app/main.py
+app/models.py
+app/routers/account.py
+app/routers/app_links.py
+app/routers/auth.py
+app/routers/mobile_auth.py
+app/sessions.py
+deploy/.env.example
+deploy/.env.staging.example
+deploy/Caddyfile.staging
+deploy/compose.yml
+docs/api.md
+docs/architecture.md
+docs/database.md
+docs/decisions.md
+docs/mobile_auth.md
+docs/mobile_plan.md
+docs/mobile_testing.md
+docs/progress.md
+docs/setup.md
+docs/staging.md
+migrations/versions/k2a4b6c8d0e1_mobile_sessions.py
+mobile/.env.example
+mobile/README.md
+mobile/app.config.ts
+mobile/package-lock.json
+mobile/package.json
+mobile/scripts/build-android-preview.sh
+mobile/scripts/check-native-config.py
+mobile/src/app/(tabs)/index.tsx
+mobile/src/app/(tabs)/settings.tsx
+mobile/src/app/+native-intent.ts
+mobile/src/app/_layout.tsx
+mobile/src/app/account.tsx
+mobile/src/app/email-action.tsx
+mobile/src/app/reset-password.tsx
+mobile/src/app/sign-in.tsx
+mobile/src/app/staging-access.tsx
+mobile/src/auth/api.ts
+mobile/src/auth/config.ts
+mobile/src/auth/context.tsx
+mobile/src/auth/controller.ts
+mobile/src/auth/emailLinks.ts
+mobile/src/auth/vault.ts
+mobile/src/components/ui.tsx
+mobile/tests/authApi.test.ts
+mobile/tests/authController.test.ts
+mobile/tests/authVault.test.ts
+mobile/tests/emailActionScreen.test.tsx
+mobile/tests/emailLinks.test.ts
+mobile/tests/signInScreen.test.tsx
+scripts/check_mobile_gateway.py
+scripts/smoke_mobile_auth.py
+tests/test_email_auth_migration.py
+tests/test_mobile_app_links.py
+tests/test_mobile_auth.py
+tests/test_mobile_sessions_migration.py
+other/mobile_context.md (ignored, локальный контекст)
+```
+
+</details>
+
 ## Блок 2 — мобильный каркас, 16.11.2026
 
 Пользователь отдельно разрешил переход к mobile. Публичный HTTPS/SMTP блока 1 отложены; приложение сейчас не обращается к API. Подтверждены Samsung S25 с возможностью USB-подключения и отсутствие аккаунтов магазинов. Mac/iPhone/macOS CI и покрытие без GMS пока не подтверждены. **17.11.2026 пользователь подтвердил установку и работу каркаса на S25, разрешил коммит и переход к блоку 3. Полная приёмка платформенных пунктов блока 2 остаётся открытой.**

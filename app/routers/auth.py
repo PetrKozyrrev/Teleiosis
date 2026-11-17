@@ -55,13 +55,7 @@ def start_session(request: Request, response: Response, db: DbSession, user: Use
     response.headers["Cache-Control"] = "no-store"
 
 
-@router.post(
-    "/register",
-    response_model=UserOut,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_same_origin)],
-)
-def register(data: RegisterRequest, request: Request, response: Response, db: DbSession):
+def register_user(data: RegisterRequest, request: Request, db: DbSession) -> User:
     # Лимит проверяется до хэширования: заблокированный запрос ничего не стоит.
     # Считаются все попытки, дошедшие до этого места (ошибки формата не считаются).
     ip_key = make_key(client_ip(request))
@@ -87,16 +81,10 @@ def register(data: RegisterRequest, request: Request, response: Response, db: Db
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
     db.refresh(user)
-    start_session(request, response, db, user)
     return user
 
 
-@router.post(
-    "/login",
-    response_model=UserOut,
-    dependencies=[Depends(require_same_origin)],
-)
-def login(data: LoginRequest, request: Request, response: Response, db: DbSession):
+def authenticate_user(data: LoginRequest, request: Request, db: DbSession) -> User:
     try:
         email = normalize_email(data.email)
     except ValueError:
@@ -122,7 +110,6 @@ def login(data: LoginRequest, request: Request, response: Response, db: DbSessio
         db.commit()
 
     clear(db, LOGIN_EMAIL_IP, pair_key)  # счётчик пары обнуляется, счётчик IP нет
-    start_session(request, response, db, user)
     return user
 
 
@@ -139,3 +126,16 @@ def logout(request: Request, db: DbSession):
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     clear_session_cookie(response)
     return response
+
+@router.post("/register", response_model=UserOut, status_code=201, dependencies=[Depends(require_same_origin)])
+def register(data: RegisterRequest, request: Request, response: Response, db: DbSession):
+    user = register_user(data, request, db)
+    start_session(request, response, db, user)
+    return user
+
+
+@router.post("/login", response_model=UserOut, dependencies=[Depends(require_same_origin)])
+def login(data: LoginRequest, request: Request, response: Response, db: DbSession):
+    user = authenticate_user(data, request, db)
+    start_session(request, response, db, user)
+    return user

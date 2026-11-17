@@ -125,6 +125,8 @@ jobs:
         run: |
           sh deploy/compose.sh restart api worker
           sh deploy/compose.sh up -d --wait api worker
+      - name: Native staging gateway transport over private HTTPS
+        run: python3 scripts/check_mobile_gateway.py --image teleiosis:ci
       - name: Stop disposable CI stack
         if: always()
         run: sh deploy/compose.sh down --volumes --remove-orphans

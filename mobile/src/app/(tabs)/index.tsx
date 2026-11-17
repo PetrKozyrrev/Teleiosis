@@ -7,7 +7,8 @@ export default function Library() {
     <Card>
       <Text style={styles.heading}>Сохраняйте то, к чему хочется вернуться</Text>
       <Body>Здесь появятся ваши ссылки, заметки и материалы для изучения.</Body>
-      <Body>Это первый тестовый каркас приложения. Вход и библиотека будут подключены в следующих блоках.</Body>
+      <Body>Войдите в аккаунт, чтобы проверить доступ с телефона. Подключение библиотеки — следующий этап.</Body>
+      <Action title="Аккаунт" onPress={() => router.push('/account')} />
       <Action title="Проверить устройство" onPress={() => router.push('/probe')} />
     </Card>
   </Page>;
