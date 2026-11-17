@@ -1,0 +1,49 @@
+# Explicit overlay, enabled only via TELEIOSIS_STAGING=1.
+x-capture-environment: &capture-environment
+  APP_ENV: staging
+  EMAIL_BACKEND: capture
+  CAPTURE_EMAIL_DIR: /var/lib/teleiosis/captured-mail
+
+services:
+  migrate:
+    environment: *capture-environment
+  mail-init:
+    image: ${TELEIOSIS_IMAGE:-teleiosis:local}
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER]
+    restart: "no"
+    healthcheck:
+      disable: true
+    volumes:
+      - capture_mail:/var/lib/teleiosis/captured-mail
+    command:
+      - python
+      - -c
+      - "import os; p='/var/lib/teleiosis/captured-mail'; os.chmod(p, 0o700); os.chown(p, 10001, 10001)"
+  api:
+    environment: *capture-environment
+    volumes:
+      - capture_mail:/var/lib/teleiosis/captured-mail
+    depends_on:
+      mail-init:
+        condition: service_completed_successfully
+  worker:
+    environment: *capture-environment
+    volumes:
+      - capture_mail:/var/lib/teleiosis/captured-mail
+    depends_on:
+      mail-init:
+        condition: service_completed_successfully
+  proxy:
+    # Ordinary `up` cannot publish the staged app before explicit approval.
+    profiles: [public]
+    environment:
+      STAGING_AUTH_HASH: ${STAGING_AUTH_HASH:?Set STAGING_AUTH_HASH}
+    volumes:
+      - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
+
+volumes:
+  capture_mail:

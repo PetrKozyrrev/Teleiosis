@@ -1,0 +1,12 @@
+[Unit]
+Description=Teleiosis scoped container egress policy
+Before=docker.service
+After=systemd-modules-load.service systemd-sysctl.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /srv/teleiosis/deploy/egress-iptables.sh apply
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

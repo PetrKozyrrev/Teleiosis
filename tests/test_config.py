@@ -72,6 +72,16 @@ def test_prod_requires_encrypted_smtp():
         make(**{**PROD, "smtp_security": "none"})
 
 
+def test_capture_requires_explicit_secure_staging(tmp_path):
+    config = {**PROD, "app_env": "staging", "email_backend": "capture", "capture_email_dir": tmp_path}
+    assert make(**config).email_backend == "capture"
+    for changes in ({"app_env": "prod"}, {"app_env": "dev"}, {"cookie_secure": False},
+                    {"app_origin": "http://example.ru"}, {"secret_key": "short"},
+                    {"capture_email_dir": "relative/path"}, {"email_backend": "console"}):
+        with pytest.raises(ValidationError):
+            make(**{**config, **changes})
+
+
 @pytest.mark.parametrize("origin", ["https://user:secret@example.ru", "https://user@example.ru"])
 def test_origin_rejects_credentials_without_leaking_them(origin):
     with pytest.raises(ValidationError) as exc:

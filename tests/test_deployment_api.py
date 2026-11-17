@@ -9,12 +9,12 @@ from app.deps import get_db
 from app.main import create_app
 
 
-@pytest.mark.parametrize("production", [False, True])
-def test_docs_are_private_in_production(monkeypatch, production):
-    monkeypatch.setattr(settings, "app_env", "prod" if production else "dev")
+@pytest.mark.parametrize("environment", ["dev", "prod", "staging"])
+def test_docs_are_private_in_production(monkeypatch, environment):
+    monkeypatch.setattr(settings, "app_env", environment)
     with TestClient(create_app()) as client:
         for path in ("/docs", "/redoc", "/openapi.json"):
-            assert client.get(path).status_code == (404 if production else 200)
+            assert client.get(path).status_code == (404 if environment != "dev" else 200)
         assert client.get("/health").json() == {"status": "ok"}
         assert client.get("/app/login.html").status_code == 200
 

@@ -1,0 +1,25 @@
+{
+	admin off
+}
+
+{$DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		X-Robots-Tag "noindex, nofollow"
+		X-Teleiosis-Environment staging
+		-Server
+	}
+	@private path /docs /docs/* /redoc /redoc/* /openapi.json /ready
+	respond @private 404
+	basic_auth argon2id {
+		tester {$STAGING_AUTH_HASH}
+	}
+	respond / "Тестовый стенд Teleiosis. Письма перехватываются администратором и не доставляются в ваш ящик. Используйте только тестовые данные. Библиотека: /app/" 200
+	reverse_proxy api:8000 {
+		# Gateway credentials must not become application credentials.
+		header_up -Authorization
+	}
+}

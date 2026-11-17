@@ -1,4 +1,7 @@
-# Review on the target Linux host BEFORE enabling public access.
+# Historical native-nftables example, NOT the policy for the current Timeweb host.
+# Current Docker 29.10 uses iptables-nft; use DOCKER-USER/iptables for that backend.
+# Do not install this file alongside Docker's iptables backend.
+# Review on a compatible target Linux host BEFORE enabling public access.
 # Not installed automatically. See docs/deployment.md. Requires nftables,
 # Docker bridge filtering, IPv4-only compose networks and unchanged static IPs.
 # Validate with `nft -c -f ...`; do not flush the host's existing ruleset.

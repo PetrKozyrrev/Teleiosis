@@ -7,7 +7,9 @@ venv/
 .env.*
 !.env.example
 !deploy/.env.example
+!deploy/.env.staging.example
 backups/
+deploy/.ssh/
 *.dump
 *.dump.partial
 

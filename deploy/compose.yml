@@ -7,16 +7,17 @@ x-app: &app
     dockerfile: Dockerfile
   environment:
     DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
-    APP_ENV: prod
+    APP_ENV: ${APP_ENV:-prod}
     APP_ORIGIN: https://${DOMAIN:?Set DOMAIN}
     COOKIE_SECURE: "true"
     SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
-    EMAIL_BACKEND: smtp
-    SMTP_HOST: ${SMTP_HOST:?Set SMTP_HOST}
+    EMAIL_BACKEND: ${EMAIL_BACKEND:-smtp}
+    CAPTURE_EMAIL_DIR: /var/lib/teleiosis/captured-mail
+    SMTP_HOST: ${SMTP_HOST:-}
     SMTP_PORT: ${SMTP_PORT:-587}
     SMTP_USER: ${SMTP_USER:-}
     SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-    SMTP_FROM: ${SMTP_FROM:?Set SMTP_FROM}
+    SMTP_FROM: ${SMTP_FROM:-}
     SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
   restart: unless-stopped
   read_only: true

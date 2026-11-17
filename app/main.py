@@ -30,7 +30,7 @@ WEB_HEADERS = {
 
 def create_app() -> FastAPI:
     """Production не публикует OpenAPI; локальная документация сохраняется."""
-    production = settings.app_env == "prod"
+    production = settings.app_env != "dev"
     application = FastAPI(
         title="Teleiosis API",
         docs_url=None if production else "/docs",

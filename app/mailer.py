@@ -1,9 +1,13 @@
-"""Отправка писем. Режим console печатает письмо в терминал (разработка),
-режим smtp отправляет через почтовый сервер."""
+"""console для разработки, SMTP для доставки, приватный capture для staging."""
 
 import logging
 import smtplib
 import ssl
+import os
+import stat
+import tempfile
+from pathlib import Path
+from uuid import uuid4
 from email.message import EmailMessage
 
 from app.config import settings
@@ -11,6 +15,31 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 SMTP_TIMEOUT = 10  # секунд
+
+
+def capture_email(message: EmailMessage) -> None:
+    """Closed staging mailbox: private atomic MIME files, never logs tokens."""
+    if settings.app_env != "staging":
+        raise ValueError("Mail capture requires staging")
+    directory = settings.capture_email_dir
+    directory.mkdir(mode=0o700, exist_ok=True)
+    info = directory.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+        raise PermissionError("Capture directory must be private and owned by the process")
+    # Refuse an overflowing test mailbox instead of silently losing old mail.
+    if sum(1 for _ in directory.glob("*.eml")) >= 1000:
+        raise OSError("Capture mailbox is full")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=directory, prefix=".pending-", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(message.as_bytes())
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(directory / f"{uuid4().hex}.eml")
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def send_email(
@@ -34,12 +63,16 @@ def send_email(
 
     try:
         message = EmailMessage()
-        message["From"] = settings.smtp_from
+        message["From"] = settings.smtp_from or "Teleiosis staging <noreply@example.invalid>"
         message["To"] = to
         message["Subject"] = subject
         for name, value in extra.items():
             message[name] = value  # перевод строки в значении даст ValueError
         message.set_content(body)
+
+        if settings.email_backend == "capture":
+            capture_email(message)
+            return True
 
         context = ssl.create_default_context()
         if settings.smtp_security == "ssl":
