@@ -1,7 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
 
-// The experimental iOS extension is confined to explicit investigation builds.
-const iosShareProbe = process.env.MOBILE_IOS_SHARE_PROBE === '1';
+// Enable the iOS share target for builds with App Group signing.
+const iosShare = process.env.MOBILE_IOS_SHARE === '1';
 const apiUrl = process.env.EXPO_PUBLIC_API_ORIGIN ? new URL(process.env.EXPO_PUBLIC_API_ORIGIN) : null;
 if (apiUrl && (apiUrl.protocol !== 'https:' || apiUrl.username || apiUrl.password || apiUrl.pathname !== '/' || apiUrl.search || apiUrl.hash)) {
   throw new Error('EXPO_PUBLIC_API_ORIGIN must be an HTTPS origin');
@@ -10,7 +10,7 @@ if (apiUrl && (apiUrl.protocol !== 'https:' || apiUrl.username || apiUrl.passwor
 const config: ExpoConfig = {
   name: 'Телеосис · тест',
   slug: 'teleiosis-mobile',
-  version: '0.2.0',
+  version: '0.4.0',
   scheme: 'teleiosis-dev',
   platforms: ['android', 'ios'],
   orientation: 'default',
@@ -24,7 +24,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'ru.teleiosis.mobile.dev',
-    versionCode: 2,
+    versionCode: 7,
     allowBackup: false,
     intentFilters: apiUrl ? [{ action: 'VIEW', autoVerify: true, category: ['BROWSABLE', 'DEFAULT'], data: [
       { scheme: 'https', host: apiUrl.hostname, path: '/app/reset.html' },
@@ -36,13 +36,16 @@ const config: ExpoConfig = {
     'expo-file-system',
     'expo-font',
     'expo-router',
+    'expo-sqlite',
     'expo-dev-client',
     ['expo-secure-store', { configureAndroidBackup: true }],
+    ...(iosShare ? ['./plugins/withShareInbox'] : []),
     ['expo-sharing', {
       android: { enabled: true, singleShareMimeTypes: ['text/plain'], multipleShareMimeTypes: [] },
       ios: {
-        enabled: iosShareProbe,
-        activationRule: { supportsText: true, supportsWebURLWithMaxCount: 1 },
+        enabled: iosShare,
+        appGroupId: 'group.ru.teleiosis.mobile.dev',
+        activationRule: { supportsText: true, supportsWebUrlWithMaxCount: 1 },
       },
     }],
     ['expo-build-properties', {
@@ -50,7 +53,7 @@ const config: ExpoConfig = {
       ios: { deploymentTarget: '16.4' },
     }],
   ],
-  extra: { iosShareProbe, stage: process.env.EXPO_PUBLIC_STAGING_GATE === '1' ? 'staging-auth' : 'auth' },
+  extra: { iosShare, stage: process.env.EXPO_PUBLIC_STAGING_GATE === '1' ? 'staging-auth' : 'auth' },
 };
 
 export default config;

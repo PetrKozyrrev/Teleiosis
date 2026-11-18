@@ -1,7 +1,7 @@
-import { ApiError, AuthApi, type Session } from './api';
+import { ApiError, AuthApi, type LibraryMethod, type LibraryOptions, type LibraryPath, type Session } from './api';
 import type { Vault } from './vault';
 
-export type AuthState = { phase: 'loading' | 'signedOut' | 'signedIn' | 'offline' | 'error'; session: Session | null; busy: boolean; message: string | null };
+export type AuthState = { phase: 'loading' | 'signedOut' | 'signedIn' | 'offline' | 'error'; session: Session | null; busy: boolean; message: string | null; offlineOwner?: number | null };
 const safeStorageError = 'Не удалось обратиться к защищённому хранилищу. Разблокируйте устройство и повторите.';
 
 export class AuthController {
@@ -34,6 +34,8 @@ export class AuthController {
         }
         this.token = await this.storage.load(this.api.origin);
         if (!this.token) { this.set({ phase: 'signedOut', session: null }); return; }
+        const offlineOwner = await this.storage.lastOwner?.(this.api.origin, this.token);
+        if (offlineOwner) this.set({ phase: 'offline', offlineOwner });
         await this.refreshSession();
       } catch (error) {
         if (!(error instanceof ApiError)) this.set({ phase: 'error', session: null });
@@ -46,14 +48,14 @@ export class AuthController {
     if (!this.token) return;
     try {
       const current = await this.api.current(this.token);
-      this.set({ phase: 'signedIn', session: { user: current.user, expires_at: current.expires_at, absolute_expires_at: current.absolute_expires_at }, message: null });
+      if (this.storage.lastOwner && this.state.offlineOwner !== current.user.id && this.api.origin) {
+        await this.storage.save(this.api.origin, this.token, current.user.id).catch(() => {});
+      }
+      this.set({ phase: 'signedIn', session: { user: current.user, expires_at: current.expires_at, absolute_expires_at: current.absolute_expires_at }, offlineOwner: current.user.id, message: null });
     }
     catch (error) {
       if (error instanceof ApiError && error.status === 401 && !error.gateway) {
-        this.set({ phase: 'error', session: null });
-        await this.storage.clear();
-        this.token = null;
-        this.set({ phase: 'signedOut', session: null, message: 'Сессия завершилась. Войдите заново.' });
+        await this.expireSession();
       } else {
         this.set({ phase: 'offline', message: error instanceof ApiError ? error.message : safeStorageError });
         throw error;
@@ -66,12 +68,50 @@ export class AuthController {
     await this.exclusive(() => this.refreshSession());
   }
 
+  verifyGateway = (authorization: string) => this.api.verifyGateway(authorization);
+
+  private async expireSession() {
+    this.set({ phase: 'error', session: null, offlineOwner: null });
+    await this.storage.clear();
+    this.token = null;
+    this.set({ phase: 'signedOut', session: null, message: 'Сессия завершилась. Войдите заново.' });
+  }
+
+  library = async (path: LibraryPath, method: LibraryMethod, body?: unknown, options?: LibraryOptions) => {
+    const token = this.token;
+    if (!token) throw new ApiError(401);
+    if (!this.state.session) throw new ApiError(this.state.phase === 'offline' ? 0 : 401);
+    if (options?.ownerId !== undefined && options.ownerId !== this.state.session.user.id) throw new ApiError(401);
+    let response: unknown;
+    try {
+      response = await this.api.library(path, method, token, body, ...(options ? [options] : []));
+    } catch (error) {
+      if (token === this.token && error instanceof ApiError && error.status === 401 && !error.gateway) {
+        if (this.state.busy) {
+          // Let the in-flight auth operation finish before touching SecureStore.
+          const unsubscribe = this.subscribe(() => {
+            if (this.state.busy) return;
+            unsubscribe();
+            if (token === this.token && this.state.session) {
+              void this.exclusive(() => this.expireSession()).catch(() => {});
+            }
+          });
+        } else {
+          await this.exclusive(() => this.expireSession()).catch(() => {});
+        }
+      }
+      throw error;
+    }
+    if (token !== this.token || !this.state.session) throw new ApiError(401);
+    return response;
+  };
+
   async signIn(mode: 'login' | 'register', email: string, password: string, consent?: boolean) {
     if (!this.api.origin) throw new Error('Подключение к серверу ещё не настроено в этой сборке.');
     if (this.token) throw new Error('Сначала завершите текущую сессию на устройстве.');
     await this.exclusive(async () => {
       const issued = await this.api.signIn(mode, email, password, consent);
-      try { await this.storage.save(this.api.origin!, issued.token); }
+      try { await this.storage.save(this.api.origin!, issued.token, issued.user.id); }
       catch (error) {
         // Do not report a successful sign-in if durable storage failed.
         try { await this.api.logout(issued.token); } catch { /* Bounded server expiry if offline. */ }
@@ -79,17 +119,18 @@ export class AuthController {
         throw error;
       }
       this.token = issued.token;
-      this.set({ phase: 'signedIn', session: { user: issued.user, expires_at: issued.expires_at, absolute_expires_at: issued.absolute_expires_at } });
+      this.set({ phase: 'signedIn', session: { user: issued.user, expires_at: issued.expires_at, absolute_expires_at: issued.absolute_expires_at }, offlineOwner: issued.user.id });
     });
   }
 
-  async logout(localOnly = false) {
+  async logout(localOnly = false, beforeClear?: () => Promise<void>) {
     await this.exclusive(async () => {
       if (this.token && !localOnly) {
         try { await this.api.logout(this.token); }
         catch (error) { if (!(error instanceof ApiError && error.status === 401 && !error.gateway)) throw error; }
       }
-      this.set({ phase: 'error', session: null });
+      await beforeClear?.();
+      this.set({ phase: 'error', session: null, offlineOwner: null });
       await this.storage.clear();
       this.token = null;
       this.set({ phase: 'signedOut', session: null });

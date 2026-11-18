@@ -50,6 +50,10 @@ jobs:
         run: |
           EXPO_PUBLIC_API_ORIGIN=https://example.com EXPO_PUBLIC_STAGING_GATE=1 npx --no-install expo prebuild --no-install
           python3 scripts/check-native-config.py --api-host example.com
+      - name: Generate and check the iOS share inbox target
+        run: |
+          MOBILE_IOS_SHARE=1 npx --no-install expo prebuild --platform ios --no-install
+          python3 scripts/check-native-config.py --ios-share-probe
 
   android-preview:
     if: github.event_name == 'workflow_dispatch' && inputs.android_apk

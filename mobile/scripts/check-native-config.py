@@ -46,6 +46,19 @@ for path in main_plists:
 assert len(extensions) == (1 if args.ios_share_probe else 0), "Experimental iOS extension must be opt-in"
 if extensions:
     assert extensions[0]["NSExtension"]["NSExtensionPointIdentifier"] == "com.apple.share-services"
+    assert extensions[0]["CFBundleDisplayName"] == "Телеосис"
+    rule = extensions[0]["NSExtension"]["NSExtensionAttributes"]["NSExtensionActivationRule"]
+    assert rule["NSExtensionActivationSupportsText"] is True
+    assert rule["NSExtensionActivationSupportsWebURLWithMaxCount"] == 1
+    group = extensions[0]["AppGroupId"]
+    assert group == "group.ru.teleiosis.mobile.dev"
+    entitlements = [plistlib.loads(path.read_bytes()) for path in (root / "ios").glob("*/*.entitlements")]
+    assert sum(group in value.get("com.apple.security.application-groups", []) for value in entitlements) >= 2
+    assert (root / "ios/expo-sharing-extension/ShareIntoViewController.swift").read_bytes() == (
+        root / "plugins/ios/ShareIntoViewController.swift"
+    ).read_bytes()
+    project = next((root / "ios").glob("*.xcodeproj/project.pbxproj")).read_text()
+    assert project.count("APPLICATION_EXTENSION_API_ONLY = YES;") == 2
 if args.api_host:
     entitlements = list((root / "ios").glob("*/*.entitlements"))
     assert entitlements

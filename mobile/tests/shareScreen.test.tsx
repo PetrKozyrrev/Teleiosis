@@ -1,43 +1,40 @@
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, Platform, type AppStateStatus } from 'react-native';
 import { router } from 'expo-router';
 import { clearSharedPayloads, getSharedPayloads } from 'expo-sharing';
-import ShareProbe from '../src/app/share-probe';
+import IncomingShare from '../src/app/share-probe';
+import { importDraft } from '../src/offline/store';
 
 jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
 jest.mock('expo-sharing', () => ({ getSharedPayloads: jest.fn(), clearSharedPayloads: jest.fn() }));
+jest.mock('../src/offline/store', () => ({ importDraft: jest.fn() }));
 
 beforeEach(() => {
-  jest.mocked(getSharedPayloads).mockReturnValue([{ shareType: 'text', value: 'Проверочный текст' }]);
-  jest.mocked(clearSharedPayloads).mockImplementation(() => {});
+  Platform.OS = 'android';
+  jest.mocked(importDraft).mockReset().mockResolvedValue(undefined);
+  jest.mocked(clearSharedPayloads).mockReset().mockImplementation(() => { jest.mocked(getSharedPayloads).mockReturnValue([]); });
+  jest.mocked(getSharedPayloads).mockReset().mockReturnValue([{ shareType: 'text', value: 'Проверочный текст' }]);
+  jest.mocked(router.replace).mockClear();
 });
 
-test('previews, clears, and can receive the same text again', async () => {
-  const first = await render(<ShareProbe />);
+test('persists the share as a draft before clearing the native payload', async () => {
+  await render(<IncomingShare />);
   expect(screen.getByText('Проверочный текст')).toBeTruthy();
-  await fireEvent.press(screen.getByRole('button', { name: 'Очистить и закрыть' }));
-  expect(clearSharedPayloads).toHaveBeenCalledTimes(1);
-  expect(router.replace).toHaveBeenCalledWith('/');
-  expect(screen.queryByText('Проверочный текст')).toBeNull();
-  await first.unmount();
-  await render(<ShareProbe />);
-  expect(screen.getByText('Проверочный текст')).toBeTruthy();
+  expect(importDraft).toHaveBeenCalledWith({ note: 'Проверочный текст' });
+  expect(jest.mocked(importDraft).mock.invocationCallOrder[0]).toBeLessThan(jest.mocked(clearSharedPayloads).mock.invocationCallOrder[0]);
+  await fireEvent.press(screen.getByRole('button', { name: 'Открыть входящие' }));
+  expect(router.replace).toHaveBeenCalledWith('/queue');
 });
 
-test('handles native errors without displaying payloads or exception internals', async () => {
-  jest.mocked(getSharedPayloads).mockImplementation(() => { throw new Error('sensitive internals'); });
-  await render(<ShareProbe />);
-  expect(screen.getByText(/Не удалось прочитать/)).toBeTruthy();
+test('retains the native payload when SQLite cannot persist it', async () => {
+  jest.mocked(importDraft).mockRejectedValueOnce(new Error('sensitive internals'));
+  await render(<IncomingShare />);
+  expect(screen.getByText(/Не удалось обработать/)).toBeTruthy();
+  expect(clearSharedPayloads).not.toHaveBeenCalled();
   expect(screen.queryByText(/sensitive internals/)).toBeNull();
-});
-
-test('does not claim a successful discard when native clear fails', async () => {
-  jest.mocked(clearSharedPayloads).mockImplementation(() => { throw new Error('native failure'); });
-  await render(<ShareProbe />);
-  await fireEvent.press(screen.getByRole('button', { name: 'Очистить и закрыть' }));
-  expect(screen.getByText(/Не удалось прочитать/)).toBeTruthy();
-  expect(router.replace).not.toHaveBeenCalled();
+  await fireEvent.press(screen.getByRole('button', { name: 'Повторить' }));
+  expect(clearSharedPayloads).toHaveBeenCalledTimes(1);
 });
 
 test('refreshes raw data on a warm return and removes its listener', async () => {
@@ -48,7 +45,7 @@ test('refreshes raw data on a warm return and removes its listener', async () =>
     return { remove };
   });
   try {
-    const view = await render(<ShareProbe />);
+    const view = await render(<IncomingShare />);
     jest.mocked(getSharedPayloads).mockReturnValue([{ shareType: 'text', value: 'Второе сообщение' }]);
     await act(() => onChange('active'));
     expect(screen.getByText('Второе сообщение')).toBeTruthy();

@@ -22,7 +22,8 @@
 				header_up -X-Staging-Authorization
 			}
 		}
-		handle /mobile/* {
+		@native expression `path('/mobile/*') || (header({'X-Staging-Authorization': '*'}) && path_regexp('^/(contents(/submissions|/[0-9]+(/open|/versioned)?)?|categories(/[0-9]+)?)$'))`
+		handle @native {
 			header Cache-Control "no-store"
 			route {
 				# Validate the separate gateway credential, then restore Bearer.
@@ -31,7 +32,10 @@
 				basic_auth argon2id {
 					tester {$STAGING_AUTH_HASH}
 				}
-				@has_token expression `{http.vars.mobile_authorization} != ""`
+				# The library is Bearer-only here. Keep mixed-credential checks on /mobile/auth.
+				@library_request not path /mobile/*
+				request_header @library_request -Cookie
+				@has_token expression `{http.vars.mobile_authorization}.matches('(?i)^Bearer [A-Za-z0-9_-]+$')`
 				handle @has_token {
 					reverse_proxy api:8000 {
 						header_up Authorization {http.vars.mobile_authorization}

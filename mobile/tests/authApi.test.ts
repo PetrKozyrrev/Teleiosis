@@ -6,8 +6,8 @@ import { apiOrigin } from '../src/auth/config';
 jest.mock('expo/fetch', () => ({ fetch: jest.fn() }));
 const profile = { id: 1, email: 'user@example.com', timezone: 'UTC', reminders_enabled: true, reminder_time: '10:00', email_verified_at: null };
 const issued = { user: profile, token: 'a'.repeat(43), token_type: 'Bearer', expires_at: '2026-12-01T00:00:00Z', absolute_expires_at: '2027-01-01T00:00:00Z' };
-function response(status: number, json: unknown, headers: Record<string, string> = {}) {
-  return { ok: status >= 200 && status < 300, status, json: async () => json, headers: { get: (key: string) => headers[key] ?? null } } as Awaited<ReturnType<typeof nativeFetch>>;
+function response(status: number, json: unknown, headers: Record<string, string> = {}, readJson = async () => json) {
+  return { ok: status >= 200 && status < 300, status, json: readJson, headers: { get: (key: string) => headers[key] ?? null } } as Awaited<ReturnType<typeof nativeFetch>>;
 }
 
 describe('native credential transport', () => {
@@ -35,6 +35,27 @@ describe('native credential transport', () => {
     const api = new AuthApi('https://example.com', async () => null, transport);
     await expect(api.current(issued.token)).rejects.toMatchObject({ status: 401, gateway: true });
     await expect(api.current(issued.token)).rejects.not.toThrow('private token internals');
+  });
+  test('verifies the candidate gateway password without sending a session or touching saved credentials', async () => {
+    const body = jest.fn<() => Promise<never>>().mockRejectedValue(new Error('Cannot read response body'));
+    const transport = jest.fn<typeof nativeFetch>().mockResolvedValue(response(401, null, { 'X-Teleiosis-Environment': 'staging' }, body));
+    const saved = jest.fn<() => Promise<string | null>>();
+    const api = new AuthApi('https://example.com', saved, transport);
+    await expect(api.verifyGateway('Basic candidate')).resolves.toBeUndefined();
+    expect(saved).not.toHaveBeenCalled();
+    expect(body).not.toHaveBeenCalled();
+    expect(transport).toHaveBeenCalledWith('https://example.com/mobile/auth/session', expect.objectContaining({ method: 'GET', headers: { Accept: 'application/json', 'X-Staging-Authorization': 'Basic candidate' } }));
+    transport.mockResolvedValue(response(401, {}, { 'WWW-Authenticate': 'Basic realm="test"' }));
+    await expect(api.verifyGateway('Basic candidate')).rejects.toMatchObject({ status: 401, gateway: true });
+    transport.mockResolvedValue(response(401, { detail: 'Not authenticated' }));
+    await expect(api.verifyGateway('Basic candidate')).rejects.toMatchObject({ status: 502 });
+  });
+
+  test('reports an unreadable response separately from a network failure', async () => {
+    const body = jest.fn<() => Promise<never>>().mockRejectedValue(new Error('Cannot read response body'));
+    const transport = jest.fn<typeof nativeFetch>().mockResolvedValue(response(200, null, {}, body));
+    const api = new AuthApi('https://example.com', async () => null, transport);
+    await expect(api.signIn('login', profile.email, 'password')).rejects.toMatchObject({ status: 502 });
   });
   test('does not retry passwords on network, server errors or rate limit', async () => {
     const transport = jest.fn<typeof nativeFetch>().mockResolvedValue(response(429, {}, { 'Retry-After': '60' }));

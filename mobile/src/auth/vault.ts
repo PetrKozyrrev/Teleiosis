@@ -7,6 +7,25 @@ const OPTIONS: SecureStore.SecureStoreOptions = {
   keychainService: 'teleiosis.auth', keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
 
+const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function stagingAuthorization(password: string): string {
+  const value = password.trim();
+  if (!/^[\x21-\x7e]{1,256}$/.test(value)) throw new Error('Введите только пароль доступа к стенду.');
+  // The gateway issues ASCII passwords. Encode without a browser global.
+  const credentials = `tester:${value}`;
+  let encoded = '';
+  for (let i = 0; i < credentials.length; i += 3) {
+    const first = credentials.charCodeAt(i);
+    const second = credentials.charCodeAt(i + 1) || 0;
+    const third = credentials.charCodeAt(i + 2) || 0;
+    encoded += BASE64[first >> 2] + BASE64[((first & 3) << 4) | (second >> 4)];
+    encoded += i + 1 < credentials.length ? BASE64[((second & 15) << 2) | (third >> 6)] : '=';
+    encoded += i + 2 < credentials.length ? BASE64[third & 63] : '=';
+  }
+  return `Basic ${encoded}`;
+}
+
 async function remove(key: string) {
   await SecureStore.deleteItemAsync(key, OPTIONS);
   if (await SecureStore.getItemAsync(key, OPTIONS) !== null) throw new Error('Не удалось очистить защищённое хранилище. Повторите на разблокированном устройстве.');
@@ -40,7 +59,18 @@ export const vault = {
     await remove(SESSION_KEY);
     return null;
   },
-  async save(origin: string, token: string) { await write(SESSION_KEY, JSON.stringify({ version: 1, origin, token })); },
+  async save(origin: string, token: string, ownerId?: number) {
+    await write(SESSION_KEY, JSON.stringify({ version: 1, origin, token, ownerId }));
+  },
+  async lastOwner(origin: string, token: string): Promise<number | null> {
+    const raw = await SecureStore.getItemAsync(SESSION_KEY, OPTIONS);
+    if (!raw) return null;
+    try {
+      const data = JSON.parse(raw);
+      return data.version === 1 && data.origin === origin && data.token === token &&
+        Number.isSafeInteger(data.ownerId) && data.ownerId > 0 ? data.ownerId : null;
+    } catch { return null; }
+  },
   async clear() { await remove(SESSION_KEY); },
   async gateway(origin: string) {
     const raw = await SecureStore.getItemAsync(GATE_KEY, OPTIONS);
@@ -52,10 +82,12 @@ export const vault = {
     await remove(GATE_KEY);
     return null;
   },
-  async setGateway(origin: string, password: string) {
-    if (!/^[\x21-\x7e]{1,256}$/.test(password)) throw new Error('Введите пароль доступа к тестовому стенду.');
-    await write(GATE_KEY, JSON.stringify({ origin, value: `Basic ${btoa(`tester:${password}`)}` }));
+  async setGateway(origin: string, password: string, verify: (authorization: string) => Promise<void>) {
+    const value = stagingAuthorization(password);
+    await verify(value);
+    await write(GATE_KEY, JSON.stringify({ origin, value }));
   },
 };
 
-export type Vault = Pick<typeof vault, 'initialize' | 'load' | 'save' | 'clear'>;
+export type Vault = Pick<typeof vault, 'initialize' | 'load' | 'save' | 'clear'> &
+  Partial<Pick<typeof vault, 'lastOwner'>>;

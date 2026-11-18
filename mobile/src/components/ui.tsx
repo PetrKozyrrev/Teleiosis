@@ -1,21 +1,21 @@
-import type { PropsWithChildren } from 'react';
+import type { ComponentRef, PropsWithChildren, Ref } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { colors, fonts } from '../theme';
 
-export function Page({ title, children }: PropsWithChildren<{ title: string }>) {
+export function Page({ title, children, scrollRef }: PropsWithChildren<{ title: string; scrollRef?: Ref<ComponentRef<typeof ScrollView>> }>) {
   return <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={80}>
-    <ScrollView keyboardShouldPersistTaps="handled" style={styles.page} contentContainerStyle={styles.content}>
+    <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" style={styles.page} contentContainerStyle={styles.content}>
     <Text style={styles.eyebrow}>ТЕЛЕОСИС</Text>
     <Text accessibilityRole="header" style={styles.title}>{title}</Text>
     {children}
   </ScrollView></KeyboardAvoidingView>;
 }
 
-export function Field({ label, ...props }: TextInputProps & { label: string }) {
+export function Field({ label, style, ...props }: TextInputProps & { label: string }) {
   return <View style={{ gap: 8 }}>
     <Text style={styles.body}>{label}</Text>
     <TextInput accessibilityLabel={label} autoCapitalize="none" autoCorrect={false}
-      style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 14, minHeight: 48, color: colors.text, backgroundColor: colors.surface, fontFamily: fonts.body, fontSize: 16 }} {...props} />
+      style={[{ borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 14, minHeight: 48, color: colors.text, backgroundColor: colors.surface, fontFamily: fonts.body, fontSize: 16 }, style]} {...props} />
   </View>;
 }
 

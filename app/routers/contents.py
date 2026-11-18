@@ -1,14 +1,16 @@
 from datetime import datetime, timezone
+from hashlib import sha256
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Path, Query, Response, status
+from fastapi import APIRouter, Header, HTTPException, Path, Query, Response, status
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.activity import record_activity
 from app.deps import CurrentUser, DbSession
 from app.metadata import fetch_metadata
-from app.models import Content
+from app.models import Content, ContentSubmission
 from app.routers.categories import get_own_category
 from app.schemas import (
     MAX_BIGINT,
@@ -41,12 +43,11 @@ def make_title(url_normalized: str | None, note: str | None) -> str:
     return first_line[:80] or "Заметка"
 
 
-def get_own_content(db: DbSession, user: CurrentUser, content_id: int) -> Content:
+def get_own_content(db: DbSession, user: CurrentUser, content_id: int, *, lock: bool = False) -> Content:
     """Материал ищется сразу с фильтром по владельцу.
     Чужой и несуществующий выглядят одинаково: 404."""
-    content = db.scalar(
-        select(Content).where(Content.id == content_id, Content.user_id == user.id)
-    )
+    query = select(Content).where(Content.id == content_id, Content.user_id == user.id)
+    content = db.scalar(query.with_for_update() if lock else query)
     if content is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Content not found")
     return content
@@ -61,6 +62,48 @@ def already_saved(existing_id: int) -> HTTPException:
 
 @router.post("", response_model=ContentOut, status_code=status.HTTP_201_CREATED)
 def create_content(data: ContentCreate, db: DbSession, user: CurrentUser):
+    return save_content(data, db, user)
+
+
+@router.post("/submissions", response_model=ContentOut, status_code=status.HTTP_201_CREATED)
+def submit_content(data: ContentCreate, db: DbSession, user: CurrentUser,
+                   key: Annotated[UUID, Header(alias="Idempotency-Key")]):
+    fingerprint = sha256(data.model_dump_json().encode()).hexdigest()
+    lock = int.from_bytes(sha256(f"{user.id}/{key}".encode()).digest()[:8], "big", signed=True)
+    db.execute(select(func.pg_advisory_xact_lock(lock)))
+    receipt = db.get(ContentSubmission, (user.id, key))
+    if receipt is not None:
+        if receipt.fingerprint != fingerprint:
+            raise HTTPException(409, {"code": "submission_payload_changed"})
+        content = db.get(Content, receipt.content_id)
+        if content is None:
+            raise HTTPException(410, {"code": "submission_material_deleted"})
+        if receipt.duplicate:
+            raise already_saved(content.id)
+        return content
+
+    return save_content(data, db, user, key=key, fingerprint=fingerprint)
+
+
+def find_url_id(db: DbSession, user: CurrentUser, url_normalized: str) -> int | None:
+    return db.scalar(select(Content.id).where(
+        Content.user_id == user.id, Content.url_normalized == url_normalized
+    ))
+
+
+def save_content(data: ContentCreate, db: DbSession, user: CurrentUser, *,
+                 key: UUID | None = None, fingerprint: str = ""):
+    def save_receipt(content_id: int, *, duplicate: bool = False) -> None:
+        if key is not None:
+            db.add(ContentSubmission(user_id=user.id, key=key, fingerprint=fingerprint,
+                                     content_id=content_id, duplicate=duplicate))
+
+    def conflict(existing_id: int):
+        if key is not None:
+            save_receipt(existing_id, duplicate=True)
+            db.commit()
+        raise already_saved(existing_id)
+
     # 1. Дешёвые проверки до любых обращений в интернет
     if data.category_id is not None:
         get_own_category(db, user, data.category_id)
@@ -70,14 +113,9 @@ def create_content(data: ContentCreate, db: DbSession, user: CurrentUser):
         url_normalized = normalize_url(data.url)
         source, content_type = detect_source(data.url)
 
-        existing_id = db.scalar(
-            select(Content.id).where(
-                Content.user_id == user.id,
-                Content.url_normalized == url_normalized,
-            )
-        )
+        existing_id = find_url_id(db, user, url_normalized)
         if existing_id is not None:
-            raise already_saved(existing_id)
+            conflict(existing_id)
 
         # 2. Загрузка метаданных (никогда не падает: при неудаче вернёт None)
         meta = fetch_metadata(data.url)
@@ -101,23 +139,18 @@ def create_content(data: ContentCreate, db: DbSession, user: CurrentUser):
         content_type=content_type,
         source=source,
     )
-    db.add(content)
     try:
-        db.commit()
+        with db.begin_nested():
+            db.add(content)
+            db.flush()
     except IntegrityError:
         # Редкая гонка: два одинаковых запроса одновременно
-        db.rollback()
-        existing_id = None
-        if url_normalized:
-            existing_id = db.scalar(
-                select(Content.id).where(
-                    Content.user_id == user.id,
-                    Content.url_normalized == url_normalized,
-                )
-            )
-        if existing_id is None:
-            raise
-        raise already_saved(existing_id)
+        existing_id = find_url_id(db, user, url_normalized) if url_normalized else None
+        if existing_id is not None:
+            conflict(existing_id)
+        raise
+    save_receipt(content.id)
+    db.commit()
     record_activity(db, user)
     db.refresh(content)
     return content
@@ -175,7 +208,22 @@ def read_content(content_id: ContentId, db: DbSession, user: CurrentUser):
 def update_content(
     content_id: ContentId, data: ContentUpdate, db: DbSession, user: CurrentUser
 ):
-    content = get_own_content(db, user, content_id)
+    return change_content(content_id, data, db, user)
+
+
+@router.patch("/{content_id}/versioned", response_model=ContentOut)
+def update_versioned_content(
+    content_id: ContentId, data: ContentUpdate, db: DbSession, user: CurrentUser,
+    if_match: Annotated[str, Header(pattern=r'^"[1-9][0-9]{0,18}"$')],
+):
+    return change_content(content_id, data, db, user, version=int(if_match[1:-1]))
+
+
+def change_content(content_id: int, data: ContentUpdate, db: DbSession,
+                   user: CurrentUser, *, version: int | None = None):
+    content = get_own_content(db, user, content_id, lock=True)
+    if version is not None and content.version != version:
+        raise HTTPException(412, {"code": "content_version_changed"})
     changes = data.model_fields_set
 
     # 1. Сначала все проверки: при отказе ничего не должно измениться

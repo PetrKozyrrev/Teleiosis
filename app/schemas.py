@@ -139,6 +139,7 @@ class ContentOut(BaseModel):
     updated_at: datetime
     last_opened_at: datetime | None
     open_count: int
+    version: int
 
 class ContentPage(BaseModel):
     items: list[ContentOut]

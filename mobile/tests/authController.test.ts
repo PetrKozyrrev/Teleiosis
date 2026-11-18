@@ -104,3 +104,47 @@ test('reset success reports local cleanup failure without repeating the one-time
   expect(api.request).toHaveBeenCalledTimes(1);
   expect(controller.snapshot().phase).toBe('error');
 });
+
+test('library loses the session only for the API 401 and never retries a write', async () => {
+  await controller.initialize();
+  const library = jest.spyOn(api, 'library').mockRejectedValueOnce(new ApiError(401, true))
+    .mockRejectedValueOnce(new ApiError(0)).mockRejectedValueOnce(new ApiError(401));
+  await expect(controller.library('/contents', 'GET')).rejects.toMatchObject({ gateway: true });
+  await expect(controller.library('/contents', 'POST', { note: 'draft' })).rejects.toMatchObject({ status: 0 });
+  expect(controller.snapshot().phase).toBe('signedIn');
+  expect(storage.clear).not.toHaveBeenCalled();
+  await expect(controller.library('/contents', 'GET')).rejects.toMatchObject({ status: 401, gateway: false });
+  expect(library.mock.calls).toEqual([
+    ['/contents', 'GET', issued.token, undefined],
+    ['/contents', 'POST', issued.token, { note: 'draft' }],
+    ['/contents', 'GET', issued.token, undefined],
+  ]);
+  expect(storage.clear).toHaveBeenCalledTimes(1);
+  expect(controller.snapshot()).toMatchObject({ phase: 'signedOut', session: null });
+});
+
+test('drops a library response from a session that signed out while it was loading', async () => {
+  await controller.initialize();
+  let resolve!: (value: unknown) => void;
+  jest.spyOn(api, 'library').mockReturnValue(new Promise(done => { resolve = done; }));
+  const pending = controller.library('/contents', 'GET');
+  await controller.logout();
+  resolve({ items: [{ id: 12 }] });
+  await expect(pending).rejects.toMatchObject({ status: 401 });
+});
+
+test('allows only the bound offline owner after a cold network failure', async () => {
+  storage.lastOwner = jest.fn<NonNullable<Vault['lastOwner']>>().mockResolvedValue(issued.user.id);
+  jest.mocked(api.current).mockRejectedValue(new ApiError(0));
+  await expect(controller.initialize()).rejects.toThrow();
+  expect(controller.snapshot()).toMatchObject({ phase: 'offline', session: null, offlineOwner: issued.user.id });
+  await expect(controller.library('/contents', 'GET')).rejects.toMatchObject({ status: 0 });
+
+  jest.mocked(api.current).mockResolvedValue(issued);
+  await controller.refresh();
+  const send = jest.spyOn(api, 'library');
+  await expect(controller.library('/contents/submissions', 'POST', { note: 'old account' }, {
+    ownerId: issued.user.id + 1, idempotencyKey: 'another-owner',
+  })).rejects.toMatchObject({ status: 401 });
+  expect(send).not.toHaveBeenCalled();
+});

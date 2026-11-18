@@ -53,7 +53,17 @@ test('does not accept partial writes or successful-looking failed deletion', asy
   await expect(vault.clear()).rejects.toThrow();
 });
 test('binds the staging credential to its own origin as well', async () => {
-  await vault.setGateway(origin, 'synthetic-gateway-only');
+  await vault.setGateway(origin, 'synthetic-gateway-only', async () => {});
   expect(await vault.gateway(origin)).toMatch(/^Basic /);
   expect(await vault.gateway('https://different.example')).toBeNull();
+});
+
+test('trims a pasted password and preserves the saved gateway on rejection', async () => {
+  const verify = jest.fn<(value: string) => Promise<void>>().mockResolvedValue(undefined);
+  await vault.setGateway(origin, '  synthetic-gateway-only\n', verify);
+  expect(verify).toHaveBeenCalledWith('Basic dGVzdGVyOnN5bnRoZXRpYy1nYXRld2F5LW9ubHk=');
+  const saved = await vault.gateway(origin);
+  verify.mockRejectedValue(new Error('Gateway rejected'));
+  await expect(vault.setGateway(origin, 'incorrect', verify)).rejects.toThrow('Gateway rejected');
+  expect(await vault.gateway(origin)).toBe(saved);
 });

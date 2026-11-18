@@ -7,14 +7,19 @@ import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../theme';
 import { AuthProvider } from '../auth/context';
+import { OfflineSync } from '../offline/sync';
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({ Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Manrope_700Bold });
   if (!loaded && !error) return null;
   return <AuthProvider>
+    <OfflineSync />
     <StatusBar style="dark" />
     <Stack screenOptions={{ headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.surface }, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="library/[id]" options={{ title: 'Материал' }} />
+      <Stack.Screen name="library/categories" options={{ title: 'Категории' }} />
+      <Stack.Screen name="queue" options={{ title: 'Очередь и входящие' }} />
       <Stack.Screen name="probe" options={{ title: 'Проверка устройства' }} />
       <Stack.Screen name="licenses" options={{ title: 'Лицензии шрифтов' }} />
       <Stack.Screen name="account" options={{ title: 'Аккаунт' }} />

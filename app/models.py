@@ -1,4 +1,5 @@
 from datetime import date, datetime, time
+from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
@@ -13,6 +14,9 @@ from sqlalchemy import (
     Text,
     Time,
     UniqueConstraint,
+    DDL,
+    Uuid,
+    event,
     func,
     text,
 )
@@ -117,6 +121,7 @@ class Content(Base):
     studied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     open_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    version: Mapped[int] = mapped_column(BigInteger, server_default=text("1"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -128,6 +133,38 @@ class Content(Base):
     reminders: Mapped[list["Reminder"]] = relationship(
         back_populates="content", cascade="all, delete-orphan", passive_deletes=True
     )
+
+
+# Runs on direct SQL and on the FK action that clears category_id.
+event.listen(Content.__table__, "after_create", DDL("""
+CREATE OR REPLACE FUNCTION increment_content_version() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF ROW(NEW.title, NEW.note, NEW.category_id, NEW.status)
+        IS DISTINCT FROM ROW(OLD.title, OLD.note, OLD.category_id, OLD.status) THEN
+        NEW.version := OLD.version + 1;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+CREATE TRIGGER contents_version BEFORE UPDATE ON contents
+FOR EACH ROW EXECUTE FUNCTION increment_content_version();
+""").execute_if(dialect="postgresql"))
+event.listen(Content.__table__, "after_drop", DDL(
+    "DROP FUNCTION IF EXISTS increment_content_version()"
+).execute_if(dialect="postgresql"))
+
+
+class ContentSubmission(Base):
+    __tablename__ = "content_submissions"
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    key: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    fingerprint: Mapped[str] = mapped_column(Text)
+    # Intentionally independent of the material's lifetime.
+    content_id: Mapped[int] = mapped_column(BigInteger)
+    duplicate: Mapped[bool] = mapped_column(Boolean)
 
 
 class Reminder(Base):

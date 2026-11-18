@@ -33,7 +33,7 @@ Run lint and typecheck before declaring any task done.
 
 The approved plan uses local development builds and a standalone Android test APK; see README.md and scripts/build-android-preview.sh. Do not connect cloud build, OTA, analytics, push providers, paid services or store publishing without an explicit project decision. iOS requires macOS/Xcode; lack of those resources leaves device acceptance open, rather than implying a successful iOS build.
 
-The user confirmed installation on Samsung S25 and authorized block 3 (mobile auth/sessions) on 2026-11-17. Unverified share/SecureStore/iOS/push checks from block 2 remain open. Do not implement the product library (block 4) or persistent offline queue (block 5) until separately approved. Read ../docs/mobile_plan.md and ../docs/mobile_testing.md, update the report and ../other/mobile_context.md, then stop for review.
+The user accepted the 0.3.1 Android library on Samsung S25 and authorized block 5 on 2026-11-18. Block 6, commits, push, and the block 5 staging rollout require separate approval. Read ../docs/mobile_plan.md and ../docs/mobile_testing.md, update the report and ../other/mobile_context.md, then stop for review.
 
 ## Rules
 

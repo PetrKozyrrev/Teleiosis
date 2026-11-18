@@ -4,7 +4,7 @@ import { colors } from '../../theme';
 
 export default function TabsLayout() {
   return <Tabs screenOptions={{
-    headerTitle: 'Телеосис · тестовый каркас',
+    headerTitle: 'Телеосис',
     headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text,
     tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted,
     tabBarStyle: { backgroundColor: colors.surface },
