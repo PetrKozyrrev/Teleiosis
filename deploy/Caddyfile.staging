@@ -22,7 +22,7 @@
 				header_up -X-Staging-Authorization
 			}
 		}
-		@native expression `path('/mobile/*') || (header({'X-Staging-Authorization': '*'}) && path_regexp('^/(contents(/submissions|/[0-9]+(/open|/versioned)?)?|categories(/[0-9]+)?)$'))`
+		@native expression `path('/mobile/*') || (header({'X-Staging-Authorization': '*'}) && path_regexp('^/(contents(/submissions|/[0-9]+(/open|/versioned|/reminder)?)?|categories(/[0-9]+)?|me(/settings|/export)?|stats|auth/(change-password|delete-account))$'))`
 		handle @native {
 			header Cache-Control "no-store"
 			route {

@@ -1,6 +1,6 @@
 # Телеосис: мобильное приложение
 
-Блоки 2/3 утверждённого [плана](../docs/mobile_plan.md). В 0.2.0 добавлены вход/регистрация, восстановление/подтверждение, защищённая сессия и профиль. Backend и веб-MVP сохраняются; библиотека, офлайн-очередь и push — следующие блоки. [Контракт, проверки и открытая приёмка auth](../docs/mobile_auth.md).
+В версии 0.5.1 реализованы вход и сессии, библиотека, офлайн-очередь, настройки, прогресс и управление данными по блокам 2–6 утверждённого [плана](../docs/mobile_plan.md). Публичный Caddy блока 6 обновлён по согласованию пользователя. Проверки на телефоне и iOS приведены в [протоколе](../docs/mobile_testing.md).
 
 ## Стек и запуск
 
@@ -42,7 +42,7 @@ sdkmanager 'platform-tools' 'platforms;android-37.0' 'build-tools;37.0.0' 'ndk;2
 EXPO_PUBLIC_API_ORIGIN=https://teleiosistest.tw1.ru EXPO_PUBLIC_STAGING_GATE=1 sh scripts/build-android-preview.sh
 ```
 
-Результат сборки блока 5 — `artifacts/teleiosis-0.4.0-android-arm64-preview.apk` и SHA-256 в выводе. У APK есть встроенный JS для работы без Metro. Онлайн-библиотека обращается к API через HTTPS. Gradle-вариант Release использует **тестовый debug key шаблона**: APK предназначен для локальной проверки, не для магазина. Нет production signing key, IPA или AAB. Файлы сборок и ключи исключены из Git. Окончательную подпись и приложение магазина готовим в блоке выпуска.
+Результат сборки блока 6 — `artifacts/teleiosis-0.5.1-android-arm64-preview.apk` и SHA-256 в выводе. У APK есть встроенный JS для работы без Metro. Онлайн-библиотека обращается к API через HTTPS. Gradle-вариант Release использует **тестовый debug key шаблона**: APK предназначен для локальной проверки, не для магазина. Нет production signing key, IPA или AAB. Файлы сборок и ключи исключены из Git. Окончательную подпись и приложение магазина готовим в блоке выпуска.
 
 История APK 0.2.0 от 17.11.2026. 30 154 531 байт, SHA-256 `040f2e94adb97e6d7bdb26b1c72b0804bf868ebfb9da80b20996697cf2488d44`. Проверены v2 Android Debug signature (тот же сертификат, что 0.1), API24/target36/arm64, встроенный JS и 16-KiB archive alignment. Typecheck/lint, 64 теста, экспорт обеих ОС и association config проходят. Установка 0.1 на S25 подтверждена; 0.2 ещё не проверена на телефоне. Публичный API пока выключен: вход с телефона проверяется после согласованного HTTPS-запуска, пароль шлюза вводится отдельно в приложении. Миграция/приватный API/smoke готовы: [mobile_auth.md](../docs/mobile_auth.md).
 
@@ -50,7 +50,7 @@ EXPO_PUBLIC_API_ORIGIN=https://teleiosistest.tw1.ru EXPO_PUBLIC_STAGING_GATE=1 s
 
 ```sh
 adb devices
-adb install -r artifacts/teleiosis-0.4.0-android-arm64-preview.apk
+adb install -r artifacts/teleiosis-0.5.1-android-arm64-preview.apk
 ```
 
 Для WSL2 проброс USB из Windows настраивается отдельно; наличие телефона не означает его видимость внутри WSL. Запуск из IDE не заменяет тест автономного APK. При несовпадении подписи обновление существующей установки не пройдёт; удаление приложения стирает его данные, поэтому не делать его автоматически.
@@ -98,3 +98,7 @@ CI: `.github/workflows/mobile.yml` — проверки JS и генерации
 На 17.11.2026 npm при установке сообщает 22 moderate позиции в дереве зависимостей инструментов (ранее 23 включая low). Совместимый `npm audit fix` применён, отчёт не обнулился. Предлагаемые force-исправления меняют/понижают SDK или Jest и не применялись. Не объявлять зависимости безопасными или блок 2 принятым до разбора и повторной проверки перед выпуском.
 
 Официальные источники, проверены 16.11.2026: [матрица Expo SDK 58](https://docs.expo.dev/versions/v58.0.0/), [Expo Router](https://docs.expo.dev/router/installation/), [входящий sharing](https://docs.expo.dev/versions/v58.0.0/sdk/sharing/), [SecureStore](https://docs.expo.dev/versions/v58.0.0/sdk/securestore/), [Apple Share Extensions](https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/Share.html), [RuStore React Native Push 6.9.1](https://www.rustore.ru/help/sdk/push-notifications/react/6-9-1).
+
+## Настройки и данные в 0.5.0
+
+В разделе «Настройки аккаунта и данные» доступны пояс IANA, время подборки, письма, смена пароля, JSON-выгрузка и удаление аккаунта. Во вкладке «Прогресс» показана серверная статистика. Напоминания по материалам доступны в настройках аккаунта с поиском материала и датой со смещением UTC. На публичном стенде серверная выгрузка, напоминания и настройки прошли HTTPS-проверку после обновления Caddy. [Протокол проверки](../docs/mobile_testing.md)

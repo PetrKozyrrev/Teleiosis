@@ -6,6 +6,7 @@ const safeStorageError = 'Не удалось обратиться к защищ
 
 export class AuthController {
   private token: string | null = null;
+  private deletionCleanup: (() => Promise<void>) | null = null;
   private listeners = new Set<() => void>();
   private state: AuthState = { phase: 'loading', session: null, busy: false, message: null };
   constructor(private readonly api: AuthApi, private readonly storage: Vault) {}
@@ -18,7 +19,9 @@ export class AuthController {
     this.set({ busy: true, message: null });
     try { await task(); }
     catch (error) {
-      const message = error instanceof ApiError ? error.message : safeStorageError;
+      const message = this.deletionCleanup
+        ? 'Аккаунт удалён на сервере. Очистка устройства не завершена. Повторите проверку сессии для очистки.'
+        : error instanceof ApiError ? error.message : safeStorageError;
       this.set({ message });
       throw new Error(message);
     } finally { this.set({ busy: false }); }
@@ -27,6 +30,10 @@ export class AuthController {
   async initialize() {
     await this.exclusive(async () => {
       try {
+        if (this.deletionCleanup) {
+          await Promise.all([this.storage.clear(), this.deletionCleanup()]);
+          this.deletionCleanup = null;
+        }
         await this.storage.initialize();
         if (!this.api.origin) {
           this.set({ phase: 'signedOut', session: null, message: 'Подключение к серверу ещё не настроено в этой сборке.' });
@@ -133,6 +140,29 @@ export class AuthController {
       this.set({ phase: 'error', session: null, offlineOwner: null });
       await this.storage.clear();
       this.token = null;
+      this.set({ phase: 'signedOut', session: null });
+    });
+  }
+
+  async deleteAccount(password: string, cleanup: () => Promise<void>, ownerId?: number) {
+    await this.exclusive(async () => {
+      if (!this.token || !this.state.session) throw new ApiError(401);
+      if (ownerId !== undefined && this.state.session.user.id !== ownerId) throw new ApiError(401);
+      try {
+        await this.api.library('/auth/delete-account', 'POST', this.token, { password });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 400) error.message = 'Проверьте пароль аккаунта.';
+        throw error;
+      }
+      this.token = null;
+      this.deletionCleanup = cleanup;
+      this.set({ phase: 'error', session: null, offlineOwner: null });
+      // Keep the UI signed out even if a local cleanup operation fails.
+      const results = await Promise.allSettled([this.storage.clear(), cleanup()]);
+      if (results.some(result => result.status === 'rejected')) {
+        throw new Error('Local cleanup incomplete');
+      }
+      this.deletionCleanup = null;
       this.set({ phase: 'signedOut', session: null });
     });
   }

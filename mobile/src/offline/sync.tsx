@@ -52,10 +52,11 @@ export function OfflineSync() {
     }
 
     async function readInbox() {
-      if (Platform.OS !== 'ios') return;
+      if (Platform.OS !== 'ios' || controller.snapshot().busy) return;
       try {
         const inbox = nativeStorage();
         for (const entry of await inbox.pendingShares()) {
+          if (controller.snapshot().busy) return;
           const result = inspectShare([{ shareType: 'text', value: entry.value }]);
           if (result.ok) {
             await importDraft(result.item.kind === 'url' ? { url: result.item.value } : { note: result.item.value }, entry.id);

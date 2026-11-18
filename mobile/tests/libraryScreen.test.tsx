@@ -77,6 +77,7 @@ test('edits only changed fields, displays fallback and hands the original to the
   mockRequestedId = '12';
   await render(<MaterialRoute />);
   expect(screen.getByText('Описание страницы недоступно.')).toBeTruthy();
+  expect(screen.queryByLabelText('Дата и время напоминания')).toBeNull();
   await press('Редактировать');
   await fireEvent.changeText(screen.getByLabelText('Название'), 'Новое название');
   await press('Статус · Не просмотрено');

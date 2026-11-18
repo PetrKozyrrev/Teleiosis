@@ -190,3 +190,13 @@ export async function saveSnapshot(db: Pick<SQLiteDatabase, 'runAsync'>, owner: 
     )
   `, owner, owner);
 }
+
+// Account deletion also discards unassigned drafts on this device.
+export async function clearDeletedAccount(owner: string) {
+  ownerGenerations.set(owner, generation(owner) + 1);
+  await mutate(db => db.withExclusiveTransactionAsync(async transaction => {
+    await transaction.runAsync('DELETE FROM snapshots WHERE owner = ?', owner);
+    await transaction.runAsync('DELETE FROM jobs WHERE owner IN (?, ?)', owner, unassigned);
+  }));
+  changed();
+}

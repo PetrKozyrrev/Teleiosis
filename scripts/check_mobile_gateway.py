@@ -27,6 +27,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
     do_POST=do_GET
+    do_PUT=do_GET
     do_PATCH=do_GET
     do_DELETE=do_GET
     def log_message(self,*args): pass
@@ -65,7 +66,9 @@ status,headers,body=request("/mobile/auth/session",{"X-Staging-Authorization":go
 assert status==200 and json.loads(body)["cookie"]==cookie, "API must see mixed credentials on the existing mobile auth routes"
 for method,path in (("GET","/contents?q=sample"),("POST","/contents"),("POST","/contents/submissions"),("GET","/contents/12"),
                     ("PATCH","/contents/12"),("DELETE","/contents/12"),("POST","/contents/12/open"),
-                    ("PATCH","/contents/12/versioned"),
+                    ("PATCH","/contents/12/versioned"), ("GET","/contents/12/reminder"), ("PUT","/contents/12/reminder"),
+                    ("DELETE","/contents/12/reminder"), ("GET","/me"), ("PATCH","/me/settings"), ("GET","/me/export"),
+                    ("GET","/stats"), ("POST","/auth/change-password"), ("POST","/auth/delete-account"),
                     ("GET","/categories"),("POST","/categories"),("PATCH","/categories/12"),("DELETE","/categories/12")):
     assert request(path,{"Authorization":"Bearer synthetic-session-token"},method)[0]==401
     assert request(path,{"X-Staging-Authorization":bad},method)[0]==401
@@ -76,7 +79,7 @@ for method,path in (("GET","/contents?q=sample"),("POST","/contents"),("POST","/
     assert status==200 and json.loads(body)=={"auth":None,"gate":None,"cookie":cookie,"path":path,"method":method}
 status,headers,body=request("/contents",{"X-Staging-Authorization":good,"Authorization":good})
 assert status==200 and json.loads(body)["auth"] is None, "Basic credential passed as app authorization"
-for path in ("/contents/12/reminder","/categories-extra","/me","/app/"):
+for path in ("/contents/12/unknown","/categories-extra","/auth/unknown","/app/"):
     assert request(path,{"X-Staging-Authorization":good})[0]==401, "Native matcher too broad"
 for path in ("/docs","/openapi.json","/ready"):
     assert request(path)[0]==404, "Private API path exposed"

@@ -22,6 +22,7 @@ export default function RootLayout() {
       <Stack.Screen name="queue" options={{ title: 'Очередь и входящие' }} />
       <Stack.Screen name="probe" options={{ title: 'Проверка устройства' }} />
       <Stack.Screen name="licenses" options={{ title: 'Лицензии шрифтов' }} />
+      <Stack.Screen name="preferences" options={{ title: 'Настройки аккаунта' }} />
       <Stack.Screen name="account" options={{ title: 'Аккаунт' }} />
       <Stack.Screen name="sign-in" options={{ title: 'Вход и регистрация' }} />
       <Stack.Screen name="reset-password" options={{ title: 'Восстановление доступа' }} />

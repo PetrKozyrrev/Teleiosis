@@ -8,8 +8,8 @@ export type User = {
 export type Session = { user: User; expires_at: string; absolute_expires_at: string };
 export type IssuedSession = Session & { token: string; token_type: 'Bearer' };
 export type LibraryPath = '/contents' | '/contents/submissions' | `/contents?${string}` | `/contents/${number}`
-  | `/contents/${number}/open` | `/contents/${number}/versioned` | '/categories' | `/categories/${number}`;
-export type LibraryMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  | `/contents/${number}/open` | `/contents/${number}/versioned` | `/contents/${number}/reminder` | '/me' | '/me/settings' | '/me/export' | '/stats' | '/auth/change-password' | '/auth/delete-account' | '/categories' | `/categories/${number}`;
+export type LibraryMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 export type LibraryOptions = { ownerId?: number; idempotencyKey?: string; version?: number };
 
 export class ApiError extends Error {

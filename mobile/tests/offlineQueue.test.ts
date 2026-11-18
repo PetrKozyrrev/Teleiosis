@@ -137,3 +137,16 @@ test('respects server backoff and keeps expired uncertain requests for the user'
   expect(await store.claim(owner, 60_999)).toBeNull();
   expect(await store.claim(owner, 61_000)).toMatchObject({ id: job.id, attempts: 2 });
 });
+
+test('deletion removes the owner cache, queue and unassigned inbox while preserving another account', async () => {
+  const { store, cache } = loadModules();
+  await store.enqueue(owner, { note: 'Owner note' });
+  await store.enqueue(other, { note: 'Other account' });
+  await store.importDraft({ note: 'Unassigned note' });
+  await cache.remember(owner, '/contents/1', { id: 1, title: 'Owner cache' });
+  await store.clearDeletedAccount(owner);
+  expect(await store.listJobs(owner)).toEqual([]);
+  expect(await store.listJobs(store.unassigned)).toEqual([]);
+  expect(await cache.cachedMaterial(owner, 1)).toBeNull();
+  expect(await store.listJobs(other)).toHaveLength(1);
+});

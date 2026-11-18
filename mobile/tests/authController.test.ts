@@ -148,3 +148,38 @@ test('allows only the bound offline owner after a cold network failure', async (
   })).rejects.toMatchObject({ status: 401 });
   expect(send).not.toHaveBeenCalled();
 });
+
+test('deletion signs out even if local cleanup fails and never exposes the old session', async () => {
+  await controller.initialize();
+  jest.spyOn(api, 'library').mockResolvedValue(undefined);
+  const cleanup = jest.fn<() => Promise<void>>().mockRejectedValue(new Error('local failure'));
+  await expect(controller.deleteAccount('synthetic-password', cleanup)).rejects.toThrow();
+  expect(api.library).toHaveBeenCalledWith('/auth/delete-account', 'POST', issued.token, { password: 'synthetic-password' });
+  expect(controller.snapshot()).toMatchObject({ phase: 'error', session: null, offlineOwner: null });
+  expect(storage.clear).toHaveBeenCalled();
+  cleanup.mockResolvedValue(undefined);
+  storage.load.mockResolvedValue(null);
+  await controller.initialize();
+  expect(controller.snapshot().phase).toBe('signedOut');
+  expect(cleanup).toHaveBeenCalledTimes(2);
+  expect(api.library).toHaveBeenCalledTimes(1);
+});
+
+test('a rejected deletion keeps the session and the local data', async () => {
+  await controller.initialize();
+  jest.spyOn(api, 'library').mockRejectedValue(new ApiError(400));
+  const cleanup = jest.fn<() => Promise<void>>();
+  await expect(controller.deleteAccount('incorrect-password', cleanup)).rejects.toThrow();
+  expect(controller.snapshot().session?.user.id).toBe(issued.user.id);
+  expect(cleanup).not.toHaveBeenCalled();
+});
+
+test('an old deletion dialog cannot delete a different signed-in account', async () => {
+  await controller.initialize();
+  const request = jest.spyOn(api, 'library');
+  const cleanup = jest.fn<() => Promise<void>>();
+  await expect(controller.deleteAccount('synthetic-password', cleanup, issued.user.id + 1)).rejects.toThrow();
+  expect(request).not.toHaveBeenCalled();
+  expect(cleanup).not.toHaveBeenCalled();
+  expect(controller.snapshot().session?.user.id).toBe(issued.user.id);
+});
