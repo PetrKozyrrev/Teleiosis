@@ -14,4 +14,4 @@ mkdir -p artifacts
 mobile_version=$(node -p "require('./package.json').version")
 artifact="artifacts/teleiosis-$mobile_version-android-arm64-preview.apk"
 cp android/app/build/outputs/apk/release/app-release.apk "$artifact"
-sha256sum "$artifact"
+python3 scripts/check_android_apk.py "$artifact" --report "$artifact.report.json"

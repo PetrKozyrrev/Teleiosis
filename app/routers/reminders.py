@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.activity import record_activity
+from app.push import cancel_for_content
 from app.deps import CurrentUser, DbSession
 from app.models import Reminder
 from app.routers.contents import ContentId, get_own_content
@@ -67,6 +68,7 @@ def set_reminder(
     else:
         reminder.scheduled_at = data.scheduled_at
 
+    cancel_for_content(db, user.id, content_id)
     try:
         db.commit()
     except IntegrityError:
@@ -87,5 +89,6 @@ def cancel_reminder(content_id: ContentId, db: DbSession, user: CurrentUser):
     reminder = pending_reminder(db, user, content_id)
     if reminder is not None:
         reminder.status = "cancelled"
-        db.commit()
+    cancel_for_content(db, user.id, content_id)
+    db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

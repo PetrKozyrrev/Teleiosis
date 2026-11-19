@@ -15,6 +15,7 @@ from app.config import MIN_SECRET_KEY_LENGTH, settings
 from app.db import SessionLocal, engine
 from app.digest import process_due_users
 from app.reminders import process_due_reminders
+from app.push import process_push
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ def main() -> None:
         try:
             now = datetime.now(timezone.utc)
             with SessionLocal() as db:
+                process_push(db, now)
                 digests = process_due_users(db, now)
                 reminders = process_due_reminders(db, now)
             if digests.sent or digests.failed or reminders.sent or reminders.failed or reminders.cancelled:

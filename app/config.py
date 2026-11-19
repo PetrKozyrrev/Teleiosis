@@ -3,7 +3,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 import re
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIN_SECRET_KEY_LENGTH = 32
@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     mobile_android_cert_sha256: list[str] = Field(default_factory=list)
     mobile_apple_team_id: str = ""
 
+    push_enabled: bool = False
+    rustore_project_id: str = ""
+    rustore_service_token: SecretStr = Field(default_factory=lambda: SecretStr(""))
+
     # Секрет для подписи ссылок отписки (HMAC), не короче 32 символов.
     # Только в окружении. Смена ключа делает недействительными все выданные ссылки.
     secret_key: str = ""
@@ -52,6 +56,10 @@ class Settings(BaseSettings):
             raise ValueError("Android app-link certificates must be SHA-256 fingerprints")
         if self.mobile_apple_team_id and not re.fullmatch(r"[A-Z0-9]{10}", self.mobile_apple_team_id):
             raise ValueError("Apple team ID must have 10 uppercase alphanumeric characters")
+        if self.rustore_project_id and not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", self.rustore_project_id):
+            raise ValueError("Invalid RuStore project ID")
+        if self.push_enabled and (not self.rustore_project_id or not self.rustore_service_token.get_secret_value()):
+            raise ValueError("Push requires the RuStore project and service token")
         origin = self.app_origin.strip().lower().rstrip("/")
         parts = urlsplit(origin)
         if (

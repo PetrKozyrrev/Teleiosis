@@ -33,9 +33,11 @@ Run lint and typecheck before declaring any task done.
 
 The approved plan uses local development builds and a standalone Android test APK; see README.md and scripts/build-android-preview.sh. Do not connect cloud build, OTA, analytics, push providers, paid services or store publishing without an explicit project decision. iOS requires macOS/Xcode; lack of those resources leaves device acceptance open, rather than implying a successful iOS build.
 
-The user accepted the 0.3.1 Android library on Samsung S25 and authorized block 6 on 2026-11-18 after confirming the queue works. Block 7, commits, push, and the block 6 staging rollout require separate approval. Read ../docs/mobile_plan.md and ../docs/mobile_testing.md, update the report and ../other/mobile_context.md, then stop for review.
+The user confirmed APK 0.5.1 works after the approved block 6 staging rollout and authorized block 7 on 2026-11-19. Android push provider is RuStore Push. Provider accounts and Apple build resources are not yet available. See ../docs/mobile_push.md for prerequisites and implementation status. On 2026-11-19 the user authorized proceeding with block 8 preparation and deferred real RuStore acceptance to general testing. Track unfinished implementation and deferred checks in ../docs/mobile_release_checklist.md. Block 7 remains incomplete and push stays disabled. Blocks 9–13, store submission/publication, commits, git push, and any new staging rollout require separate approval. Read ../docs/mobile_plan.md and ../docs/mobile_testing.md, update the report and ../other/mobile_context.md, then stop for review.
 
 ## Rules
+
+- Preview APK handoff requires a successful `scripts/check_android_apk.py` report with matching SHA-256. Keep `preview-policy.json`, package.json, and app.config.ts versions consistent. Never change the pinned certificate just to make a failing build pass. See ../docs/mobile_release.md for block 8 checks, dependency audit debt, and rollout boundaries.
 
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.

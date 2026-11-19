@@ -2,9 +2,9 @@ name: Mobile checks
 
 on:
   push:
-    paths: ['mobile/**', '.github/workflows/mobile.yml']
+    paths: ['mobile/**', 'tests/test_android_artifact.py', '.github/workflows/mobile.yml']
   pull_request:
-    paths: ['mobile/**', '.github/workflows/mobile.yml']
+    paths: ['mobile/**', 'tests/test_android_artifact.py', '.github/workflows/mobile.yml']
   workflow_dispatch:
     inputs:
       android_apk:
@@ -38,6 +38,8 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
       - run: npm run check:dependencies
+      - name: Preview verifier regression (standard library only)
+        run: python3 -m unittest discover -s ../tests -p test_android_artifact.py
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -80,5 +82,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: teleiosis-android-arm64-preview
-          path: mobile/artifacts/*.apk
+          path: |
+            mobile/artifacts/*.apk
+            mobile/artifacts/*.apk.report.json
+          if-no-files-found: error
           retention-days: 7

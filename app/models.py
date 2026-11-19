@@ -316,3 +316,35 @@ class UserActivity(Base):
         autoincrement=False,
     )
     day: Mapped[date] = mapped_column(Date, primary_key=True)
+
+
+class PushDevice(Base):
+    __tablename__ = "push_devices"
+    __table_args__ = (UniqueConstraint("token_hash", name="uq_push_devices_token_hash"),)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    session_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("auth_sessions.id", ondelete="CASCADE"))
+    token: Mapped[str] = mapped_column(Text)
+    token_hash: Mapped[str] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean)
+    enabled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PushDelivery(Base):
+    __tablename__ = "push_deliveries"
+    __table_args__ = (
+        UniqueConstraint("device_id", "event_key", name="uq_push_deliveries_event_device"),
+        CheckConstraint("status IN ('pending','sending','retry_wait','accepted','cancelled','expired','failed')", name="ck_push_deliveries_status"),
+        Index("ix_push_deliveries_due", "status", "next_attempt_at"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    device_id: Mapped[UUID] = mapped_column(Uuid, ForeignKey("push_devices.id", ondelete="CASCADE"))
+    content_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("contents.id", ondelete="CASCADE"))
+    reminder_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("reminders.id", ondelete="CASCADE"))
+    event_key: Mapped[str] = mapped_column(Text)
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(Text, server_default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    reason: Mapped[str | None] = mapped_column(Text)

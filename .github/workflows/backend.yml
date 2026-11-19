@@ -45,6 +45,19 @@ jobs:
         run: python scripts/check_migrations.py
       - name: Python and web regression suite
         run: python -m pytest -q
+      - name: Disposable pilot library baseline
+        env:
+          DATABASE_URL: postgresql+psycopg://teleiosis_ci:ci-only-not-a-secret@127.0.0.1:5432/teleiosis_pilot_test_ci
+        run: |
+          docker exec "${{ job.services.postgres.id }}" createdb -U teleiosis_ci teleiosis_pilot_test_ci
+          python -m alembic upgrade head
+          python scripts/benchmark_library.py --report /tmp/teleiosis-pilot-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: teleiosis-pilot-baseline
+          path: /tmp/teleiosis-pilot-report.json
+          retention-days: 7
       - name: Shell syntax and whitespace
         run: |
           for script in deploy/*.sh; do sh -n "$script"; done
