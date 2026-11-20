@@ -150,3 +150,47 @@ test('deletion removes the owner cache, queue and unassigned inbox while preserv
   expect(await cache.cachedMaterial(owner, 1)).toBeNull();
   expect(await store.listJobs(other)).toHaveLength(1);
 });
+
+test('late network replies cannot restore local data after logout cleanup', async () => {
+  const { store, cache } = loadModules();
+  await store.enqueue(owner, { note: 'Synthetic old account draft' });
+  await store.enqueue(other, { note: 'Synthetic second account draft' });
+  const job = (await store.claim(owner, 1000))!;
+  let reply!: (value: unknown) => void;
+  const pending = cache.readOnline(owner, async () => new Promise(resolve => { reply = resolve; }),
+    '/contents/7', key => cache.cachedMaterial(key, 7));
+  await store.clearAccount(owner, true);
+  reply({ id: 7, title: 'Synthetic late response' });
+  await pending;
+  await store.settle(job, 'synced', null, 0, 7, { id: 7, title: 'Synthetic late write' });
+  expect(await store.listJobs(owner)).toEqual([]);
+  expect(await cache.cachedMaterial(owner, 7)).toBeNull();
+  expect(await cache.cachedMaterial(other, 7)).toBeNull();
+  expect(await store.listJobs(other)).toHaveLength(1);
+});
+
+test('a cache write failure rolls back settlement and preserves the retry payload', async () => {
+  const { store, cache } = loadModules();
+  await store.enqueue(owner, { note: 'Synthetic recoverable draft' });
+  const job = (await store.claim(owner, 1000))!;
+  mockDb.exec("CREATE TRIGGER reject_snapshot BEFORE INSERT ON snapshots BEGIN SELECT RAISE(ABORT, 'synthetic storage failure'); END;");
+  await expect(store.settle(job, 'synced', null, 0, 9, { id: 9, title: 'Synthetic receipt' })).rejects.toThrow();
+  expect(await store.getJob(owner, job.id)).toMatchObject({ state: 'sending', payload: job.payload });
+  expect(await cache.cachedMaterial(owner, 9)).toBeNull();
+  mockDb.exec('DROP TRIGGER reject_snapshot');
+  await store.settle(job, 'synced', null, 0, 9, { id: 9, title: 'Synthetic receipt' });
+  expect(await store.getJob(owner, job.id)).toMatchObject({ state: 'synced', payload: '{}' });
+  expect(await cache.cachedMaterial(owner, 9)).toMatchObject({ value: { id: 9 } });
+});
+
+test('server backoff blocks the bound account while leaving another queue independent', async () => {
+  const { store } = loadModules();
+  await store.enqueue(owner, { note: 'Synthetic first' });
+  const limited = (await store.claim(owner, 1000))!;
+  await store.settle(limited, 'retry_wait', 'rate', 61_000);
+  await store.enqueue(owner, { note: 'Synthetic second' });
+  await store.enqueue(other, { note: 'Synthetic independent account' });
+  expect(await store.claim(owner, 60_999)).toBeNull();
+  expect(await store.claim(other, 1000)).toMatchObject({ owner: other, state: 'sending', attempts: 1 });
+  expect(await store.claim(owner, 61_000)).not.toBeNull();
+});

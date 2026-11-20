@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useState, type PropsWithChildren } from 'react';
+import { useMemo, useState, type PropsWithChildren } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useAuth } from '../auth/context';
 import { ApiError } from '../auth/api';
@@ -49,13 +49,17 @@ export function optionsOf<T extends string>(labels: Record<T, string>) {
 
 export function LibraryAccess({ children }: { children: (request: Request, owner: string | null) => React.ReactNode }) {
   const { controller, state } = useAuth();
-  const hasSession = state.session !== null;
+  const session = state.session;
   const phase = state.phase;
-  const request = useCallback<Request>((...args) => {
-    if (phase === 'offline' && !hasSession) return Promise.reject(new ApiError(0));
-    return controller.library(...args);
-  }, [controller, hasSession, phase]);
   const id = state.session?.user.id ?? (state.phase === 'offline' ? state.offlineOwner : null);
+  const request = useMemo<Request>(() => {
+    const isCurrent = controller.captureSession();
+    return (...args) => {
+      if (!id || !isCurrent()) return Promise.reject(new ApiError(401));
+      if (phase === 'offline' && session === null) return Promise.reject(new ApiError(0));
+      return controller.library(...args);
+    };
+  }, [controller, id, phase, session]);
   if (id) return <View key={id} style={{ flex: 1 }}>{children(request, API_ORIGIN ? ownerKey(API_ORIGIN, id) : null)}</View>;
   return <Page title="Библиотека"><Card>
     {state.phase === 'loading' ? <Loading /> : <>

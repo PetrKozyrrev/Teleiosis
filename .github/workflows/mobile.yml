@@ -37,7 +37,19 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
+      - name: Audit dependencies (moderate and higher)
+        run: |
+          mkdir -p artifacts
+          npm audit --audit-level=moderate --json > artifacts/dependency-audit.json
+      - name: Preserve dependency audit even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: teleiosis-mobile-dependency-audit
+          path: mobile/artifacts/dependency-audit.json
+          retention-days: 7
       - run: npm run check:dependencies
+      - run: npm run test:toolchain
       - name: Preview verifier regression (standard library only)
         run: python3 -m unittest discover -s ../tests -p test_android_artifact.py
       - run: npm run typecheck

@@ -45,7 +45,7 @@ beforeEach(() => {
   jest.mocked(router.push).mockClear();
   jest.mocked(openURL).mockReset().mockResolvedValue(true);
   jest.mocked(useAuth).mockReturnValue({
-    controller: { library: request } as unknown as AuthController,
+    controller: { library: request, captureSession: () => () => true } as unknown as AuthController,
     state: { phase: 'signedIn', session: { user, expires_at: '', absolute_expires_at: '' }, busy: false, message: null },
   });
 });

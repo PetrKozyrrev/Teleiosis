@@ -1,6 +1,6 @@
 {
   "name": "teleiosis-mobile",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "main": "expo-router/entry",
   "dependencies": {
     "@expo-google-fonts/inter": "0.4.2",
@@ -49,10 +49,19 @@
     "lint": "expo lint",
     "test": "jest --runInBand",
     "check:dependencies": "expo install --check",
-    "export:check": "expo export --platform all --output-dir dist"
+    "export:check": "expo export --platform all --output-dir dist",
+    "test:toolchain": "node scripts/toolchain.test.cjs",
+    "audit:dependencies": "npm audit --audit-level=moderate"
   },
   "engines": {
     "node": "^22.13.0 || ^24.3.0"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "glob": "14.0.2",
+    "test-exclude@6.0.0": {
+      "glob": "7.2.3"
+    },
+    "minimatch@>=7.0.0 <11.0.1": "11.0.8"
+  }
 }

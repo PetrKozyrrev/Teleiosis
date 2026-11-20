@@ -11,6 +11,11 @@ export class AuthController {
   private state: AuthState = { phase: 'loading', session: null, busy: false, message: null };
   constructor(private readonly api: AuthApi, private readonly storage: Vault) {}
   snapshot = () => this.state;
+  // A delayed confirmation can check session identity without exposing its token.
+  captureSession = () => {
+    const token = this.token;
+    return () => this.token === token;
+  };
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   private set(patch: Partial<AuthState>) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()); }
 
@@ -130,17 +135,24 @@ export class AuthController {
     });
   }
 
-  async logout(localOnly = false, beforeClear?: () => Promise<void>) {
+  async logout(localOnly = false, beforeClear?: () => Promise<void>, isCurrent = this.captureSession()) {
     await this.exclusive(async () => {
+      if (!isCurrent()) {
+        const error = new ApiError(401);
+        error.message = 'Аккаунт или сессия изменились. Повторите выход.';
+        throw error;
+      }
       if (this.token && !localOnly) {
         try { await this.api.logout(this.token); }
         catch (error) { if (!(error instanceof ApiError && error.status === 401 && !error.gateway)) throw error; }
       }
+      // Stop serving authenticated responses while asynchronous cleanup runs.
+      // Retain the owner for a cleanup retry if SQLite or SecureStore fails.
+      this.set({ phase: 'error', session: null });
       await beforeClear?.();
-      this.set({ phase: 'error', session: null, offlineOwner: null });
       await this.storage.clear();
       this.token = null;
-      this.set({ phase: 'signedOut', session: null });
+      this.set({ phase: 'signedOut', session: null, offlineOwner: null });
     });
   }
 

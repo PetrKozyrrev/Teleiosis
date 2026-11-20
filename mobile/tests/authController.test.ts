@@ -74,6 +74,58 @@ test('failed remote logout retains session until explicit local-only logout', as
   expect(controller.snapshot().phase).toBe('signedOut');
 });
 
+test('a logout confirmation from the same account cannot clear a newly issued session', async () => {
+  await controller.initialize();
+  const isCurrent = controller.captureSession();
+  await controller.logout(true);
+  jest.mocked(api.signIn).mockResolvedValue({ ...issued, token: 'b'.repeat(43) });
+  await controller.signIn('login', issued.user.email, 'synthetic-password');
+  storage.clear.mockClear();
+  const cleanup = jest.fn<() => Promise<void>>().mockResolvedValue();
+  await expect(controller.logout(false, cleanup, isCurrent)).rejects.toThrow('Аккаунт или сессия изменились');
+  expect(api.logout).not.toHaveBeenCalled();
+  expect(cleanup).not.toHaveBeenCalled();
+  expect(storage.clear).not.toHaveBeenCalled();
+  expect(controller.snapshot().phase).toBe('signedIn');
+});
+
+test('refreshing the same credentials does not invalidate a current logout confirmation', async () => {
+  await controller.initialize();
+  const isCurrent = controller.captureSession();
+  await controller.refresh();
+  const cleanup = jest.fn<() => Promise<void>>().mockResolvedValue();
+  await controller.logout(false, cleanup, isCurrent);
+  expect(api.logout).toHaveBeenCalledWith(issued.token);
+  expect(cleanup).toHaveBeenCalledTimes(1);
+  expect(controller.snapshot().phase).toBe('signedOut');
+});
+
+test('logout blocks late authenticated replies before local cleanup finishes', async () => {
+  await controller.initialize();
+  let reply!: (value: unknown) => void;
+  let finishCleanup!: () => void;
+  jest.spyOn(api, 'library').mockReturnValue(new Promise(resolve => { reply = resolve; }));
+  const request = controller.library('/contents', 'GET');
+  const leaving = controller.logout(true, () => new Promise(resolve => { finishCleanup = resolve; }));
+  expect(controller.snapshot()).toMatchObject({ phase: 'error', session: null });
+  reply({ items: [{ id: 12, title: 'Synthetic late response' }] });
+  await expect(request).rejects.toMatchObject({ status: 401 });
+  finishCleanup();
+  await leaving;
+  expect(controller.snapshot()).toMatchObject({ phase: 'signedOut', offlineOwner: null });
+});
+
+test('failed queue cleanup retains its owner for an explicit retry', async () => {
+  await controller.initialize();
+  const cleanup = jest.fn<() => Promise<void>>().mockRejectedValueOnce(new Error('synthetic SQLite failure')).mockResolvedValueOnce();
+  await expect(controller.logout(true, cleanup)).rejects.toThrow();
+  expect(controller.snapshot()).toMatchObject({ phase: 'error', session: null, offlineOwner: issued.user.id });
+  expect(storage.clear).not.toHaveBeenCalled();
+  await controller.logout(true, cleanup);
+  expect(cleanup).toHaveBeenCalledTimes(2);
+  expect(controller.snapshot()).toMatchObject({ phase: 'signedOut', offlineOwner: null });
+});
+
 test('does not report successful deletion when secure storage deletion fails', async () => {
   await controller.initialize();
   storage.clear.mockRejectedValue(new Error('native failure'));

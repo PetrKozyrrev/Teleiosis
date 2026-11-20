@@ -8,6 +8,7 @@ import { clearAccount, listJobs, ownerKey } from '../offline/store';
 
 export default function Account() {
   const { controller, state } = useAuth();
+  const isCurrent = controller.captureSession();
   const [message, setMessage] = useState<string | null>(null);
   const [localLogout, setLocalLogout] = useState(false);
   async function run(action: () => Promise<void>, success?: string, logout = false) {
@@ -19,7 +20,7 @@ export default function Account() {
     const id = state.session?.user.id ?? state.offlineOwner;
     const owner = API_ORIGIN && id ? ownerKey(API_ORIGIN, id) : null;
     const signOut = (confirmed: boolean) => controller.logout(localOnly,
-      owner ? () => clearAccount(owner, confirmed) : undefined);
+      owner ? () => clearAccount(owner, confirmed) : undefined, isCurrent);
     try {
       const jobs = owner ? await listJobs(owner) : [];
       if (jobs.some(job => job.state !== 'synced')) {
