@@ -110,11 +110,34 @@ assert request("/mobile/library/collections", token=a)[1][0]["contents_count"] =
 print("HTTPS organization E2E passed: save/assign/filter/rename/export, two-account isolation, web cookie/CSRF, versions and non-destructive group deletion")
 '''
 
+IMPORT_SEARCH = r'''
+from urllib.parse import quote
+
+imports = "/mobile/library/imports/"
+query = "?q=" + quote("Синтетическая")
+search = "/mobile/library/search" + query + "&search_in=note"
+assert request(search, token=b)[1]["total"] == 0
+assert request(imports + "apply", "POST", data)[0] == 401
+status, preview, headers = request(imports + "preview", "POST", data, b)
+assert status == 200 and preview["materials"] == 1 and preview["memberships"] == 2
+assert headers.get("cache-control") == "no-store"
+assert request(search, token=b)[1]["total"] == 0
+assert request(imports + "apply", "POST", data, b)[1] == preview
+assert request(imports + "apply", "POST", data, b)[1] == dict(preview, replayed=True)
+assert request(search, token=a)[1]["total"] == 0
+assert request(search, token=b)[1]["total"] == 1
+assert request("/contents" + query, token=b)[1]["total"] == 0
+assert request("/mobile/auth/logout", "POST", {}, b)[0] == 204
+assert request(search, token=b)[0] == 401
+print("HTTPS import and search E2E passed: archived library, atomic apply, replay, extended fields, isolation and revoked session")
+'''
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", required=True, help="Existing project Python image (dependencies must match requirements.txt)")
     parser.add_argument("--image-only", action="store_true", help="Test code copied into the built image instead of mounting working tree sources")
+    parser.add_argument("--import-search", action="store_true", help="Also test the block 9B import and extended search")
     parser.add_argument("--caddy-image", default="caddy:2-alpine")
     parser.add_argument("--postgres-image", default="postgres:16")
     args = parser.parse_args()
@@ -132,7 +155,7 @@ def main():
         caddy = (root / "deploy/Caddyfile.staging").read_text().replace(
             "admin off", "admin off\n\tlocal_certs\n\tskip_install_trust", 1)
         (work / "Caddyfile").write_text(caddy)
-        (work / "client.py").write_text(CLIENT)
+        (work / "client.py").write_text(CLIENT + (IMPORT_SEARCH if args.import_search else ""))
         for path in work.iterdir():
             path.chmod(0o644)
         mounts = []

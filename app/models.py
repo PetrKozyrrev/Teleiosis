@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    JSON,
     Identity,
     Text,
     Time,
@@ -96,7 +97,7 @@ class Content(Base):
             name="ck_contents_status",
         ),
         CheckConstraint(
-            "url IS NOT NULL OR note IS NOT NULL", name="ck_contents_url_or_note"
+            "url IS NOT NULL OR note IS NOT NULL OR content_type = 'pdf'", name="ck_contents_url_or_note"
         ),
         CheckConstraint("open_count >= 0", name="ck_contents_open_count"),
         Index("ix_contents_user_created", "user_id", text("created_at DESC")),
@@ -183,6 +184,39 @@ class ContentGroup(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     content_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     group_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+
+
+class LibraryImport(Base):
+    __tablename__ = "library_imports"
+
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    digest: Mapped[str] = mapped_column(Text, primary_key=True)
+    summary: Mapped[dict] = mapped_column(JSON)
+
+
+class PdfObject(Base):
+    __tablename__ = "pdf_objects"
+    __table_args__ = (
+        ForeignKeyConstraint(["content_id", "user_id"], ["contents.id", "contents.user_id"],
+                             ondelete="SET NULL", name="fk_pdf_objects_content_owner"),
+        UniqueConstraint("content_id", name="uq_pdf_objects_content"),
+        UniqueConstraint("user_id", "digest", name="uq_pdf_objects_owner_digest"),
+        CheckConstraint("size_bytes BETWEEN 1 AND 10485760", name="ck_pdf_objects_size"),
+        CheckConstraint("(user_id IS NULL) = (content_id IS NULL)", name="ck_pdf_objects_ownership"),
+        Index("ix_pdf_objects_charged_user", "charged_user_id"),
+        Index("ix_pdf_objects_cleanup", "created_at", "id", postgresql_where=text("published IS FALSE OR user_id IS NULL")),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(BigInteger)
+    content_id: Mapped[int | None] = mapped_column(BigInteger)
+    charged_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"))
+    digest: Mapped[str] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    published: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    creating: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
 
 
 class ContentSubmission(Base):

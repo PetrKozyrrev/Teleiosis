@@ -55,3 +55,49 @@ test('organization uses mobile gateway aliases, preserves Bearer and If-Match, a
     }),
   }));
 });
+
+test('preserves original import bytes and safely decodes validation location', async () => {
+  const transport = jest.fn<typeof nativeFetch>().mockResolvedValue({
+    ok: false, status: 422, headers: new Headers(),
+    json: async () => ({ detail: { code: 'invalid_export_field', location: ['contents', 3, 'note'], input: 'private' } }),
+  } as Awaited<ReturnType<typeof nativeFetch>>);
+  const api = new AuthApi('https://example.com', async () => 'Basic synthetic', transport);
+  const original = new Uint8Array([239, 187, 191, 123, 125]).buffer;
+  await expect(api.library('/mobile/library/imports/preview', 'POST', 'synthetic-session', original))
+    .rejects.toMatchObject({ status: 422, code: 'invalid_export_field', location: ['contents', 3, 'note'] });
+  expect(transport).toHaveBeenCalledTimes(1);
+  expect(transport).toHaveBeenCalledWith('https://example.com/mobile/library/imports/preview', expect.objectContaining({
+    body: original, credentials: 'omit', redirect: 'error',
+    headers: expect.objectContaining({ 'Content-Type': 'application/json', Authorization: 'Bearer synthetic-session',
+      'X-Staging-Authorization': 'Basic synthetic' }),
+  }));
+});
+
+test('uploads PDF to create a material and accepts only a bounded PDF download', async () => {
+  const bytes = new Uint8Array([37, 80, 68, 70]).buffer;
+  const transport = jest.fn<typeof nativeFetch>();
+  transport.mockResolvedValueOnce({
+    ok: true, status: 200, headers: new Headers(), json: async () => ({ published: true }),
+  } as Awaited<ReturnType<typeof nativeFetch>>);
+  transport.mockResolvedValueOnce({
+    ok: true, status: 200, headers: new Headers({ 'Content-Type': 'application/pdf', 'Content-Length': '4' }),
+    arrayBuffer: async () => bytes,
+  } as Awaited<ReturnType<typeof nativeFetch>>);
+  transport.mockResolvedValueOnce({
+    ok: true, status: 200, headers: new Headers({ 'Content-Type': 'text/html', 'Content-Length': '4' }),
+  } as Awaited<ReturnType<typeof nativeFetch>>);
+  const api = new AuthApi('https://example.com', async () => 'Basic synthetic', transport);
+  const path = '/mobile/library/contents/11/pdf';
+  const create = '/mobile/library/pdf?category_id=3';
+  await api.library(create, 'POST', 'synthetic-session', bytes, { pdfFilename: 'Мой файл.pdf', pdfTitle: 'Название' });
+  expect(transport).toHaveBeenNthCalledWith(1, `https://example.com${create}`, expect.objectContaining({
+    body: bytes, credentials: 'omit', redirect: 'error',
+    headers: expect.objectContaining({ 'Content-Type': 'application/pdf', 'X-Teleiosis-Filename': encodeURIComponent('Мой файл.pdf'), 'X-Teleiosis-Pdf-Title': encodeURIComponent('Название'),
+      Authorization: 'Bearer synthetic-session', 'X-Staging-Authorization': 'Basic synthetic' }),
+  }));
+  await expect(api.library(`${path}/download`, 'GET', 'synthetic-session')).resolves.toBe(bytes);
+  expect(transport).toHaveBeenNthCalledWith(2, `https://example.com${path}/download`, expect.objectContaining({
+    headers: expect.objectContaining({ Accept: 'application/pdf' }),
+  }));
+  await expect(api.library(`${path}/download`, 'GET', 'synthetic-session')).rejects.toMatchObject({ status: 502 });
+});

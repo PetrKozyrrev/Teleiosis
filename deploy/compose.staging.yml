@@ -29,6 +29,8 @@ services:
     environment: *capture-environment
     volumes:
       - capture_mail:/var/lib/teleiosis/captured-mail
+      - pdf_objects:/var/lib/teleiosis/pdf
+      - pdf_scanner_socket:/run/pdf-scanner:ro
     depends_on:
       mail-init:
         condition: service_completed_successfully
@@ -46,6 +48,25 @@ services:
       STAGING_AUTH_HASH: ${STAGING_AUTH_HASH:?Set STAGING_AUTH_HASH}
     volumes:
       - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
+  pdf-scanner:
+    profiles: [pdf]
+    image: clamav/clamav:stable@sha256:12177441d1b40cef3c47b44c4090d59d4babc4c67bedd5af0fa315e603aa6dd8
+    restart: unless-stopped
+    mem_limit: 2300m
+    environment:
+      FRESHCLAM_CHECKS: "2"
+    volumes:
+      - ./clamd.staging.conf:/etc/clamav/clamd.conf:ro
+      - ./freshclam.staging.conf:/etc/clamav/freshclam.conf:ro
+      - pdf_scanner_socket:/tmp
+      - pdf_signatures:/var/lib/clamav
+    networks: [pdf-signatures]
 
 volumes:
   capture_mail:
+  pdf_objects:
+  pdf_scanner_socket:
+  pdf_signatures:
+
+networks:
+  pdf-signatures:

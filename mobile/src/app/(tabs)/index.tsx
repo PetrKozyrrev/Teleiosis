@@ -2,8 +2,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState, type ComponentRef } from 'react';
 import { AppState, Pressable, Text, type ScrollView } from 'react-native';
 import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
+import { ApiError } from '../../auth/api';
 import {
-  errorMessage, initialFilters, listPath, maxOffset, pageSize, sorts, sources, statuses,
+  errorMessage, initialFilters, listPath, maxOffset, pageSize, searchScopes, sorts, sources, statuses,
   type Category, type Filters, type MaterialPage, type Request,
 } from '../../library/model';
 import { Choice, LibraryAccess, Loading, Notice, optionsOf } from '../../library/ui';
@@ -26,6 +27,7 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
   const [groupError, setGroupError] = useState('');
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const path = listPath(filters, offset);
+  const advancedSearch = Boolean(filters.searchIn && filters.q.trim());
   const [result, setResult] = useState<{ path: string; revision: number; page?: MaterialPage; error?: string; cachedAt?: number }>();
   const current = result?.path === path && result.revision === revision ? result : undefined;
   const page = current?.page;
@@ -51,17 +53,26 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
   useFocusEffect(useCallback(() => {
     let active = true;
     const timer = setTimeout(() => {
-      void readOnline(owner, request, path, key => cachedList(key, filters, offset)).then(({ value: next, cachedAt }) => {
+      const read = advancedSearch
+        ? request(path, 'GET').then(value => ({ value: value as MaterialPage, cachedAt: undefined }))
+        : readOnline(owner, request, path, key => cachedList(key, filters, offset));
+      void read.then(({ value: next, cachedAt }) => {
         if (!active) return;
         const lastOffset = Math.max(0, Math.floor((next.total - 1) / pageSize) * pageSize);
         if (!next.items.length && offset > lastOffset) setOffset(lastOffset);
         else setResult({ path, revision, page: next, cachedAt });
       }).catch(error => {
-        if (active) setResult({ path, revision, error: errorMessage(error) });
+        if (!active) return;
+        let message = errorMessage(error);
+        if (advancedSearch && error instanceof ApiError && !error.gateway) {
+          if (error.status === 0) message = 'Расширенный поиск доступен при подключении к серверу.';
+          if (error.status === 404) message = 'На сервере ещё недоступен расширенный поиск.';
+        }
+        setResult({ path, revision, error: message });
       });
     }, 250);
     return () => { active = false; clearTimeout(timer); };
-  }, [filters, offset, owner, path, request, revision]));
+  }, [advancedSearch, filters, offset, owner, path, request, revision]));
 
   useFocusEffect(useCallback(() => {
     void revision; // Refresh available groups together with the list.
@@ -74,11 +85,13 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
   }, [showFilters, request, revision]));
 
   function change(next: Partial<Filters>) {
+    setResult(undefined);
     setFilters(currentFilters => ({ ...currentFilters, ...next }));
     setOffset(0);
   }
 
   function goToPage(nextOffset: number) {
+    setResult(undefined);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
     setOffset(nextOffset);
   }
@@ -88,9 +101,12 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
     <Action title="Управлять категориями" onPress={() => router.push('/library/categories')} />
     <Action title="Теги и коллекции" onPress={() => router.push('/library/organization')} />
     <Action title="Очередь и входящие" onPress={() => router.push('/queue')} />
-    <Field label="Поиск по названию" value={filters.q} onChangeText={q => change({ q })} maxLength={100} returnKeyType="search" />
+    <Field label={filters.searchIn ? 'Поисковый запрос' : 'Поиск по названию'}
+      value={filters.q} onChangeText={q => change({ q })} maxLength={100} returnKeyType="search" />
     <Action title={showFilters ? 'Скрыть фильтры' : 'Фильтры и сортировка'} onPress={() => setShowFilters(!showFilters)} />
     {showFilters && <Card>
+      <Choice label="Искать в" value={filters.searchIn ?? ''} onChange={searchIn => change({ searchIn })}
+        options={optionsOf(searchScopes)} />
       <Choice label="Статус" value={filters.status} onChange={status => change({ status })}
         options={[{ value: '', label: 'Все статусы' }, ...optionsOf(statuses)]} />
       <Choice label="Источник" value={filters.source} onChange={source => change({ source })}
@@ -106,7 +122,7 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
       {groupError && <Notice>{groupError}</Notice>}
       <Choice label="Сортировка" value={filters.sort} onChange={sort => change({ sort })} options={optionsOf(sorts)} />
     </Card>}
-    {(filtered || filters.sort !== initialFilters.sort) &&
+    {(filtered || filters.searchIn || filters.sort !== initialFilters.sort) &&
       <Action title="Сбросить поиск и фильтры" onPress={() => change(initialFilters)} />}
     {categoryError?.revision === revision && <Notice>Категории не обновились. {categoryError.message}</Notice>}
     <Action title="Обновить" onPress={() => setRevision(value => value + 1)} />
@@ -118,7 +134,7 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
       {page.items.map(item => <Pressable key={item.id} accessibilityRole="button" style={styles.card}
         onPress={() => router.push({ pathname: '/library/[id]', params: { id: String(item.id) } })}>
         <Text style={styles.heading} numberOfLines={3}>{item.title}</Text>
-        <Body>{[sources[item.source], statuses[item.status], categories.find(category => category.id === item.category_id)?.name].filter(Boolean).join(' · ')}</Body>
+        <Body>{[item.content_type === 'pdf' ? 'PDF' : sources[item.source], statuses[item.status], categories.find(category => category.id === item.category_id)?.name].filter(Boolean).join(' · ')}</Body>
       </Pressable>)}
       {offset > 0 && <Action title="Предыдущая страница" onPress={() => goToPage(offset - pageSize)} />}
       {offset + page.limit < page.total && offset + pageSize <= maxOffset &&

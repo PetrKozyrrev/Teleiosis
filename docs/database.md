@@ -1,5 +1,11 @@
 # База данных (PostgreSQL 16)
 
+Ревизия 9В `q7f9b1c3d5e6` добавляет журнал владения и очистки `pdf_objects`. Ревизия `r8a0c2e4f6b7` разделяет резервирование загрузки и публикацию PDF-карточки. [Схема жизненного цикла и откат](mobile_pdf.md).
+
+## Схема 9Б — локальный кандидат
+
+Ревизия `p6e8f0a2b4c5` добавляет `library_imports` с составным PK `(user_id, digest)`, JSON-счётчиками импорта и FK к пользователю с ON DELETE CASCADE. Материалы и назначения добавляются в той же транзакции, что и квитанция. Downgrade удаляет квитанции, сохраняя данные библиотеки. [Контракт и порядок отката](mobile_import_search.md).
+
 Локальная схема на ревизии n5d7e9f1a3b4: 14 таблиц (users, categories, contents, reminders, auth_sessions, rate_limit_events, password_reset_tokens, user_activity, email_verification_tokens, content_submissions, push_devices, push_deliveries, library_groups, content_groups). Ревизия стенда проверяется отдельно. Схема меняется только миграциями Alembic. Время всегда хранится в UTC (TIMESTAMPTZ), перевод в часовой пояс пользователя делается при показе и при расчёте времени отправки.
 
 ## users

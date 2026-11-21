@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Teleiosis staging PDF backups
+
+[Timer]
+OnCalendar=*-*-* 03:20:00 Europe/Moscow
+Persistent=true
+Unit=teleiosis-pdf-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -5,7 +5,7 @@ x-app: &app
   build:
     context: ..
     dockerfile: Dockerfile
-  environment:
+  environment: &app-environment
     DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
     APP_ENV: ${APP_ENV:-prod}
     MOBILE_APPLICATION_ID: ${MOBILE_APPLICATION_ID:-ru.teleiosis.mobile.dev}
@@ -79,6 +79,18 @@ services:
 
   api:
     <<: *app
+    environment:
+      <<: *app-environment
+      PDF_ENABLED: ${PDF_ENABLED:-false}
+      PDF_LOCAL_DIR: ${PDF_LOCAL_DIR:-}
+      PDF_S3_ENDPOINT: ${PDF_S3_ENDPOINT:-}
+      PDF_S3_REGION: ${PDF_S3_REGION:-}
+      PDF_S3_BUCKET: ${PDF_S3_BUCKET:-}
+      PDF_S3_ACCESS_KEY: ${PDF_S3_ACCESS_KEY:-}
+      PDF_S3_SECRET_KEY: ${PDF_S3_SECRET_KEY:-}
+      PDF_SCANNER_HOST: ${PDF_SCANNER_HOST:-}
+      PDF_SCANNER_SOCKET: ${PDF_SCANNER_SOCKET:-}
+      PDF_SCANNER_PORT: ${PDF_SCANNER_PORT:-3310}
     # Доверять proxy-заголовкам только от Caddy в выделенной сети.
     command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, "8000", --proxy-headers, --forwarded-allow-ips, "172.30.60.2", --no-access-log]
     networks:

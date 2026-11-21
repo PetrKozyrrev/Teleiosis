@@ -63,6 +63,10 @@ for method,path in (("GET","/mobile/library/tags"),("POST","/mobile/library/tags
                     ("PATCH","/mobile/library/tags/12"),("DELETE","/mobile/library/tags/12"),
                     ("GET","/mobile/library/collections"),("POST","/mobile/library/collections"),
                     ("PATCH","/mobile/library/collections/12"),("DELETE","/mobile/library/collections/12"),
+                    ("POST","/mobile/library/imports/preview"),("POST","/mobile/library/imports/apply"),
+                    ("GET","/mobile/library/search?q=sample&search_in=all"),
+                    ("GET","/mobile/library/pdf"),("POST","/mobile/library/pdf?category_id=3"),
+                    ("GET","/mobile/library/contents/12/pdf"),("GET","/mobile/library/contents/12/pdf/download"),
                     ("GET","/mobile/library/contents/12/organization"),("PATCH","/mobile/library/contents/12/organization")):
     assert request(path,{"Authorization":"Bearer synthetic-session-token"},method)[0]==401
     assert request(path,{"X-Staging-Authorization":bad},method)[0]==401

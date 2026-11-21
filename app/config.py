@@ -3,7 +3,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 import re
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIN_SECRET_KEY_LENGTH = 32
@@ -34,6 +34,17 @@ class Settings(BaseSettings):
     rustore_project_id: str = ""
     rustore_service_token: SecretStr = Field(default_factory=lambda: SecretStr(""))
 
+    pdf_enabled: bool = False
+    pdf_local_dir: Path | None = None
+    pdf_s3_endpoint: str = ""
+    pdf_s3_region: str = ""
+    pdf_s3_bucket: str = ""
+    pdf_s3_access_key: SecretStr = Field(default_factory=lambda: SecretStr(""))
+    pdf_s3_secret_key: SecretStr = Field(default_factory=lambda: SecretStr(""))
+    pdf_scanner_host: str = ""
+    pdf_scanner_socket: Path | None = None
+    pdf_scanner_port: int = Field(default=3310, ge=1, le=65535)
+
     # Секрет для подписи ссылок отписки (HMAC), не короче 32 символов.
     # Только в окружении. Смена ключа делает недействительными все выданные ссылки.
     secret_key: str = ""
@@ -48,8 +59,29 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     smtp_security: Literal["starttls", "ssl", "none"] = "starttls"
 
+    @field_validator("pdf_local_dir", "pdf_scanner_socket", mode="before")
+    @classmethod
+    def optional_pdf_path(cls, value):
+        return None if value == "" else value
+
     @model_validator(mode="after")
     def check_web_settings(self):
+        if self.pdf_enabled:
+            if bool(self.pdf_scanner_host) == bool(self.pdf_scanner_socket):
+                raise ValueError("PDF requires exactly one scanner address")
+            if self.pdf_scanner_socket and not self.pdf_scanner_socket.is_absolute():
+                raise ValueError("PDF_SCANNER_SOCKET must be absolute")
+            if self.pdf_local_dir is not None:
+                if self.app_env == "prod" or not self.pdf_local_dir.is_absolute() or self.pdf_s3_endpoint:
+                    raise ValueError("Local PDF storage requires an absolute directory and is limited to testing")
+            endpoint = urlsplit(self.pdf_s3_endpoint)
+            allowed_schemes = ("http", "https") if self.app_env == "dev" else ("https",)
+            if self.pdf_local_dir is None and (endpoint.scheme not in allowed_schemes or not endpoint.hostname or endpoint.username is not None
+                or endpoint.password is not None or endpoint.path not in ("", "/") or endpoint.query or endpoint.fragment
+                or not re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", self.pdf_s3_bucket)
+                or not self.pdf_s3_region or not self.pdf_s3_access_key.get_secret_value()
+                or not self.pdf_s3_secret_key.get_secret_value()):
+                raise ValueError("PDF requires a private S3 endpoint, bucket and credentials")
         if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+", self.mobile_application_id):
             raise ValueError("Invalid mobile application ID")
         if any(not re.fullmatch(r"(?:[0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}", value) for value in self.mobile_android_cert_sha256):

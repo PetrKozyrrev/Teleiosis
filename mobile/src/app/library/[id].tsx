@@ -9,6 +9,7 @@ import {
   type Category, type Material, type Request, type Status,
 } from '../../library/model';
 import { Choice, LibraryAccess, Loading, Notice, optionsOf } from '../../library/ui';
+import { createPdf, pdfCreatePath, pdfError, pickPdf, type SelectedPdf } from '../../library/pdf';
 import { cachedCategories, cachedMaterial, forgetMaterial, readOnline, remember } from '../../offline/cache';
 import { enqueue, getJob, unassigned, type Draft } from '../../offline/store';
 
@@ -36,7 +37,8 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
   const [categoryRevision, setCategoryRevision] = useState(0);
   const [editing, setEditing] = useState(id === 'new');
   const [url, setUrl] = useState('');
-  const [kind, setKind] = useState<'link' | 'note'>('link');
+  const [kind, setKind] = useState<'link' | 'note' | 'pdf'>('link');
+  const [selectedPdf, setSelectedPdf] = useState<SelectedPdf | null>(null);
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [status, setStatus] = useState<Status>('unseen');
@@ -46,6 +48,7 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
   const [message, setMessage] = useState('');
   const [staleEdit, setStaleEdit] = useState(false);
   const original = originalUrl(item?.url ?? null);
+  const creatingPdf = id === 'new' && kind === 'pdf';
 
   useFocusEffect(useCallback(() => {
     void revision; // Refresh the card explicitly or when returning from organization.
@@ -113,9 +116,24 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
 
   async function save() {
     const cleanTitle = title.trim();
+    if (creatingPdf) {
+      if (!selectedPdf) { setMessage('Выберите PDF-файл.'); return; }
+      await run(async () => {
+        const savedId = await createPdf(request, selectedPdf, cleanTitle, categoryId);
+        if (navigation.isFocused()) router.replace({ pathname: '/library/[id]', params: { id: String(savedId) } });
+      }, error => {
+        if (error instanceof ApiError && error.code === 'pdf_category_missing') {
+          setCategoryRevision(value => value + 1);
+          return 'Выбранная категория больше недоступна. Выберите другую.';
+        }
+        return pdfError(error, true);
+      });
+      return;
+    }
     const cleanNote = note.trim();
     const cleanUrl = url.trim();
-    if ((id === 'new' && kind === 'note' && !cleanNote) || (item && !item.url && !cleanNote)) {
+    if ((id === 'new' && kind === 'note' && !cleanNote) ||
+      (item && item.content_type !== 'pdf' && !item.url && !cleanNote)) {
       setMessage('Введите текст заметки.');
       return;
     }
@@ -171,6 +189,15 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
     });
   }
 
+  function choosePdf() {
+    void run(async () => {
+      await request(pdfCreatePath, 'GET');
+      if (!navigation.isFocused()) return;
+      const selected = await pickPdf();
+      if (selected && navigation.isFocused()) setSelectedPdf(selected);
+    }, error => pdfError(error, true));
+  }
+
   function remove() {
     if (id === 'new') return;
     Alert.alert('Удалить материал?', item?.title, [
@@ -206,7 +233,7 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
     </Card> : <Loading />)}
     {item && !editing && <Card>
       <Text accessibilityRole="header" style={styles.heading}>{item.title}</Text>
-      <Body>{[sources[item.source], statuses[item.status], categories.find(category => category.id === item.category_id)?.name].filter(Boolean).join(' · ')}</Body>
+      <Body>{[item.content_type === 'pdf' ? 'PDF' : sources[item.source], statuses[item.status], categories.find(category => category.id === item.category_id)?.name].filter(Boolean).join(' · ')}</Body>
       {item.description && <Body>{item.description}</Body>}
       {item.note && <Text selectable style={styles.body}>{item.note}</Text>}
       {original && <>
@@ -218,6 +245,8 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
       {cachedAt !== undefined && <Notice>Загруженная карточка · {new Date(cachedAt).toLocaleString('ru-RU')}</Notice>}
       <Action title="Теги и коллекции материала" disabled={busy || cachedAt !== undefined}
         onPress={() => router.push({ pathname: '/library/organize', params: { id: String(id) } })} />
+      {item.content_type === 'pdf' && <Action title="Открыть PDF" disabled={busy || cachedAt !== undefined}
+        onPress={() => router.push({ pathname: '/library/pdf', params: { id: String(id) } })} />}
       <Action title="Редактировать" disabled={busy || cachedAt !== undefined} onPress={() => beginEdit(item)} />
       <Action title="Удалить материал" disabled={busy || cachedAt !== undefined} onPress={remove} />
       {cachedAt !== undefined && <Action title="Обновить карточку" disabled={busy} onPress={() => {
@@ -226,22 +255,27 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
     </Card>}
     {draftId && !draftReady && (loadError ? <Notice>{loadError}</Notice> : <Loading />)}
     {editing && draftReady && <Card>
-      {id === 'new' && <Choice label="Вид материала" value={kind} onChange={setKind} disabled={busy}
-        options={[{ value: 'link', label: 'Ссылка' }, { value: 'note', label: 'Заметка' }]} />}
+      {id === 'new' && <Choice label="Вид материала" value={kind} onChange={value => { setKind(value); setMessage(''); }} disabled={busy}
+        options={[{ value: 'link', label: 'Ссылка' }, { value: 'note', label: 'Заметка' },
+          ...(!draftId ? [{ value: 'pdf' as const, label: 'PDF' }] : [])]} />}
       {id === 'new' && kind === 'link' && <Field label="Ссылка" value={url} onChangeText={setUrl}
         keyboardType="url" maxLength={2048} editable={!busy} />}
+      {creatingPdf && <>
+        <Body>{selectedPdf?.name ?? 'PDF до 10 МиБ. Для загрузки требуется подключение.'}</Body>
+        <Action title={selectedPdf ? 'Выбрать другой PDF' : 'Выбрать PDF'} disabled={busy} onPress={choosePdf} />
+      </>}
       <Field label={id === 'new' ? 'Название (необязательно)' : 'Название'} value={title} onChangeText={setTitle}
         maxLength={300} editable={!busy} autoCapitalize="sentences" />
-      <Field label={kind === 'note' || (item && !item.url) ? 'Текст заметки' : 'Заметка (необязательно)'}
+      {!creatingPdf && <Field label={kind === 'note' || (item && !item.url && item.content_type !== 'pdf') ? 'Текст заметки' : 'Заметка (необязательно)'}
         value={note} onChangeText={setNote} multiline maxLength={10000} editable={!busy} autoCapitalize="sentences"
-        style={{ minHeight: 120, maxHeight: 250, textAlignVertical: 'top' }} />
+        style={{ minHeight: 120, maxHeight: 250, textAlignVertical: 'top' }} />}
       {id !== 'new' && <Choice label="Статус" value={status} onChange={setStatus} disabled={busy} options={optionsOf(statuses)} />}
       {owner !== unassigned && <Choice label="Категория" value={categoryId} onChange={setCategoryId} disabled={busy} options={categoryOptions} />}
       {categoryError && <>
         <Notice>Категории не обновились. {categoryError}</Notice>
         <Action title="Обновить категории" disabled={busy} onPress={() => setCategoryRevision(value => value + 1)} />
       </>}
-      <Action title={busy ? 'Сохранение…' : 'Сохранить'} disabled={busy || staleEdit} onPress={() => void save()} />
+      <Action title={busy ? 'Сохранение…' : 'Сохранить'} disabled={busy || staleEdit || (creatingPdf && !selectedPdf)} onPress={() => void save()} />
       {staleEdit && <Action title="Загрузить актуальную версию" onPress={() => {
         setStaleEdit(false); setMessage(''); setEditing(false); setItem(null); setLoadError(''); setRevision(value => value + 1);
       }} />}

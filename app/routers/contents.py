@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 from hashlib import sha256
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Path, Query, Response, status
-from sqlalchemy import func, select, update
+from pydantic import BaseModel, Field
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.activity import record_activity
@@ -25,6 +26,7 @@ from app.schemas import (
 from app.urls import detect_source, normalize_url
 
 router = APIRouter(prefix="/contents", tags=["contents"])
+search_router = APIRouter(tags=["contents"])
 
 ContentId = Annotated[int, Path(gt=0, le=MAX_BIGINT)]
 
@@ -34,6 +36,28 @@ SORT_ORDER = {
     "oldest": (Content.created_at.asc(), Content.id.asc()),
     "title": (func.lower(Content.title), Content.id),
 }
+SEARCH_COLUMNS = {
+    "title": Content.title, "note": Content.note,
+    "description": Content.description, "url": Content.url,
+}
+SearchScope = Literal["all", "title", "note", "description", "url"]
+
+
+class ListFilters(BaseModel):
+    q: str | None = Field(default=None, max_length=100)
+    status: ContentStatus | None = None
+    source: ContentSource | None = None
+    category_id: int | None = Field(default=None, gt=0, le=MAX_BIGINT)
+    uncategorized: bool = False
+    tag_id: int | None = Field(default=None, gt=0, le=MAX_BIGINT)
+    collection_id: int | None = Field(default=None, gt=0, le=MAX_BIGINT)
+    sort: SortOrder = "newest"
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0, le=1_000_000)
+
+
+class SearchFilters(ListFilters):
+    search_in: SearchScope = "all"
 
 
 def make_title(url_normalized: str | None, note: str | None) -> str:
@@ -157,21 +181,17 @@ def save_content(data: ContentCreate, db: DbSession, user: CurrentUser, *,
 
 
 @router.get("", response_model=ContentPage)
-def list_contents(
-    db: DbSession,
-    user: CurrentUser,
-    q: Annotated[str | None, Query(max_length=100)] = None,
-    status_filter: Annotated[ContentStatus | None, Query(alias="status")] = None,
-    source: ContentSource | None = None,
-    category_id: Annotated[int | None, Query(gt=0, le=MAX_BIGINT)] = None,
-    uncategorized: bool = False,
-    tag_id: Annotated[int | None, Query(gt=0, le=MAX_BIGINT)] = None,
-    collection_id: Annotated[int | None, Query(gt=0, le=MAX_BIGINT)] = None,
-    sort: SortOrder = "newest",
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
-    offset: Annotated[int, Query(ge=0, le=1_000_000)] = 0,
-):
-    if category_id is not None and uncategorized:
+def list_contents(db: DbSession, user: CurrentUser, filters: Annotated[ListFilters, Query()]):
+    return content_page(db, user, filters, "title")
+
+
+@search_router.get("/search", response_model=ContentPage)
+def search_contents(db: DbSession, user: CurrentUser, filters: Annotated[SearchFilters, Query()]):
+    return content_page(db, user, filters, filters.search_in)
+
+
+def content_page(db: DbSession, user: CurrentUser, filters: ListFilters, search_in: SearchScope):
+    if filters.category_id is not None and filters.uncategorized:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "Use either category_id or uncategorized, not both",
@@ -179,18 +199,22 @@ def list_contents(
 
     # Главное условие изоляции: только материалы текущего пользователя
     conditions = [Content.user_id == user.id]
-    if q and q.strip():
-        conditions.append(Content.title.icontains(q.strip(), autoescape=True))
-    if status_filter:
-        conditions.append(Content.status == status_filter)
-    if source:
-        conditions.append(Content.source == source)
-    if category_id is not None:
-        conditions.append(Content.category_id == category_id)
-    if uncategorized:
+    q = (filters.q or "").strip()
+    if q:
+        if "\x00" in q:
+            raise HTTPException(422, "Invalid search text")
+        columns = SEARCH_COLUMNS.values() if search_in == "all" else (SEARCH_COLUMNS[search_in],)
+        conditions.append(or_(*(column.icontains(q, autoescape=True) for column in columns)))
+    if filters.status:
+        conditions.append(Content.status == filters.status)
+    if filters.source:
+        conditions.append(Content.source == filters.source)
+    if filters.category_id is not None:
+        conditions.append(Content.category_id == filters.category_id)
+    if filters.uncategorized:
         conditions.append(Content.category_id.is_(None))
 
-    for group_id, kind in ((tag_id, "tag"), (collection_id, "collection")):
+    for group_id, kind in ((filters.tag_id, "tag"), (filters.collection_id, "collection")):
         if group_id is not None:
             conditions.append(select(ContentGroup.content_id).join(
                 LibraryGroup, LibraryGroup.id == ContentGroup.group_id).where(
@@ -202,11 +226,11 @@ def list_contents(
     items = db.scalars(
         select(Content)
         .where(*conditions)
-        .order_by(*SORT_ORDER[sort])
-        .limit(limit)
-        .offset(offset)
+        .order_by(*SORT_ORDER[filters.sort])
+        .limit(filters.limit)
+        .offset(filters.offset)
     ).all()
-    return ContentPage(items=items, total=total, limit=limit, offset=offset)
+    return ContentPage(items=items, total=total, limit=filters.limit, offset=filters.offset)
 
 
 @router.get("/{content_id}", response_model=ContentOut)
@@ -241,7 +265,7 @@ def change_content(content_id: int, data: ContentUpdate, db: DbSession,
         get_own_category(db, user, data.category_id)
 
     note = data.note or None
-    if "note" in changes and note is None and content.url is None:
+    if "note" in changes and note is None and content.url is None and content.content_type != "pdf":
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "A material without a link must keep its note",

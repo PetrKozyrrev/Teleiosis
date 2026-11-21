@@ -9,6 +9,7 @@ import { ApiError } from '../src/auth/api';
 import type { AuthController } from '../src/auth/controller';
 import Library from '../src/app/(tabs)/index';
 import MaterialRoute from '../src/app/library/[id]';
+import { pickPdf } from '../src/library/pdf';
 
 jest.mock('../src/offline/store', () => ({ enqueue: jest.fn(), subscribe: () => () => {}, ownerKey: () => 'account-1', unassigned: '' }));
 jest.mock('../src/offline/cache', () => ({ readOnline: async (_owner: unknown, request: Request, path: Parameters<Request>[0]) => ({
@@ -23,6 +24,10 @@ jest.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
 }));
 jest.mock('expo-linking', () => ({ openURL: jest.fn() }));
+jest.mock('../src/library/pdf', () => ({
+  ...jest.requireActual<typeof import('../src/library/pdf')>('../src/library/pdf'),
+  pickPdf: jest.fn(),
+}));
 
 const request = jest.fn<Request>();
 const item: Material = {
@@ -39,6 +44,7 @@ function press(name: string) {
 
 beforeEach(() => {
   mockRequestedId = 'new';
+  jest.mocked(pickPdf).mockReset();
   jest.mocked(enqueue).mockReset().mockResolvedValue(undefined);
   request.mockReset().mockImplementation(async path => path === '/categories' ? [{ id: 3, name: 'Техника', contents_count: 1 }] : item);
   jest.mocked(router.replace).mockClear();
@@ -167,4 +173,80 @@ test('offers organization outside filters and combines tag and collection filter
   await waitFor(() => expect(request.mock.calls.some(([path]) => path.startsWith('/contents?')
     && new URLSearchParams(path.split('?')[1]).get('tag_id') === '9'
     && new URLSearchParams(path.split('?')[1]).get('collection_id') === '10')).toBe(true));
+});
+
+test('advanced search resets pagination, ignores stale results and requires a connection', async () => {
+  jest.useFakeTimers();
+  try {
+    let resolveOld!: (value: MaterialPage) => void;
+    request.mockImplementation(async path => {
+      if (path === '/categories' || path === '/mobile/library/tags' || path === '/mobile/library/collections') return [];
+      if (path.includes('search_in=note')) return new Promise<MaterialPage>(resolve => { resolveOld = resolve; });
+      if (path.includes('search_in=url')) throw new ApiError(0);
+      return page([item], 21);
+    });
+    await render(<Library />);
+    await fireEvent.changeText(screen.getByLabelText('Поиск по названию'), 'текст');
+    await act(async () => { jest.advanceTimersByTime(250); });
+    await press('Следующая страница');
+    await act(async () => { jest.advanceTimersByTime(250); });
+    expect(request).toHaveBeenLastCalledWith(expect.stringContaining('offset=20'), 'GET');
+    await press('Фильтры и сортировка');
+    await press('Искать в · Название · доступно офлайн');
+    await fireEvent.press(screen.getByRole('radio', { name: 'Заметка' }));
+    await act(async () => { jest.advanceTimersByTime(250); });
+    expect(request).toHaveBeenLastCalledWith(expect.stringMatching(/^\/mobile\/library\/search\?.*offset=0.*search_in=note$/), 'GET');
+    await press('Искать в · Заметка');
+    await fireEvent.press(screen.getByRole('radio', { name: 'Ссылка' }));
+    await act(async () => { jest.advanceTimersByTime(250); });
+    expect(screen.getByText('Расширенный поиск доступен при подключении к серверу.')).toBeTruthy();
+    await act(async () => { resolveOld(page([{ ...item, title: 'Устаревший ответ по заметке' }])); });
+    expect(screen.queryByText('Устаревший ответ по заметке')).toBeNull();
+    expect(screen.queryByText(item.title)).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('creates a standalone PDF from the new material form and retries after an unknown result', async () => {
+  const bytes = new Uint8Array([37, 80, 68, 70]).buffer;
+  jest.mocked(pickPdf).mockResolvedValueOnce({ name: 'document.pdf', bytes });
+  const create = '/mobile/library/pdf?category_id=3';
+  let attempts = 0;
+  request.mockImplementation(async path => {
+    if (path === '/categories') return [{ id: 3, name: 'Техника', contents_count: 1 }];
+    if (path === create && ++attempts === 1) throw new ApiError(0);
+    return { id: 12 };
+  });
+  await render(<MaterialRoute />);
+  await press('Вид материала · Ссылка');
+  await fireEvent.press(screen.getByRole('radio', { name: 'PDF' }));
+  await press('Выбрать PDF');
+  expect(request).toHaveBeenLastCalledWith('/mobile/library/pdf', 'GET');
+  expect(screen.getByText('document.pdf')).toBeTruthy();
+  await press('Категория · Без категории');
+  await fireEvent.press(screen.getByRole('radio', { name: 'Техника' }));
+  await fireEvent.changeText(screen.getByLabelText('Название (необязательно)'), 'Справочник');
+  await press('Сохранить');
+  expect(screen.getByText('Для работы с PDF требуется подключение к серверу.')).toBeTruthy();
+  await press('Сохранить');
+  expect(request.mock.calls.filter(([path]) => path === create)).toEqual([
+    [create, 'POST', bytes, { pdfFilename: 'document.pdf', pdfTitle: 'Справочник' }],
+    [create, 'POST', bytes, { pdfFilename: 'document.pdf', pdfTitle: 'Справочник' }],
+  ]);
+  expect(enqueue).not.toHaveBeenCalled();
+  expect(router.replace).toHaveBeenCalledWith({ pathname: '/library/[id]', params: { id: '12' } });
+});
+
+test('explains that the old staging API lacks PDF creation before opening the file picker', async () => {
+  request.mockImplementation(async path => {
+    if (path === '/mobile/library/pdf') throw new ApiError(404);
+    return [];
+  });
+  await render(<MaterialRoute />);
+  await press('Вид материала · Ссылка');
+  await fireEvent.press(screen.getByRole('radio', { name: 'PDF' }));
+  await press('Выбрать PDF');
+  expect(screen.getByText('Сервер пока не поддерживает создание PDF-материалов.')).toBeTruthy();
+  expect(pickPdf).not.toHaveBeenCalled();
 });

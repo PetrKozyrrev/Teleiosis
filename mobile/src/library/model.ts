@@ -5,12 +5,18 @@ export const statuses = {
 };
 export const sources = { youtube: 'YouTube', telegram: 'Telegram', web: 'Сайт', other: 'Заметка' };
 export const sorts = { newest: 'Сначала новые', oldest: 'Сначала старые', title: 'По названию' };
+export const searchScopes = {
+  '': 'Название · доступно офлайн',
+  all: 'Название, описание, заметка и ссылка',
+  description: 'Описание', note: 'Заметка', url: 'Ссылка',
+};
 
 export type Status = keyof typeof statuses;
 export type Source = keyof typeof sources;
 export type Category = { id: number; name: string; contents_count: number };
 export type Material = {
   id: number;
+  content_type?: string;
   title: string;
   url: string | null;
   description: string | null;
@@ -26,6 +32,7 @@ export type MaterialPage = { items: Material[]; total: number; limit: number; of
 export type Request = (path: LibraryPath, method: LibraryMethod, body?: unknown, options?: LibraryOptions) => Promise<unknown>;
 export type Filters = {
   q: string;
+  searchIn?: keyof typeof searchScopes;
   status: Status | '';
   source: Source | '';
   category: number | 'none' | '';
@@ -33,11 +40,11 @@ export type Filters = {
   tag?: number | '';
   collection?: number | '';
 };
-export const initialFilters: Filters = { q: '', status: '', source: '', category: '', sort: 'newest', tag: '', collection: '' };
+export const initialFilters: Filters = { q: '', searchIn: '', status: '', source: '', category: '', sort: 'newest', tag: '', collection: '' };
 export const pageSize = 20;
 export const maxOffset = 1_000_000;
 
-export function listPath({ q, status, source, category, sort, tag, collection }: Filters, offset: number): LibraryPath {
+export function listPath({ q, searchIn, status, source, category, sort, tag, collection }: Filters, offset: number): LibraryPath {
   const query = new URLSearchParams({ sort, limit: String(pageSize), offset: String(offset) });
   if (q.trim()) query.set('q', q.trim());
   if (status) query.set('status', status);
@@ -46,6 +53,10 @@ export function listPath({ q, status, source, category, sort, tag, collection }:
   else if (category) query.set('category_id', String(category));
   if (tag) query.set('tag_id', String(tag));
   if (collection) query.set('collection_id', String(collection));
+  if (searchIn && q.trim()) {
+    query.set('search_in', searchIn);
+    return `/mobile/library/search?${query}`;
+  }
   return `/contents?${query}`;
 }
 

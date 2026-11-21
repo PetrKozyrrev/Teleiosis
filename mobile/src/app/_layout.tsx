@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 import { useFonts } from 'expo-font';
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
 import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
@@ -8,8 +9,10 @@ import { StatusBar } from 'expo-status-bar';
 import { colors } from '../theme';
 import { AuthProvider } from '../auth/context';
 import { OfflineSync } from '../offline/sync';
+import { clearPdfPreviews } from '../library/pdf';
 
 export default function RootLayout() {
+  useEffect(clearPdfPreviews, []);
   const [loaded, error] = useFonts({ Inter_400Regular, Inter_600SemiBold, Inter_700Bold, Manrope_700Bold });
   if (!loaded && !error) return null;
   return <AuthProvider>
@@ -21,6 +24,8 @@ export default function RootLayout() {
       <Stack.Screen name="library/organization" options={{ title: 'Теги и коллекции' }} />
       <Stack.Screen name="library/organize" options={{ title: 'Теги и коллекции материала' }} />
       <Stack.Screen name="library/categories" options={{ title: 'Категории' }} />
+      <Stack.Screen name="library/import" options={{ title: 'Импорт библиотеки' }} />
+      <Stack.Screen name="library/pdf" options={{ title: 'PDF' }} />
       <Stack.Screen name="queue" options={{ title: 'Очередь и входящие' }} />
       <Stack.Screen name="probe" options={{ title: 'Проверка устройства' }} />
       <Stack.Screen name="licenses" options={{ title: 'Лицензии шрифтов' }} />

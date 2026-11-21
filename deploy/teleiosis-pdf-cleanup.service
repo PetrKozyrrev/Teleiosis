@@ -1,0 +1,8 @@
+[Unit]
+Description=Remove detached or expired Teleiosis staging PDF files
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /srv/teleiosis/deploy/staging-pdf-maintenance.sh cleanup

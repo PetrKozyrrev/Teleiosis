@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry Teleiosis staging PDF cleanup
+
+[Timer]
+OnCalendar=*:0/10
+Persistent=true
+Unit=teleiosis-pdf-cleanup.service
+
+[Install]
+WantedBy=timers.target

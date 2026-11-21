@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Category, Content, Reminder, User, UserActivity, LibraryGroup, ContentGroup
+from app.models import Category, Content, Reminder, User, UserActivity, LibraryGroup, ContentGroup, PdfObject
 
 EXPORT_VERSION = 1
 
@@ -40,8 +40,14 @@ def build_export(db: Session, user: User, now: datetime | None = None) -> dict:
     groups = db.scalars(select(LibraryGroup).where(LibraryGroup.user_id == user.id).order_by(LibraryGroup.id)).all()
     memberships = db.execute(select(ContentGroup.content_id, ContentGroup.group_id).where(
         ContentGroup.user_id == user.id).order_by(ContentGroup.content_id, ContentGroup.group_id)).all()
+    pdfs = db.scalars(select(PdfObject).where(PdfObject.user_id == user.id, PdfObject.published.is_(True))
+                     .order_by(PdfObject.content_id)).all()
 
     return {
+        **({"pdf_attachments": [
+            {"content_id": pdf.content_id, "name": pdf.name, "size_bytes": pdf.size_bytes, "sha256": pdf.digest}
+            for pdf in pdfs
+        ]} if pdfs else {}),
         "tags": [{"id": g.id, "name": g.name, "created_at": _iso(g.created_at)} for g in groups if g.kind == "tag"],
         "collections": [{"id": g.id, "name": g.name, "created_at": _iso(g.created_at)} for g in groups if g.kind == "collection"],
         "organization": [{"content_id": content_id, "group_id": group_id} for content_id, group_id in memberships],
@@ -69,7 +75,8 @@ def build_export(db: Session, user: User, now: datetime | None = None) -> dict:
                 "title": c.title,
                 "url": c.url,
                 "description": c.description,
-                "note": c.note,
+                # JSON v1 imports a standalone PDF as a note when the bytes are absent.
+                "note": (c.note or c.title) if c.content_type == "pdf" else c.note,
                 "content_type": c.content_type,
                 "source": c.source,
                 "image_url": c.image_url,

@@ -1,0 +1,8 @@
+[Unit]
+Description=Archive Teleiosis staging PostgreSQL and PDF files together
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /srv/teleiosis/deploy/staging-pdf-maintenance.sh backup

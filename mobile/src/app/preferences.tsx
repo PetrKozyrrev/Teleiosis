@@ -90,6 +90,7 @@ function PreferencesView({ request, owner }: { request: Request; owner: string |
       <Action title="Выгрузить данные" disabled={disabled} onPress={() => void run(() =>
         exportAccount(request, () => Boolean(state.session && controller.snapshot().session?.user.id === state.session.user.id)),
       'Системное меню выгрузки закрыто.')} />
+      <Action title="Импортировать выгрузку" disabled={disabled} onPress={() => router.push('/library/import')} />
     </Card>
     <Card>
       <Field label="Пароль для удаления аккаунта" value={deletePassword} onChangeText={setDeletePassword} secureTextEntry editable={!disabled} maxLength={128} />

@@ -1,5 +1,11 @@
 # API (FastAPI)
 
+Для PDF-материалов 9В используются GET и POST `/mobile/library/pdf`, GET `/mobile/library/contents/{id}/pdf` и GET `/mobile/library/contents/{id}/pdf/download`. POST принимает `application/pdf`, кодированные URL-способом заголовки `X-Teleiosis-Filename` и `X-Teleiosis-Pdf-Title` и необязательную категорию в `category_id`. Карточка удаляется обычным `DELETE /contents/{id}`. [Контракт и ограничения](mobile_pdf.md).
+
+## Библиотека 9Б — локальный кандидат
+
+`POST /mobile/library/imports/preview` проверяет исходный JSON экспорта v1, `POST /mobile/library/imports/apply` атомарно добавляет данные текущему аккаунту. Повтор исходного файла возвращает квитанцию. `GET /mobile/library/search` расширяет поиск на описание, заметку и URL, сохраняя AND-фильтры и формат страниц. `GET /contents` по-прежнему ищет по названию. [Лимиты, ошибки и примеры сценариев](mobile_import_search.md).
+
 Интерактивная документация при запущенном сервере: http://127.0.0.1:8000/docs
 (доступна только при APP_ENV=dev; staging/prod закрывают docs/OpenAPI).
 
