@@ -75,6 +75,7 @@ export async function cachedMaterial(owner: string, id: number): Promise<Read<Ma
 }
 
 export async function cachedList(owner: string, filters: Filters, offset: number): Promise<Read<MaterialPage> | null> {
+  if (filters.tag || filters.collection) return null;
   const result = await loaded(owner);
   if (result.cachedAt === undefined) return null;
   const items = filterDownloaded(result.items, filters);

@@ -44,7 +44,7 @@ jobs:
       - name: Real Alembic entrypoint and schema parity
         run: python scripts/check_migrations.py
       - name: Python and web regression suite
-        run: python -m pytest -q
+        run: python -m pytest tests -q
       - name: Disposable pilot library baseline
         env:
           DATABASE_URL: postgresql+psycopg://teleiosis_ci:ci-only-not-a-secret@127.0.0.1:5432/teleiosis_pilot_test_ci
@@ -140,6 +140,8 @@ jobs:
           sh deploy/compose.sh up -d --wait api worker
       - name: Native staging gateway transport over private HTTPS
         run: python3 scripts/check_mobile_gateway.py --image teleiosis:ci
+      - name: Organization API and web regression over private HTTPS
+        run: python3 scripts/check_mobile_organization.py --image teleiosis:ci --image-only --caddy-image caddy:2
       - name: Stop disposable CI stack
         if: always()
         run: sh deploy/compose.sh down --volumes --remove-orphans

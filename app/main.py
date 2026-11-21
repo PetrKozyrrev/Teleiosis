@@ -12,7 +12,7 @@ from app.config import settings
 from app.deps import DbSession
 from app.routers import (
     account, auth, categories, contents, email_verification, password_reset,
-    reminders, stats, unsubscribe, users, mobile_auth, app_links, push_devices,
+    reminders, stats, unsubscribe, users, mobile_auth, app_links, push_devices, organization,
 )
 
 # Путь строится от файла, а не от текущей папки: сервер можно запускать откуда угодно
@@ -64,6 +64,10 @@ def create_app() -> FastAPI:
         unsubscribe.router, reminders.router, mobile_auth.router, app_links.router,
     ):
         application.include_router(router)
+
+    for router in (organization.tags_router, organization.collections_router, organization.router):
+        application.include_router(router)
+        application.include_router(router, prefix="/mobile/library")
 
     @application.get("/health")
     def health():

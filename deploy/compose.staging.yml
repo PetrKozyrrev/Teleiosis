@@ -6,6 +6,7 @@ x-capture-environment: &capture-environment
 
 services:
   migrate:
+    image: ${TELEIOSIS_API_IMAGE:-${TELEIOSIS_IMAGE:-teleiosis:local}}
     environment: *capture-environment
   mail-init:
     image: ${TELEIOSIS_IMAGE:-teleiosis:local}
@@ -24,6 +25,7 @@ services:
       - -c
       - "import os; p='/var/lib/teleiosis/captured-mail'; os.chmod(p, 0o700); os.chown(p, 10001, 10001)"
   api:
+    image: ${TELEIOSIS_API_IMAGE:-${TELEIOSIS_IMAGE:-teleiosis:local}}
     environment: *capture-environment
     volumes:
       - capture_mail:/var/lib/teleiosis/captured-mail

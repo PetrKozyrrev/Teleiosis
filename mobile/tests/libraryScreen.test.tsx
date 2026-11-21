@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import { router } from 'expo-router';
 import { openURL } from 'expo-linking';
@@ -51,7 +51,7 @@ beforeEach(() => {
 });
 
 test('opens category management from the library with filters closed', async () => {
-  request.mockImplementation(async path => path === '/categories' ? [] : page([]));
+  request.mockImplementation(async path => path === '/categories' || path.startsWith('/mobile/library/') ? [] : page([]));
   await render(<Library />);
 
   expect(screen.queryByRole('button', { name: 'Категория · Все категории' })).toBeNull();
@@ -149,4 +149,22 @@ test('ignores older search replies and queries the next page of the current sear
   } finally {
     jest.useRealTimers();
   }
+});
+
+
+test('offers organization outside filters and combines tag and collection filters', async () => {
+  request.mockImplementation(async path => path === '/mobile/library/tags' ? [{ id: 9, name: 'Метка', contents_count: 0 }]
+    : path === '/mobile/library/collections' ? [{ id: 10, name: 'Подборка', contents_count: 0 }]
+      : path === '/categories' ? [] : page([]));
+  await render(<Library />);
+  await press('Теги и коллекции');
+  expect(router.push).toHaveBeenCalledWith('/library/organization');
+  await press('Фильтры и сортировка');
+  await press('Тег · Все теги');
+  await fireEvent.press(screen.getByRole('radio', { name: 'Метка' }));
+  await press('Коллекция · Все коллекции');
+  await fireEvent.press(screen.getByRole('radio', { name: 'Подборка' }));
+  await waitFor(() => expect(request.mock.calls.some(([path]) => path.startsWith('/contents?')
+    && new URLSearchParams(path.split('?')[1]).get('tag_id') === '9'
+    && new URLSearchParams(path.split('?')[1]).get('collection_id') === '10')).toBe(true));
 });

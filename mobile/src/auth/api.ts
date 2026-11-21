@@ -8,13 +8,16 @@ export type User = {
 export type Session = { user: User; expires_at: string; absolute_expires_at: string };
 export type IssuedSession = Session & { token: string; token_type: 'Bearer' };
 export type LibraryPath = '/contents' | '/contents/submissions' | `/contents?${string}` | `/contents/${number}`
-  | `/contents/${number}/open` | `/contents/${number}/versioned` | `/contents/${number}/reminder` | '/me' | '/me/settings' | '/me/export' | '/stats' | '/auth/change-password' | '/auth/delete-account' | '/categories' | `/categories/${number}`;
+  | `/contents/${number}/open` | `/contents/${number}/versioned` | `/contents/${number}/reminder` | '/me' | '/me/settings' | '/me/export' | '/stats' | '/auth/change-password' | '/auth/delete-account' | '/categories' | `/categories/${number}`
+  | '/mobile/library/tags' | '/mobile/library/collections'
+  | `/mobile/library/tags/${number}` | `/mobile/library/collections/${number}`
+  | `/mobile/library/contents/${number}/organization`;
 export type LibraryMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 export type LibraryOptions = { ownerId?: number; idempotencyKey?: string; version?: number };
 
 export class ApiError extends Error {
   constructor(public readonly status: number, public readonly gateway = false, public readonly retryAfter: number | null = null,
-    public readonly existingId: number | null = null) {
+    public readonly existingId: number | null = null, public readonly code: string | null = null) {
     super(gateway ? 'Проверьте доступ к тестовому стенду.' : status === 401 ? 'Проверьте почту и пароль или войдите заново.'
       : status === 429 ? 'Слишком много попыток. Повторите позже.'
       : status === 409 ? 'Адрес уже зарегистрирован или подтверждён.'
@@ -85,8 +88,13 @@ export class AuthApi {
           const id = result?.detail?.existing_id;
           if (Number.isSafeInteger(id) && id > 0) existingId = id;
         }
+        let code: string | null = null;
+        if (response.status === 409 && path.startsWith('/mobile/library/')) {
+          const result = await response.json().catch(() => null);
+          if (['group_name_exists', 'group_limit_reached'].includes(result?.detail?.code)) code = result.detail.code;
+        }
         throw new ApiError(response.status, basicChallenge,
-          Number.isFinite(retry) && retry > 0 ? Math.min(retry, 3600) : null, existingId);
+          Number.isFinite(retry) && retry > 0 ? Math.min(retry, 3600) : null, existingId, code);
       }
       if (response.status === 204) return;
       try {

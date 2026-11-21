@@ -18,6 +18,8 @@ export default function RootLayout() {
     <Stack screenOptions={{ headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.surface }, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="library/[id]" options={{ title: 'Материал' }} />
+      <Stack.Screen name="library/organization" options={{ title: 'Теги и коллекции' }} />
+      <Stack.Screen name="library/organize" options={{ title: 'Теги и коллекции материала' }} />
       <Stack.Screen name="library/categories" options={{ title: 'Категории' }} />
       <Stack.Screen name="queue" options={{ title: 'Очередь и входящие' }} />
       <Stack.Screen name="probe" options={{ title: 'Проверка устройства' }} />

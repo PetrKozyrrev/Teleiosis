@@ -194,3 +194,11 @@ test('server backoff blocks the bound account while leaving another queue indepe
   expect(await store.claim(other, 1000)).toMatchObject({ owner: other, state: 'sending', attempts: 1 });
   expect(await store.claim(owner, 61_000)).not.toBeNull();
 });
+
+test('tag and collection filters never fall back to an unfiltered downloaded library', async () => {
+  const cache = jest.requireActual<typeof import('../src/offline/cache')>('../src/offline/cache');
+  const { initialFilters } = jest.requireActual<typeof import('../src/library/model')>('../src/library/model');
+  await cache.remember(owner, '/contents/73', { id: 73, title: 'Synthetic cached card', source: 'other', status: 'unseen', category_id: null });
+  expect(await cache.cachedList(owner, { ...initialFilters, tag: 7 }, 0)).toBeNull();
+  expect(await cache.cachedList(owner, { ...initialFilters, collection: 8 }, 0)).toBeNull();
+});

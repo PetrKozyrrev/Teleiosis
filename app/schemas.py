@@ -310,3 +310,41 @@ class ReminderOut(BaseModel):
     content_id: int
     scheduled_at: datetime
     status: str
+
+
+class LibraryGroupWrite(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: CategoryName
+
+
+class LibraryGroupOut(CategoryOut):
+    pass
+
+
+class LibraryGroupRef(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+
+
+class OrganizationOut(BaseModel):
+    content_id: int
+    version: int
+    tags: list[LibraryGroupRef]
+    collections: list[LibraryGroupRef]
+
+
+class OrganizationUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tag_ids: list[Annotated[int, Field(strict=True, gt=0, le=MAX_BIGINT)]] | None = Field(default=None, max_length=20)
+    collection_ids: list[Annotated[int, Field(strict=True, gt=0, le=MAX_BIGINT)]] | None = Field(default=None, max_length=20)
+
+    @model_validator(mode="after")
+    def check_selection(self):
+        if not self.model_fields_set:
+            raise ValueError("Provide at least one selection")
+        for name in self.model_fields_set:
+            ids = getattr(self, name)
+            if ids is None or len(ids) != len(set(ids)):
+                raise ValueError("Selections must be non-null lists of unique ids")
+        return self

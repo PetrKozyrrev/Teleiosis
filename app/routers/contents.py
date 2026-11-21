@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from app.activity import record_activity
 from app.deps import CurrentUser, DbSession
 from app.metadata import fetch_metadata
-from app.models import Content, ContentSubmission
+from app.models import Content, ContentSubmission, ContentGroup, LibraryGroup
 from app.routers.categories import get_own_category
 from app.schemas import (
     MAX_BIGINT,
@@ -165,6 +165,8 @@ def list_contents(
     source: ContentSource | None = None,
     category_id: Annotated[int | None, Query(gt=0, le=MAX_BIGINT)] = None,
     uncategorized: bool = False,
+    tag_id: Annotated[int | None, Query(gt=0, le=MAX_BIGINT)] = None,
+    collection_id: Annotated[int | None, Query(gt=0, le=MAX_BIGINT)] = None,
     sort: SortOrder = "newest",
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0, le=1_000_000)] = 0,
@@ -187,6 +189,14 @@ def list_contents(
         conditions.append(Content.category_id == category_id)
     if uncategorized:
         conditions.append(Content.category_id.is_(None))
+
+    for group_id, kind in ((tag_id, "tag"), (collection_id, "collection")):
+        if group_id is not None:
+            conditions.append(select(ContentGroup.content_id).join(
+                LibraryGroup, LibraryGroup.id == ContentGroup.group_id).where(
+                    ContentGroup.user_id == user.id, ContentGroup.content_id == Content.id,
+                    LibraryGroup.user_id == user.id, LibraryGroup.id == group_id,
+                    LibraryGroup.kind == kind).exists())
 
     total = db.scalar(select(func.count()).select_from(Content).where(*conditions))
     items = db.scalars(

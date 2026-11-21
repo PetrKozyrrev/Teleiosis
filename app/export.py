@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Category, Content, Reminder, User, UserActivity
+from app.models import Category, Content, Reminder, User, UserActivity, LibraryGroup, ContentGroup
 
 EXPORT_VERSION = 1
 
@@ -37,7 +37,14 @@ def build_export(db: Session, user: User, now: datetime | None = None) -> dict:
         .order_by(UserActivity.day)
     ).all()
 
+    groups = db.scalars(select(LibraryGroup).where(LibraryGroup.user_id == user.id).order_by(LibraryGroup.id)).all()
+    memberships = db.execute(select(ContentGroup.content_id, ContentGroup.group_id).where(
+        ContentGroup.user_id == user.id).order_by(ContentGroup.content_id, ContentGroup.group_id)).all()
+
     return {
+        "tags": [{"id": g.id, "name": g.name, "created_at": _iso(g.created_at)} for g in groups if g.kind == "tag"],
+        "collections": [{"id": g.id, "name": g.name, "created_at": _iso(g.created_at)} for g in groups if g.kind == "collection"],
+        "organization": [{"content_id": content_id, "group_id": group_id} for content_id, group_id in memberships],
         "version": EXPORT_VERSION,
         "exported_at": _iso(now),
         "user": {

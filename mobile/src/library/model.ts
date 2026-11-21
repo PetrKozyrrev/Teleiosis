@@ -30,18 +30,22 @@ export type Filters = {
   source: Source | '';
   category: number | 'none' | '';
   sort: keyof typeof sorts;
+  tag?: number | '';
+  collection?: number | '';
 };
-export const initialFilters: Filters = { q: '', status: '', source: '', category: '', sort: 'newest' };
+export const initialFilters: Filters = { q: '', status: '', source: '', category: '', sort: 'newest', tag: '', collection: '' };
 export const pageSize = 20;
 export const maxOffset = 1_000_000;
 
-export function listPath({ q, status, source, category, sort }: Filters, offset: number): LibraryPath {
+export function listPath({ q, status, source, category, sort, tag, collection }: Filters, offset: number): LibraryPath {
   const query = new URLSearchParams({ sort, limit: String(pageSize), offset: String(offset) });
   if (q.trim()) query.set('q', q.trim());
   if (status) query.set('status', status);
   if (source) query.set('source', source);
   if (category === 'none') query.set('uncategorized', 'true');
   else if (category) query.set('category_id', String(category));
+  if (tag) query.set('tag_id', String(tag));
+  if (collection) query.set('collection_id', String(collection));
   return `/contents?${query}`;
 }
 

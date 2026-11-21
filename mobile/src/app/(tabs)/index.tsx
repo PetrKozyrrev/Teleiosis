@@ -8,6 +8,7 @@ import {
 } from '../../library/model';
 import { Choice, LibraryAccess, Loading, Notice, optionsOf } from '../../library/ui';
 import { cachedCategories, cachedList, readOnline } from '../../offline/cache';
+import { groupPath, organizationError, type Group } from '../../library/organization';
 import { subscribe } from '../../offline/store';
 
 export default function Library() {
@@ -21,12 +22,14 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryError, setCategoryError] = useState<{ revision: number; message: string } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [groups, setGroups] = useState<{ tags: Group[]; collections: Group[] }>({ tags: [], collections: [] });
+  const [groupError, setGroupError] = useState('');
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const path = listPath(filters, offset);
   const [result, setResult] = useState<{ path: string; revision: number; page?: MaterialPage; error?: string; cachedAt?: number }>();
   const current = result?.path === path && result.revision === revision ? result : undefined;
   const page = current?.page;
-  const filtered = Boolean(filters.q.trim() || filters.status || filters.source || filters.category);
+  const filtered = Boolean(filters.q.trim() || filters.status || filters.source || filters.category || filters.tag || filters.collection);
 
   useFocusEffect(useCallback(() => {
     const refresh = () => setRevision(value => value + 1);
@@ -60,6 +63,16 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
     return () => { active = false; clearTimeout(timer); };
   }, [filters, offset, owner, path, request, revision]));
 
+  useFocusEffect(useCallback(() => {
+    void revision; // Refresh available groups together with the list.
+    if (!showFilters) return;
+    let active = true;
+    void Promise.all([request(groupPath('tags'), 'GET'), request(groupPath('collections'), 'GET')]).then(([tags, collections]) => {
+      if (active) { setGroups({ tags: tags as Group[], collections: collections as Group[] }); setGroupError(''); }
+    }).catch(error => { if (active) setGroupError(organizationError(error, true)); });
+    return () => { active = false; };
+  }, [showFilters, request, revision]));
+
   function change(next: Partial<Filters>) {
     setFilters(currentFilters => ({ ...currentFilters, ...next }));
     setOffset(0);
@@ -73,6 +86,7 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
   return <Page title="Библиотека" scrollRef={scrollRef}>
     <Action title="Добавить материал" onPress={() => router.push('/library/new')} />
     <Action title="Управлять категориями" onPress={() => router.push('/library/categories')} />
+    <Action title="Теги и коллекции" onPress={() => router.push('/library/organization')} />
     <Action title="Очередь и входящие" onPress={() => router.push('/queue')} />
     <Field label="Поиск по названию" value={filters.q} onChangeText={q => change({ q })} maxLength={100} returnKeyType="search" />
     <Action title={showFilters ? 'Скрыть фильтры' : 'Фильтры и сортировка'} onPress={() => setShowFilters(!showFilters)} />
@@ -84,6 +98,12 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
       <Choice label="Категория" value={filters.category} onChange={category => change({ category })}
         options={[{ value: '', label: 'Все категории' }, { value: 'none', label: 'Без категории' },
           ...categories.map(category => ({ value: category.id, label: category.name }))]} />
+      <Choice label="Тег" value={filters.tag ?? ''} onChange={tag => change({ tag })}
+        options={[{ value: '', label: 'Все теги' }, ...groups.tags.map(tag => ({ value: tag.id, label: tag.name }))]} />
+      <Choice label="Коллекция" value={filters.collection ?? ''} onChange={collection => change({ collection })}
+        options={[{ value: '', label: 'Все коллекции' }, ...groups.collections.map(collection => ({ value: collection.id, label: collection.name }))]} />
+      <Body>Фильтры по тегам и коллекциям работают при подключении к серверу.</Body>
+      {groupError && <Notice>{groupError}</Notice>}
       <Choice label="Сортировка" value={filters.sort} onChange={sort => change({ sort })} options={optionsOf(sorts)} />
     </Card>}
     {(filtered || filters.sort !== initialFilters.sort) &&

@@ -8,6 +8,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Identity,
@@ -89,6 +90,7 @@ class Content(Base):
     __tablename__ = "contents"
     __table_args__ = (
         UniqueConstraint("user_id", "url_normalized", name="uq_contents_user_url"),
+        UniqueConstraint("id", "user_id", name="uq_contents_id_user"),
         CheckConstraint(
             "status IN ('unseen','planned','studied','irrelevant')",
             name="ck_contents_status",
@@ -152,6 +154,35 @@ FOR EACH ROW EXECUTE FUNCTION increment_content_version();
 event.listen(Content.__table__, "after_drop", DDL(
     "DROP FUNCTION IF EXISTS increment_content_version()"
 ).execute_if(dialect="postgresql"))
+
+
+class LibraryGroup(Base):
+    __tablename__ = "library_groups"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_library_groups_id_user"),
+        Index("uq_library_groups_owner_kind_name", "user_id", "kind", text("lower(name)"), unique=True),
+        CheckConstraint("kind IN ('tag', 'collection')", name="ck_library_groups_kind"),
+        CheckConstraint("char_length(name) BETWEEN 1 AND 50", name="ck_library_groups_name_len"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ContentGroup(Base):
+    __tablename__ = "content_groups"
+    __table_args__ = (
+        ForeignKeyConstraint(["content_id", "user_id"], ["contents.id", "contents.user_id"],
+                             ondelete="CASCADE", name="fk_content_groups_content_owner"),
+        ForeignKeyConstraint(["group_id", "user_id"], ["library_groups.id", "library_groups.user_id"],
+                             ondelete="CASCADE", name="fk_content_groups_group_owner"),
+        Index("ix_content_groups_owner_group", "user_id", "group_id", "content_id"),
+    )
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    content_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    group_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
 
 class ContentSubmission(Base):

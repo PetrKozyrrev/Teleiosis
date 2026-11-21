@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { openURL } from 'expo-linking';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Text } from 'react-native';
 import { ApiError } from '../../auth/api';
 import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
@@ -47,7 +47,8 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
   const [staleEdit, setStaleEdit] = useState(false);
   const original = originalUrl(item?.url ?? null);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
+    void revision; // Refresh the card explicitly or when returning from organization.
     let active = true;
     if (id !== 'new') {
       void readOnline(owner, request, `/contents/${id}`, key => cachedMaterial(key, id)).then(result => {
@@ -61,7 +62,7 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
       });
     }
     return () => { active = false; };
-  }, [id, owner, request, revision]);
+  }, [id, owner, request, revision]));
 
   useEffect(() => {
     if (owner === unassigned) return;
@@ -215,6 +216,8 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
         <Body>Открытий оригинала · {item.open_count}</Body>
       </>}
       {cachedAt !== undefined && <Notice>Загруженная карточка · {new Date(cachedAt).toLocaleString('ru-RU')}</Notice>}
+      <Action title="Теги и коллекции материала" disabled={busy || cachedAt !== undefined}
+        onPress={() => router.push({ pathname: '/library/organize', params: { id: String(id) } })} />
       <Action title="Редактировать" disabled={busy || cachedAt !== undefined} onPress={() => beginEdit(item)} />
       <Action title="Удалить материал" disabled={busy || cachedAt !== undefined} onPress={remove} />
       {cachedAt !== undefined && <Action title="Обновить карточку" disabled={busy} onPress={() => {

@@ -59,6 +59,16 @@ assert status==200 and all(json.loads(body)[key] is None for key in ("auth","gat
 status,headers,body=request("/mobile/auth/session",{"X-Staging-Authorization":good,"Authorization":"Bearer synthetic-session-token"})
 assert status==200 and json.loads(body)["auth"]=="Bearer synthetic-session-token" and json.loads(body)["gate"] is None, "Bearer was lost or gateway credential leaked"
 assert headers.get("x-teleiosis-environment")=="staging"
+for method,path in (("GET","/mobile/library/tags"),("POST","/mobile/library/tags"),
+                    ("PATCH","/mobile/library/tags/12"),("DELETE","/mobile/library/tags/12"),
+                    ("GET","/mobile/library/collections"),("POST","/mobile/library/collections"),
+                    ("PATCH","/mobile/library/collections/12"),("DELETE","/mobile/library/collections/12"),
+                    ("GET","/mobile/library/contents/12/organization"),("PATCH","/mobile/library/contents/12/organization")):
+    assert request(path,{"Authorization":"Bearer synthetic-session-token"},method)[0]==401
+    assert request(path,{"X-Staging-Authorization":bad},method)[0]==401
+    status,headers,body=request(path,{"X-Staging-Authorization":good,"Authorization":"Bearer synthetic-session-token"},method)
+    assert status==200 and json.loads(body)=={"auth":"Bearer synthetic-session-token","gate":None,"cookie":None,"path":path,"method":method}
+    assert headers.get("cache-control")=="no-store"
 status,headers,body=request("/me",{"Authorization":good})
 assert status==200 and all(json.loads(body)[key] is None for key in ("auth","gate")), "Browser transport regression"
 cookie="session=synthetic-web-cookie"

@@ -38,3 +38,20 @@ test('sends the UUID and version in the dedicated write endpoints', async () => 
     method: 'PATCH', headers: expect.objectContaining({ 'If-Match': '"1"' }),
   }));
 });
+
+test('organization uses mobile gateway aliases, preserves Bearer and If-Match, and does not replay POST', async () => {
+  const transport = jest.fn<typeof nativeFetch>().mockResolvedValue({
+    ok: false, status: 409, headers: new Headers(), json: async () => ({ detail: { code: 'group_limit_reached' } }),
+  } as Awaited<ReturnType<typeof nativeFetch>>);
+  const api = new AuthApi('https://example.com', async () => 'Basic synthetic', transport);
+  await expect(api.library('/mobile/library/tags', 'POST', 'synthetic-session', { name: 'Synthetic' }))
+    .rejects.toMatchObject({ status: 409, code: 'group_limit_reached' });
+  expect(transport).toHaveBeenCalledTimes(1);
+  await expect(api.library('/mobile/library/contents/17/organization', 'PATCH', 'synthetic-session', { tag_ids: [] }, { version: 3 }))
+    .rejects.toMatchObject({ status: 409 });
+  expect(transport).toHaveBeenLastCalledWith('https://example.com/mobile/library/contents/17/organization', expect.objectContaining({
+    credentials: 'omit', redirect: 'error', headers: expect.objectContaining({
+      Authorization: 'Bearer synthetic-session', 'X-Staging-Authorization': 'Basic synthetic', 'If-Match': '"3"',
+    }),
+  }));
+});
