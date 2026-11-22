@@ -13,7 +13,9 @@ type PdfPath = '/mobile/library/pdf' | `/mobile/library/pdf?${string}`
 type PlanPath = '/mobile/plan' | `/mobile/plan?day=${string}` | '/mobile/plan/goals' | `/mobile/plan/goals/${number}`
   | '/mobile/plan/tasks' | `/mobile/plan/tasks/${number}` | `/mobile/plan/tasks/${number}/${'day' | 'complete'}`
   | `/mobile/plan/weeks/${string}/budget`;
-export type LibraryPath = PlanPath | '/contents' | '/contents/submissions' | `/contents?${string}` | `/contents/${number}`
+type ReviewPath = '/mobile/review' | `/mobile/review?${string}` | `/mobile/review/${number}`
+  | `/mobile/review/${number}/answers` | `/mobile/review/${number}/history?${string}`;
+export type LibraryPath = ReviewPath | PlanPath | '/contents' | '/contents/submissions' | `/contents?${string}` | `/contents/${number}`
   | `/contents/${number}/open` | `/contents/${number}/versioned` | `/contents/${number}/reminder` | '/me' | '/me/settings' | '/me/export' | '/stats' | '/auth/change-password' | '/auth/delete-account' | '/categories' | `/categories/${number}`
   | '/mobile/library/tags' | '/mobile/library/collections'
   | `/mobile/library/tags/${number}` | `/mobile/library/collections/${number}`

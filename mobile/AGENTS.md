@@ -51,3 +51,7 @@ The user accepted the local 9B result and authorized local 9C work on 2026-11-21
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
 
 On 2026-11-22 the user accepted standalone PDF creation on the S25 with 0.8.1 and authorized local block 10. Weekly progress counts completed tasks, with minutes reported separately. See ../docs/mobile_week_plan.md for the candidate, outstanding checks and rollout requirements.
+
+On 2026-11-22 the user accepted the weekly plan in APK 0.9.0 on the S25 and deferred block 11 AI analysis until after release. The user selected manual reinforcement as the next stage.
+
+The user explicitly selected local block 12 (manual cards and repetition) on 2026-11-22 after deferring AI until after release. See ../docs/mobile_reinforcement.md. Staging rollout remains a separate approval.

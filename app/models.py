@@ -465,3 +465,49 @@ class StudyTaskEvent(Base):
     kind: Mapped[str] = mapped_column(Text)
     day: Mapped[date] = mapped_column(Date)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReviewCard(Base):
+    __tablename__ = "review_cards"
+    __table_args__ = (
+        ForeignKeyConstraint(["content_id", "user_id"], ["contents.id", "contents.user_id"], ondelete="CASCADE"),
+        CheckConstraint("char_length(question) BETWEEN 1 AND 500", name="ck_review_question"),
+        CheckConstraint("char_length(answer) BETWEEN 1 AND 4000", name="ck_review_answer"),
+        CheckConstraint("char_length(takeaway) <= 4000", name="ck_review_takeaway"),
+        CheckConstraint("stage BETWEEN 0 AND 7", name="ck_review_stage"),
+        Index("ix_review_owner_due", "user_id", "due_on", "id"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    content_id: Mapped[int] = mapped_column(BigInteger)
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text)
+    takeaway: Mapped[str] = mapped_column(Text, server_default="")
+    due_on: Mapped[date] = mapped_column(Date)
+    paused: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    stage: Mapped[int] = mapped_column(Integer, server_default=text("0"))
+    version: Mapped[int] = mapped_column(BigInteger, server_default=text("1"))
+
+
+class ReviewCreation(Base):
+    __tablename__ = "review_creations"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    key: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    fingerprint: Mapped[str] = mapped_column(Text)
+    card_id: Mapped[int] = mapped_column(BigInteger)
+
+
+class ReviewAnswer(Base):
+    __tablename__ = "review_answers"
+    __table_args__ = (
+        UniqueConstraint("card_id", "key", name="uq_review_answer_key"),
+        CheckConstraint("rating IN ('again','remembered')", name="ck_review_rating"),
+        Index("ix_review_answer_card_id", "card_id", "id"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    card_id: Mapped[int] = mapped_column(ForeignKey("review_cards.id", ondelete="CASCADE"))
+    key: Mapped[UUID] = mapped_column(Uuid)
+    rating: Mapped[str] = mapped_column(Text)
+    previous_version: Mapped[int] = mapped_column(BigInteger)
+    due_on: Mapped[date] = mapped_column(Date)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

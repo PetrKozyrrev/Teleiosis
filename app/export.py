@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import (
-    Category, Content, ContentGroup, LibraryGroup, PdfObject, Reminder,
+    Category, Content, ContentGroup, LibraryGroup, PdfObject, Reminder, ReviewCard, ReviewAnswer,
     StudyGoal, StudyTask, StudyTaskEvent, User, UserActivity, WeekBudget,
 )
 
@@ -62,7 +62,20 @@ def build_export(db: Session, user: User, now: datetime | None = None) -> dict:
                          "occurred_at": _iso(e.occurred_at)} for e in events],
         }}
 
+    cards = db.scalars(select(ReviewCard).where(ReviewCard.user_id == user.id).order_by(ReviewCard.id)).all()
+    reviews = {}
+    if cards:
+        answers = db.scalars(select(ReviewAnswer).join(ReviewCard).where(ReviewCard.user_id == user.id)
+                             .order_by(ReviewAnswer.id))
+        reviews = {"review_cards": [
+            {"id": c.id, "content_id": c.content_id, "question": c.question, "answer": c.answer,
+             "takeaway": c.takeaway, "due_on": _iso(c.due_on), "paused": c.paused, "stage": c.stage}
+            for c in cards],
+            "review_answers": [{"card_id": a.card_id, "rating": a.rating, "due_on": _iso(a.due_on),
+                                "occurred_at": _iso(a.occurred_at)} for a in answers]}
+
     return {
+        **reviews,
         **plan,
         **({"pdf_attachments": [
             {"content_id": pdf.content_id, "name": pdf.name, "size_bytes": pdf.size_bytes, "sha256": pdf.digest}

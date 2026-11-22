@@ -15,7 +15,9 @@ def test_week_plan_roundtrip_preserves_pdf_and_session(migration_db):
     connection.execute(text("INSERT INTO auth_sessions (user_id,token_hash,client_type,expires_at) "
                             "VALUES (:id,:hash,'mobile',now()+interval '1 day')"), {"id": user_id, "hash": "e" * 64})
     migration.upgrade()
-    assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
+    assert compare_metadata(MigrationContext.configure(connection, opts={"include_object":
+        lambda obj, name, kind, reflected, compare: kind != "table" or name not in
+        ("review_cards", "review_answers", "review_creations")}), Base.metadata) == []
     migration.downgrade()
     assert "study_tasks" not in inspect(connection).get_table_names()
     migration.upgrade()

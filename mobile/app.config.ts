@@ -10,7 +10,7 @@ if (apiUrl && (apiUrl.protocol !== 'https:' || apiUrl.username || apiUrl.passwor
 const config: ExpoConfig = {
   name: 'Телеосис · тест',
   slug: 'teleiosis-mobile',
-  version: '0.9.0',
+  version: '0.10.0',
   scheme: 'teleiosis-dev',
   platforms: ['android', 'ios'],
   orientation: 'default',
@@ -24,7 +24,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'ru.teleiosis.mobile.dev',
-    versionCode: 16,
+    versionCode: 17,
     allowBackup: false,
     intentFilters: apiUrl ? [{ action: 'VIEW', autoVerify: true, category: ['BROWSABLE', 'DEFAULT'], data: [
       { scheme: 'https', host: apiUrl.hostname, path: '/app/reset.html' },

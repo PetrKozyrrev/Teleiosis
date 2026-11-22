@@ -110,3 +110,7 @@ Backup — deploy/backup.sh с TELEIOSIS_STAGING=1. Архив 0600 `/var/lib/te
 ## Подготовка подблока 9А до согласования — 20.11.2026
 
 После приёмки APK 0.5.3 подготовлены теги/коллекции и APK 0.6.0. Только чтением по SSH с ранее подтверждённым host key проверено: API `teleiosis:mobile-queue-20261118`, worker `teleiosis:mobile-auth-20261117`, БД на `l3b5c7d9e1f2`. API и миграции 9А ещё не развёрнуты. Мобильные алиасы `/mobile/library/*` проходят через действующий matcher `/mobile/*`; Caddy менять не требуется. План, проверенные артефакты, backup/restore и порядок согласованного обновления — [mobile_organization.md](mobile_organization.md#план-обновления-отдельно-согласованный-и-выполненный).
+
+## Ручные карточки на стенде, 22.11.2026
+
+API teleiosis:review-20261122, ревизия t0c2e4f6a8b9. Восстановление парной копии и публичный HTTPS проверены. Протокол и настройки до обновления в /var/backups/teleiosis-review12-u2avrrdw. [Подробности](mobile_reinforcement.md).

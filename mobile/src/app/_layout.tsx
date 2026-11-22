@@ -26,6 +26,7 @@ export default function RootLayout() {
       <Stack.Screen name="library/categories" options={{ title: 'Категории' }} />
       <Stack.Screen name="library/import" options={{ title: 'Импорт библиотеки' }} />
       <Stack.Screen name="library/pdf" options={{ title: 'PDF' }} />
+      <Stack.Screen name="review" options={{ title: 'Повторение' }} />
       <Stack.Screen name="plan" options={{ title: 'Недельный план' }} />
       <Stack.Screen name="queue" options={{ title: 'Очередь и входящие' }} />
       <Stack.Screen name="probe" options={{ title: 'Проверка устройства' }} />

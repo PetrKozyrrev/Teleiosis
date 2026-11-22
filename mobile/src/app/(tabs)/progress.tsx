@@ -28,6 +28,7 @@ function ProgressView({ request }: { request: Request }) {
     return () => { active = false; };
   }, [request, revision]));
   return <Page title="Прогресс">
+    <Action title="Повторить карточки" onPress={() => router.push('/review')} />
     <Action title="Недельный план" onPress={() => router.push('/plan')} />
     {stats ? <>
       <Card><Body>Материалов · {stats.total}</Body>
