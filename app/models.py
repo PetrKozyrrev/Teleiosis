@@ -413,3 +413,55 @@ class PushDelivery(Base):
     status: Mapped[str] = mapped_column(Text, server_default="pending")
     attempts: Mapped[int] = mapped_column(Integer, server_default="0")
     reason: Mapped[str | None] = mapped_column(Text)
+
+
+class StudyGoal(Base):
+    __tablename__ = "study_goals"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_study_goal_owner"),
+        Index("uq_study_goal_name", "user_id", text("lower(name)"), unique=True),
+        CheckConstraint("char_length(name) BETWEEN 1 AND 100", name="ck_study_goal_name"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text)
+
+
+class WeekBudget(Base):
+    __tablename__ = "week_budgets"
+    __table_args__ = (
+        CheckConstraint("minutes BETWEEN 1 AND 10080", name="ck_week_budget_minutes"),
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    week: Mapped[date] = mapped_column(Date, primary_key=True)
+    minutes: Mapped[int] = mapped_column(Integer)
+
+
+class StudyTask(Base):
+    __tablename__ = "study_tasks"
+    __table_args__ = (
+        ForeignKeyConstraint(["goal_id", "user_id"], ["study_goals.id", "study_goals.user_id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(["content_id", "user_id"], ["contents.id", "contents.user_id"], ondelete="CASCADE"),
+        UniqueConstraint("goal_id", "content_id", name="uq_study_task_material"),
+        CheckConstraint("minutes BETWEEN 1 AND 1440", name="ck_study_task_minutes"),
+        CheckConstraint("priority BETWEEN 1 AND 3", name="ck_study_task_priority"),
+        Index("ix_study_task_owner_day", "user_id", "day"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    goal_id: Mapped[int] = mapped_column(BigInteger)
+    content_id: Mapped[int] = mapped_column(BigInteger)
+    day: Mapped[date] = mapped_column(Date)
+    minutes: Mapped[int] = mapped_column(Integer)
+    priority: Mapped[int] = mapped_column(Integer)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+class StudyTaskEvent(Base):
+    __tablename__ = "study_task_events"
+    task_id: Mapped[int] = mapped_column(ForeignKey("study_tasks.id", ondelete="CASCADE"), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(Text)
+    day: Mapped[date] = mapped_column(Date)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

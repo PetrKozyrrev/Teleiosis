@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Category, Content, Reminder, User, UserActivity, LibraryGroup, ContentGroup, PdfObject
+from app.models import (
+    Category, Content, ContentGroup, LibraryGroup, PdfObject, Reminder,
+    StudyGoal, StudyTask, StudyTaskEvent, User, UserActivity, WeekBudget,
+)
 
 EXPORT_VERSION = 1
 
@@ -43,7 +46,24 @@ def build_export(db: Session, user: User, now: datetime | None = None) -> dict:
     pdfs = db.scalars(select(PdfObject).where(PdfObject.user_id == user.id, PdfObject.published.is_(True))
                      .order_by(PdfObject.content_id)).all()
 
+    goals = db.scalars(select(StudyGoal).where(StudyGoal.user_id == user.id).order_by(StudyGoal.id)).all()
+    budgets = db.scalars(select(WeekBudget).where(WeekBudget.user_id == user.id).order_by(WeekBudget.week)).all()
+    plan = {}
+    if goals or budgets:
+        tasks = db.scalars(select(StudyTask).where(StudyTask.user_id == user.id).order_by(StudyTask.id))
+        events = db.scalars(select(StudyTaskEvent).join(StudyTask).where(StudyTask.user_id == user.id)
+                            .order_by(StudyTaskEvent.task_id, StudyTaskEvent.version))
+        plan = {"study_plan": {
+            "goals": [{"id": g.id, "name": g.name} for g in goals],
+            "budgets": [{"week": _iso(b.week), "minutes": b.minutes} for b in budgets],
+            "tasks": [{"id": t.id, "goal_id": t.goal_id, "content_id": t.content_id, "day": _iso(t.day),
+                       "minutes": t.minutes, "priority": t.priority, "completed_at": _iso(t.completed_at)} for t in tasks],
+            "history": [{"task_id": e.task_id, "version": e.version, "kind": e.kind, "day": _iso(e.day),
+                         "occurred_at": _iso(e.occurred_at)} for e in events],
+        }}
+
     return {
+        **plan,
         **({"pdf_attachments": [
             {"content_id": pdf.content_id, "name": pdf.name, "size_bytes": pdf.size_bytes, "sha256": pdf.digest}
             for pdf in pdfs

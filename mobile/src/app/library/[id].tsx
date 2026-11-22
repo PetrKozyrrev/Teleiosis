@@ -243,6 +243,8 @@ function MaterialScreen({ id, request, owner, draftId }: { id: number | 'new'; r
         <Body>Открытий оригинала · {item.open_count}</Body>
       </>}
       {cachedAt !== undefined && <Notice>Загруженная карточка · {new Date(cachedAt).toLocaleString('ru-RU')}</Notice>}
+      <Action title="Добавить в недельный план" disabled={busy || cachedAt !== undefined}
+        onPress={() => router.push({ pathname: '/plan', params: { id: String(item.id) } })} />
       <Action title="Теги и коллекции материала" disabled={busy || cachedAt !== undefined}
         onPress={() => router.push({ pathname: '/library/organize', params: { id: String(id) } })} />
       {item.content_type === 'pdf' && <Action title="Открыть PDF" disabled={busy || cachedAt !== undefined}

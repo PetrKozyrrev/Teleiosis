@@ -9,7 +9,7 @@ from tests.test_email_auth_migration import migration_db  # noqa: F401
 
 def schema_before(connection, *tables):
     def include_object(_object, name, type_, _reflected, _compare_to):
-        return type_ != "table" or name not in tables
+        return type_ != "table" or name not in (*tables, "study_goals", "week_budgets", "study_tasks", "study_task_events")
     return MigrationContext.configure(connection, opts={"include_object": include_object})
 
 

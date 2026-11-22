@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Action, Body, Card, Page } from '../../components/ui';
 import { LibraryAccess, Loading, Notice } from '../../library/ui';
 import { errorMessage, statuses, type Request } from '../../library/model';
@@ -28,6 +28,7 @@ function ProgressView({ request }: { request: Request }) {
     return () => { active = false; };
   }, [request, revision]));
   return <Page title="Прогресс">
+    <Action title="Недельный план" onPress={() => router.push('/plan')} />
     {stats ? <>
       <Card><Body>Материалов · {stats.total}</Body>
         {Object.entries(statuses).map(([key, label]) => <Body key={key}>{label} · {stats.by_status[key as keyof typeof statuses]}</Body>)}

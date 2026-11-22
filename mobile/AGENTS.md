@@ -49,3 +49,5 @@ The user accepted the local 9B result and authorized local 9C work on 2026-11-21
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+On 2026-11-22 the user accepted standalone PDF creation on the S25 with 0.8.1 and authorized local block 10. Weekly progress counts completed tasks, with minutes reported separately. See ../docs/mobile_week_plan.md for the candidate, outstanding checks and rollout requirements.

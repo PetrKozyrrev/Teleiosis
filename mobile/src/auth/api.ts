@@ -10,7 +10,10 @@ export type IssuedSession = Session & { token: string; token_type: 'Bearer' };
 type ImportPath = '/mobile/library/imports/preview' | '/mobile/library/imports/apply';
 type PdfPath = '/mobile/library/pdf' | `/mobile/library/pdf?${string}`
   | `/mobile/library/contents/${number}/pdf` | `/mobile/library/contents/${number}/pdf/download`;
-export type LibraryPath = '/contents' | '/contents/submissions' | `/contents?${string}` | `/contents/${number}`
+type PlanPath = '/mobile/plan' | `/mobile/plan?day=${string}` | '/mobile/plan/goals' | `/mobile/plan/goals/${number}`
+  | '/mobile/plan/tasks' | `/mobile/plan/tasks/${number}` | `/mobile/plan/tasks/${number}/${'day' | 'complete'}`
+  | `/mobile/plan/weeks/${string}/budget`;
+export type LibraryPath = PlanPath | '/contents' | '/contents/submissions' | `/contents?${string}` | `/contents/${number}`
   | `/contents/${number}/open` | `/contents/${number}/versioned` | `/contents/${number}/reminder` | '/me' | '/me/settings' | '/me/export' | '/stats' | '/auth/change-password' | '/auth/delete-account' | '/categories' | `/categories/${number}`
   | '/mobile/library/tags' | '/mobile/library/collections'
   | `/mobile/library/tags/${number}` | `/mobile/library/collections/${number}`
@@ -102,9 +105,10 @@ export class AuthApi {
         let location: (string | number)[] = [];
         if ((importFile && [409, 413, 415, 422].includes(response.status))
           || (pdf && !basicChallenge)
-          || (response.status === 409 && path.startsWith('/mobile/library/'))) {
+          || (response.status === 409 && (path.startsWith('/mobile/library/') || path.startsWith('/mobile/plan/')))) {
           const result = await response.json().catch(() => null);
           if (['group_name_exists', 'group_limit_reached'].includes(result?.detail?.code)) code = result.detail.code;
+          if (path.startsWith('/mobile/plan/') && ['already_planned', 'goal_limit', 'task_completed'].includes(result?.detail?.code)) code = result.detail.code;
           if (pdf && /^(pdf_[a-z_]+|invalid_pdf(?:_name|_title)?|unsafe_pdf|unsupported_pdf)$/.test(result?.detail?.code)) {
             code = result.detail.code;
           }
