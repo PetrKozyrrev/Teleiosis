@@ -57,6 +57,17 @@ describe('native credential transport', () => {
     const api = new AuthApi('https://example.com', async () => null, transport);
     await expect(api.signIn('login', profile.email, 'password')).rejects.toMatchObject({ status: 502 });
   });
+  test('registers on the older server when validation rejects only the optional name', async () => {
+    const transport = jest.fn<typeof nativeFetch>().mockResolvedValueOnce(response(422, {
+      detail: [{ type: 'extra_forbidden', loc: ['body', 'display_name'] }],
+    })).mockResolvedValueOnce(response(201, issued));
+    const api = new AuthApi('https://example.com', async () => null, transport);
+    await expect(api.signIn('register', profile.email, 'synthetic-password', true, 'Анна')).resolves.toMatchObject({ token: issued.token });
+    const bodies = transport.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies[0]).toMatchObject({ display_name: 'Анна', consent: true });
+    expect(bodies[1]).toMatchObject({ consent: true, email: profile.email });
+    expect(bodies[1]).not.toHaveProperty('display_name');
+  });
   test('does not retry passwords on network, server errors or rate limit', async () => {
     const transport = jest.fn<typeof nativeFetch>().mockResolvedValue(response(429, {}, { 'Retry-After': '60' }));
     const api = new AuthApi('https://example.com', async () => null, transport);

@@ -1,12 +1,30 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from fastapi.responses import JSONResponse
 
 from app.deps import CurrentUser, DbSession
 from app.export import build_export
 from app.ratelimit import EXPORT_USER, check_limits, make_key, record
-from app.schemas import SettingsUpdate, UserOut
+from app.schemas import MobileProfileOut, MobileProfileUpdate, SettingsUpdate, UserOut
 
 router = APIRouter(tags=["users"])
+
+
+@router.get("/mobile/profile", response_model=MobileProfileOut)
+def read_profile(response: Response, user: CurrentUser):
+    response.headers["Cache-Control"] = "no-store"
+    return user
+
+
+@router.patch("/mobile/profile", response_model=MobileProfileOut)
+def update_profile(data: MobileProfileUpdate, response: Response, db: DbSession, user: CurrentUser):
+    response.headers["Cache-Control"] = "no-store"
+    if "display_name" in data.model_fields_set:
+        user.display_name = data.display_name
+    if data.weekly_reading_goal is not None:
+        user.weekly_reading_goal = data.weekly_reading_goal
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.get("/me", response_model=UserOut)

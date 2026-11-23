@@ -14,7 +14,7 @@ const stateLabel: Record<Job['state'], string> = {
 };
 const reasonLabel: Record<string, string> = {
   network: 'Приложение повторит отправку при подключении.', rate: 'Сервер попросил подождать перед повтором.',
-  category: 'Категория недоступна. Выберите другую.', invalid: 'Проверьте ссылку или текст.',
+  category: 'Категория недоступна. Выберите другую.', collection: 'Коллекция недоступна. Измените выбор.', invalid: 'Проверьте ссылку или текст.',
   gateway: 'Проверьте доступ к тестовому стенду.', unavailable: 'Сервер пока не принимает очередь.',
   duplicate: 'Эта ссылка уже есть в библиотеке.', deleted: 'Материал был удалён на сервере.',
   expired: 'Срок автоматического повтора истёк. Проверьте библиотеку перед повторным добавлением.',
@@ -72,7 +72,7 @@ export default function Queue() {
       const draft = JSON.parse(job.payload) as Draft;
       const invalid = (draft.note?.length ?? 0) > 10_000 || (draft.url?.length ?? 0) > 2_048;
       const editable = (job.state === 'draft' || job.state === 'pending') && job.attempts === 0 ||
-        job.state === 'needs_action' && ['invalid', 'category'].includes(job.reason ?? '');
+        job.state === 'needs_action' && ['invalid', 'category', 'collection'].includes(job.reason ?? '');
       return <Card key={job.id}>
         <Text style={styles.heading}>{stateLabel[job.state]}</Text>
         {(draft.title || draft.url || draft.note) && <Text numberOfLines={4} style={styles.body}>{draft.title || draft.url || draft.note}</Text>}

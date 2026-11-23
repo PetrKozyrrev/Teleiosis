@@ -9,7 +9,7 @@ from app.cookies import cookie_name
 from app.deps import CurrentUser, DbSession
 from app.models import AuthSession, User
 from app.routers import auth, email_verification, password_reset
-from app.schemas import EmailVerificationConfirm, LoginRequest, PasswordResetConfirm, PasswordResetRequest, RegisterRequest, UserOut
+from app.schemas import EmailVerificationConfirm, LoginRequest, MobileRegisterRequest, PasswordResetConfirm, PasswordResetRequest, UserOut
 from app.sessions import SESSION_ABSOLUTE, create_session, delete_session, hash_token
 
 
@@ -52,9 +52,9 @@ def start_mobile_session(db: DbSession, user: User) -> MobileLoginOut:
 
 
 @router.post("/register", response_model=MobileLoginOut, status_code=201, dependencies=[Depends(anonymous_native_request)])
-def register(data: RegisterRequest, request: Request, response: Response, db: DbSession):
+def register(data: MobileRegisterRequest, request: Request, response: Response, db: DbSession):
     response.headers["Cache-Control"] = "no-store"
-    return start_mobile_session(db, auth.register_user(data, request, db))
+    return start_mobile_session(db, auth.register_user(data, request, db, display_name=data.display_name))
 
 
 @router.post("/login", response_model=MobileLoginOut, dependencies=[Depends(anonymous_native_request)])

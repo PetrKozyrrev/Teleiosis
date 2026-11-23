@@ -19,6 +19,8 @@ from app.timezones import is_valid_timezone
 from app.urls import clean_url
 
 MAX_BIGINT = 9_223_372_036_854_775_807
+DisplayName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+GroupIds = Annotated[list[Annotated[int, Field(strict=True, gt=0, le=MAX_BIGINT)]], Field(max_length=20)]
 
 # Время напоминания: ровно ЧЧ:ММ, без секунд и без часового пояса
 TIME_RE = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
@@ -76,6 +78,24 @@ class SettingsUpdate(BaseModel):
         for name in self.model_fields_set:
             if getattr(self, name) is None:
                 raise ValueError(f"{name} cannot be null")
+        return self
+
+
+class MobileProfileOut(UserOut):
+    display_name: str | None
+    weekly_reading_goal: int
+
+
+class MobileProfileUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: DisplayName | None = None
+    weekly_reading_goal: Annotated[int, Field(strict=True, ge=1, le=100)] | None = None
+
+    @model_validator(mode="after")
+    def check_changes(self):
+        if not self.model_fields_set or ("weekly_reading_goal" in self.model_fields_set and self.weekly_reading_goal is None):
+            raise ValueError("Provide valid profile changes")
         return self
 
 
@@ -148,6 +168,17 @@ class ContentPage(BaseModel):
     offset: int
 
 
+class MobileContentCreate(ContentCreate):
+    collection_ids: GroupIds = Field(default_factory=list)
+
+    @field_validator("collection_ids")
+    @classmethod
+    def unique_collections(cls, value):
+        if len(set(value)) != len(value):
+            raise ValueError("Collections must be unique")
+        return sorted(value)
+
+
 ContentStatus = Literal["unseen", "planned", "studied", "irrelevant"]
 ContentSource = Literal["youtube", "telegram", "web", "other"]
 SortOrder = Literal["newest", "oldest", "title"]
@@ -197,6 +228,40 @@ class RegisterRequest(BaseModel):
     @classmethod
     def known_timezone_or_none(cls, value):
         return value if is_valid_timezone(value) else None
+
+
+class MobileRegisterRequest(RegisterRequest):
+    display_name: DisplayName | None = None
+
+
+class MobileContentUpdate(ContentUpdate):
+    url: str | None = None
+    collection_ids: GroupIds | None = None
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value):
+        if value is None:
+            raise ValueError("Link cannot be null")
+        return clean_url(value)
+
+    @field_validator("collection_ids")
+    @classmethod
+    def unique_collections(cls, value):
+        if value is None:
+            raise ValueError("Collections cannot be null")
+        return MobileContentCreate.unique_collections(value)
+
+
+class LinkPreviewInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value):
+        return clean_url(value)
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")

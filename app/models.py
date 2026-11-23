@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    String,
     JSON,
     Identity,
     Text,
@@ -32,6 +33,7 @@ class User(Base):
     __table_args__ = (
         CheckConstraint("email = lower(email)", name="ck_users_email_lower"),
         CheckConstraint("char_length(email) <= 254", name="ck_users_email_len"),
+        CheckConstraint("weekly_reading_goal BETWEEN 1 AND 100", name="ck_users_weekly_reading_goal"),
         CheckConstraint(
             "(consent_at IS NULL) = (consent_version IS NULL)",
             name="ck_users_consent_pair",
@@ -43,6 +45,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(Text, unique=True)
     password_hash: Mapped[str | None] = mapped_column(Text)
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    display_name: Mapped[str | None] = mapped_column(String(80))
+    weekly_reading_goal: Mapped[int] = mapped_column(Integer, server_default=text("5"))
     # Согласие на обработку персональных данных: когда и какая версия текста
     consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     consent_version: Mapped[str | None] = mapped_column(Text)
@@ -102,6 +106,7 @@ class Content(Base):
         CheckConstraint("open_count >= 0", name="ck_contents_open_count"),
         Index("ix_contents_user_created", "user_id", text("created_at DESC")),
         Index("ix_contents_user_status", "user_id", "status"),
+        Index("ix_contents_user_studied", "user_id", "studied_at"),
         Index("ix_contents_user_category", "user_id", "category_id"),
     )
 
@@ -142,8 +147,8 @@ class Content(Base):
 event.listen(Content.__table__, "after_create", DDL("""
 CREATE OR REPLACE FUNCTION increment_content_version() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF ROW(NEW.title, NEW.note, NEW.category_id, NEW.status)
-        IS DISTINCT FROM ROW(OLD.title, OLD.note, OLD.category_id, OLD.status) THEN
+    IF ROW(NEW.title, NEW.note, NEW.category_id, NEW.status, NEW.url)
+        IS DISTINCT FROM ROW(OLD.title, OLD.note, OLD.category_id, OLD.status, OLD.url) THEN
         NEW.version := OLD.version + 1;
     END IF;
     RETURN NEW;

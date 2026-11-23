@@ -1,19 +1,23 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState, type ComponentRef } from 'react';
-import { AppState, Pressable, Text, type ScrollView } from 'react-native';
+import { Alert, AppState, Keyboard, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View,
+  type GestureResponderEvent, type ScrollView } from 'react-native';
 import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
 import { ApiError } from '../../auth/api';
 import {
-  errorMessage, initialFilters, listPath, maxOffset, pageSize, searchScopes, sorts, sources, statuses,
-  type Category, type Filters, type MaterialPage, type Request,
+  errorMessage, initialFilters, linkDomain, listPath, maxOffset, pageSize, searchScopes, sorts, sources, statuses,
+  type Category, type Filters, type Material, type MaterialPage, type Request, type Status,
 } from '../../library/model';
 import { Choice, LibraryAccess, Loading, Notice, optionsOf } from '../../library/ui';
-import { cachedCategories, cachedList, readOnline } from '../../offline/cache';
+import { cachedCategories, cachedList, forgetMaterial, readOnline, remember } from '../../offline/cache';
 import { groupPath, organizationError, type Group } from '../../library/organization';
-import { subscribe } from '../../offline/store';
+import { generation, subscribe } from '../../offline/store';
+import { MaterialThumbnail } from '../../library/MaterialThumbnail';
+import { colors } from '../../theme';
 
 export default function Library() {
-  return <LibraryAccess>{(request, owner) => <LibraryList request={request} owner={owner} />}</LibraryAccess>;
+  return <LibraryAccess brand>{(request, owner) => <LibraryList request={request} owner={owner} />}</LibraryAccess>;
 }
 
 function LibraryList({ request, owner }: { request: Request; owner: string | null }) {
@@ -23,6 +27,10 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryError, setCategoryError] = useState<{ revision: number; message: string } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [menu, setMenu] = useState<{ id: number; kind: 'item' | 'status'; x: number; y: number }>();
+  const window = useWindowDimensions();
+  const [mutationError, setMutationError] = useState('');
+  const mutation = useRef(false);
   const [groups, setGroups] = useState<{ tags: Group[]; collections: Group[] }>({ tags: [], collections: [] });
   const [groupError, setGroupError] = useState('');
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -31,7 +39,7 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
   const [result, setResult] = useState<{ path: string; revision: number; page?: MaterialPage; error?: string; cachedAt?: number }>();
   const current = result?.path === path && result.revision === revision ? result : undefined;
   const page = current?.page;
-  const filtered = Boolean(filters.q.trim() || filters.status || filters.source || filters.category || filters.tag || filters.collection);
+  const filtered = Boolean(filters.q.trim() || filters.status || filters.source || filters.contentType || filters.category || filters.tag || filters.collection);
 
   useFocusEffect(useCallback(() => {
     const refresh = () => setRevision(value => value + 1);
@@ -85,25 +93,84 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
   }, [showFilters, request, revision]));
 
   function change(next: Partial<Filters>) {
+    setMenu(undefined);
     setResult(undefined);
     setFilters(currentFilters => ({ ...currentFilters, ...next }));
     setOffset(0);
   }
 
   function goToPage(nextOffset: number) {
+    setMenu(undefined);
     setResult(undefined);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
     setOffset(nextOffset);
   }
 
-  return <Page title="Библиотека" scrollRef={scrollRef}>
-    <Action title="Добавить материал" onPress={() => router.push('/library/new')} />
-    <Action title="Управлять категориями" onPress={() => router.push('/library/categories')} />
-    <Action title="Теги и коллекции" onPress={() => router.push('/library/organization')} />
-    <Action title="Очередь и входящие" onPress={() => router.push('/queue')} />
-    <Field label={filters.searchIn ? 'Поисковый запрос' : 'Поиск по названию'}
-      value={filters.q} onChangeText={q => change({ q })} maxLength={100} returnKeyType="search" />
-    <Action title={showFilters ? 'Скрыть фильтры' : 'Фильтры и сортировка'} onPress={() => setShowFilters(!showFilters)} />
+  async function runMutation(task: () => Promise<void>) {
+    if (mutation.current) return;
+    mutation.current = true;
+    setMenu(undefined);
+    setMutationError('');
+    try { await task(); }
+    catch (error) {
+      setMutationError(error instanceof ApiError && error.status === 412
+        ? 'Материал уже изменился. Список обновлён.' : errorMessage(error));
+    } finally {
+      setRevision(value => value + 1);
+      mutation.current = false;
+    }
+  }
+
+  function changeStatus(item: Material, status: Status) {
+    if (!item.version || item.status === status) { setMenu(undefined); return; }
+    const expected = owner ? generation(owner) : undefined;
+    void runMutation(async () => {
+      const updated = await request(`/contents/${item.id}/versioned`, 'PATCH', { status }, { version: item.version });
+      if (owner) await remember(owner, `/contents/${item.id}`, updated, expected).catch(() => {});
+    });
+  }
+
+  function remove(item: Material) {
+    setMenu(undefined);
+    Alert.alert('Удалить материал?', item.title, [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Удалить', style: 'destructive', onPress: () => void runMutation(async () => {
+        try { await request(`/contents/${item.id}`, 'DELETE'); }
+        catch (error) { if (!(error instanceof ApiError && error.status === 404 && !error.gateway)) throw error; }
+        if (owner) await forgetMaterial(owner, item.id).catch(() => {});
+      }) },
+    ]);
+  }
+
+  const chips = [
+    { label: 'Все', selected: !filters.status && !filters.contentType, values: { status: '', contentType: '' } },
+    { label: 'К чтению', selected: filters.status === 'unseen' && !filters.contentType, values: { status: 'unseen', contentType: '' } },
+    { label: 'Видео', selected: filters.contentType === 'video', values: { status: '', contentType: 'video' } },
+    { label: 'Статьи', selected: filters.contentType === 'article', values: { status: '', contentType: 'article' } },
+  ] as const;
+  const online = current?.cachedAt === undefined;
+  const menuItem = online ? page?.items.find(item => item.id === menu?.id) : undefined;
+  const menuWidth = Math.min(205, window.width - 24);
+  function openMenu(item: Material, kind: 'item' | 'status', event: GestureResponderEvent) {
+    Keyboard.dismiss();
+    setMenu({ id: item.id, kind, x: event.nativeEvent?.pageX ?? 12, y: event.nativeEvent?.pageY ?? 12 });
+  }
+  return <Page title="Библиотека" subtitle="Меньше листать. Больше читать." brand scrollRef={scrollRef}>
+    <View style={libraryStyles.search}>
+      <View style={libraryStyles.grow}><Field hideLabel label={filters.searchIn ? 'Поисковый запрос' : 'Поиск по названию'}
+        placeholder="Поиск по библиотеке" leading={<Ionicons name="search-outline" size={19} color={colors.muted} />}
+        value={filters.q} onChangeText={q => change({ q })} maxLength={100} returnKeyType="search" /></View>
+      <Pressable accessibilityRole="button" accessibilityLabel={showFilters ? 'Скрыть фильтры' : 'Фильтры и сортировка'}
+        accessibilityState={{ expanded: showFilters }} onPress={() => { setMenu(undefined); setShowFilters(!showFilters); }} style={libraryStyles.iconButton}>
+        <Ionicons name="options-outline" color={colors.text} size={23} />
+      </Pressable>
+    </View>
+    <View style={libraryStyles.chips}>
+      {chips.map(chip => <Pressable key={chip.label} accessibilityRole="button" accessibilityState={{ selected: chip.selected }}
+        style={[libraryStyles.chip, chip.selected && libraryStyles.activeChip]} onPress={() => change(chip.values)}>
+        <Text style={[styles.label, chip.selected && libraryStyles.activeText]}>{chip.label}</Text>
+      </Pressable>)}
+    </View>
     {showFilters && <Card>
       <Choice label="Искать в" value={filters.searchIn ?? ''} onChange={searchIn => change({ searchIn })}
         options={optionsOf(searchScopes)} />
@@ -120,25 +187,100 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
         options={[{ value: '', label: 'Все коллекции' }, ...groups.collections.map(collection => ({ value: collection.id, label: collection.name }))]} />
       <Body>Фильтры по тегам и коллекциям работают при подключении к серверу.</Body>
       {groupError && <Notice>{groupError}</Notice>}
-      <Choice label="Сортировка" value={filters.sort} onChange={sort => change({ sort })} options={optionsOf(sorts)} />
     </Card>}
     {(filtered || filters.searchIn || filters.sort !== initialFilters.sort) &&
       <Action title="Сбросить поиск и фильтры" onPress={() => change(initialFilters)} />}
     {categoryError?.revision === revision && <Notice>Категории не обновились. {categoryError.message}</Notice>}
-    <Action title="Обновить" onPress={() => setRevision(value => value + 1)} />
     {!current && <Loading />}
     {current?.error && <Notice>{current.error}</Notice>}
+    {mutationError && <Notice>{mutationError}</Notice>}
     {current?.cachedAt !== undefined && <Notice>Без подключения. Поиск среди загруженного · {new Date(current.cachedAt).toLocaleString('ru-RU')}</Notice>}
     {page && (page.items.length ? <>
-      <Notice>{offset + 1}–{offset + page.items.length} из {page.total}</Notice>
-      {page.items.map(item => <Pressable key={item.id} accessibilityRole="button" style={styles.card}
-        onPress={() => router.push({ pathname: '/library/[id]', params: { id: String(item.id) } })}>
-        <Text style={styles.heading} numberOfLines={3}>{item.title}</Text>
-        <Body>{[item.content_type === 'pdf' ? 'PDF' : sources[item.source], statuses[item.status], categories.find(category => category.id === item.category_id)?.name].filter(Boolean).join(' · ')}</Body>
-      </Pressable>)}
+      <View style={libraryStyles.counterRow}>
+        <Text style={styles.label}>Сохранено: {page.total}</Text>
+        <Choice label="Сортировка" value={filters.sort} onChange={sort => change({ sort })} options={optionsOf(sorts)} />
+      </View>
+      {page.items.map(item => {
+        const currentMenu = menu?.id === item.id ? menu.kind : undefined;
+        const detail = { pathname: '/library/[id]' as const, params: { id: String(item.id) } };
+        return <View key={item.id} style={libraryStyles.material}>
+          <View style={libraryStyles.materialContent}>
+            <Pressable accessible={false} importantForAccessibility="no"
+              onPress={() => { setMenu(undefined); router.push(detail); }}>
+              <MaterialThumbnail imageUrl={item.image_url} kind={item.content_type} />
+            </Pressable>
+            <View style={libraryStyles.grow}>
+              <Pressable accessibilityRole="button" onPress={() => { setMenu(undefined); router.push(detail); }}>
+                <Text style={styles.label} numberOfLines={3}>{item.title}</Text>
+                <Body>{linkDomain(item.url) ?? (item.content_type === 'pdf' ? 'PDF' : sources[item.source])}</Body>
+              </Pressable>
+              <View style={libraryStyles.statusRow}>
+                <Pressable accessibilityRole="button" accessibilityLabel={`Статус: ${statuses[item.status]}`}
+                  disabled={!online || !item.version} accessibilityState={{ disabled: !online || !item.version, expanded: currentMenu === 'status' }}
+                  onPress={event => openMenu(item, 'status', event)} style={[libraryStyles.status, libraryStyles[item.status]]}>
+                  <Text style={[libraryStyles.statusText, item.status === 'unseen' && libraryStyles.unseenText]}>{statuses[item.status]}</Text>
+                </Pressable>
+                {item.category_id !== null && <Text style={[styles.body, libraryStyles.grow]} numberOfLines={1}>
+                  {categories.find(category => category.id === item.category_id)?.name}
+                </Text>}
+              </View>
+            </View>
+          </View>
+          {online && <Pressable accessibilityRole="button" accessibilityLabel={`Действия: ${item.title}`}
+            accessibilityState={{ expanded: currentMenu === 'item' }} style={libraryStyles.more} onPress={event => openMenu(item, 'item', event)}>
+            <Ionicons name="ellipsis-horizontal" color={colors.muted} size={20} />
+          </Pressable>}
+        </View>;
+      })}
       {offset > 0 && <Action title="Предыдущая страница" onPress={() => goToPage(offset - pageSize)} />}
       {offset + page.limit < page.total && offset + pageSize <= maxOffset &&
         <Action title="Следующая страница" onPress={() => goToPage(offset + pageSize)} />}
     </> : <Body>{filtered ? 'По этому запросу ничего не найдено.' : 'Библиотека пока пуста.'}</Body>)}
+    <View style={libraryStyles.chips}>
+      <Action variant="text" title="Управлять категориями" onPress={() => router.push('/library/categories')} />
+      <Action variant="text" title="Теги и коллекции" onPress={() => router.push('/library/organization')} />
+      <Action variant="text" title="Очередь и входящие" onPress={() => router.push('/queue')} />
+      <Action variant="text" title="Обновить" onPress={() => setRevision(value => value + 1)} />
+    </View>
+    {menu && menuItem && <Modal transparent statusBarTranslucent navigationBarTranslucent onRequestClose={() => setMenu(undefined)}>
+      <View style={libraryStyles.menuOverlay} accessibilityViewIsModal>
+        <Pressable accessibilityRole="button" accessibilityLabel="Закрыть меню" style={StyleSheet.absoluteFill} onPress={() => setMenu(undefined)} />
+        <View style={[libraryStyles.menu, { width: menuWidth, left: Math.max(12, Math.min(menu.x - 32, window.width - menuWidth - 12)),
+          top: Math.max(12, Math.min(menu.y + 12, window.height - (menu.kind === 'item' ? 125 : 245))) }]}>
+          {menu.kind === 'item' ? <>
+            <Action variant="text" title="Редактировать" onPress={() => {
+              setMenu(undefined);
+              router.push({ pathname: '/library/[id]', params: { id: String(menuItem.id), edit: '1' } });
+            }} />
+            <Action variant="danger" title="Удалить" onPress={() => remove(menuItem)} />
+          </> : optionsOf(statuses).map(({ value, label }) =>
+            <Action key={value} variant="text" title={label} onPress={() => changeStatus(menuItem, value)} />)}
+        </View>
+      </View>
+    </Modal>}
   </Page>;
 }
+
+const libraryStyles = StyleSheet.create({
+  grow: { flex: 1 },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconButton: { width: 48, height: 48, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 22, backgroundColor: colors.surface },
+  activeChip: { backgroundColor: colors.text },
+  activeText: { color: colors.surface },
+  counterRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  material: { position: 'relative', borderRadius: 16, backgroundColor: colors.surface, padding: 12, gap: 3 },
+  materialContent: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 34 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
+  status: { minHeight: 32, borderRadius: 8, paddingHorizontal: 8, justifyContent: 'center' },
+  unseen: { backgroundColor: colors.tint },
+  planned: { backgroundColor: colors.coolTint },
+  studied: { backgroundColor: colors.greenTint },
+  irrelevant: { backgroundColor: colors.background },
+  statusText: { ...styles.label, fontSize: 12 },
+  unseenText: { color: colors.primary },
+  more: { position: 'absolute', right: 4, top: 3, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  menuOverlay: { flex: 1 },
+  menu: { position: 'absolute', backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 10, elevation: 5, boxShadow: '0px 3px 12px #21212425' },
+});

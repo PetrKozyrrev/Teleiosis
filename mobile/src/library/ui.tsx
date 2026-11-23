@@ -47,7 +47,9 @@ export function optionsOf<T extends string>(labels: Record<T, string>) {
   return (Object.keys(labels) as T[]).map(value => ({ value, label: labels[value] }));
 }
 
-export function LibraryAccess({ children }: { children: (request: Request, owner: string | null) => React.ReactNode }) {
+export function LibraryAccess({ children, title = 'Библиотека', brand }: {
+  children: (request: Request, owner: string | null) => React.ReactNode; title?: string; brand?: boolean;
+}) {
   const { controller, state } = useAuth();
   const session = state.session;
   const phase = state.phase;
@@ -61,7 +63,7 @@ export function LibraryAccess({ children }: { children: (request: Request, owner
     };
   }, [controller, id, phase, session]);
   if (id) return <View key={id} style={{ flex: 1 }}>{children(request, API_ORIGIN ? ownerKey(API_ORIGIN, id) : null)}</View>;
-  return <Page title="Библиотека"><Card>
+  return <Page title={title} brand={brand}><Card>
     {state.phase === 'loading' ? <Loading /> : <>
       {state.message && <Notice>{state.message}</Notice>}
       {state.phase === 'signedOut' ? <>

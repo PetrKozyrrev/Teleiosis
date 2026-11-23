@@ -3,7 +3,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
 import { nativeStorage } from './native';
 
-export type Draft = { url?: string; note?: string; title?: string; category_id?: number | null };
+export type Draft = { url?: string; note?: string; title?: string; category_id?: number | null; collection_ids?: number[] };
 export type JobState = 'draft' | 'pending' | 'sending' | 'retry_wait' | 'needs_auth' | 'needs_action' | 'synced';
 export type Job = {
   id: string; owner: string; payload: string; state: JobState; attempts: number;
@@ -75,7 +75,7 @@ export async function enqueue(owner: string, payload: Draft, edit?: string) {
           state = ?, attempts = 0, tried_at = NULL, next_at = 0, reason = NULL
         WHERE owner = ? AND id = ? AND (
           (state IN ('draft', 'pending') AND attempts = 0) OR
-          (state = 'needs_action' AND reason IN ('invalid', 'category'))
+          (state = 'needs_action' AND reason IN ('invalid', 'category', 'collection'))
         )
       `, id, serialized, owner ? 'pending' : 'draft', owner, edit);
       if (!result.changes) throw new Error('Этот черновик уже отправляется. Проверьте очередь.');

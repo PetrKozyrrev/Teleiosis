@@ -1,14 +1,17 @@
 import { ApiError } from '../auth/api';
 import type { Material, Request } from '../library/model';
-import type { Job, JobState } from './store';
+import type { Draft, Job, JobState } from './store';
 
 export const maxRetryAge = 14 * 24 * 60 * 60 * 1000;
 type Outcome = { state: JobState; reason?: string; nextAt?: number; serverId?: number; material?: Material };
 
 export async function dispatch(job: Job, ownerId: number, request: Request, now: number, jitter = Math.random): Promise<Outcome> {
   if (job.tried_at !== null && now - job.tried_at >= maxRetryAge) return { state: 'needs_action', reason: 'expired' };
+  let withCollections = false;
   try {
-    const result = await request('/contents/submissions', 'POST', JSON.parse(job.payload), {
+    const payload = JSON.parse(job.payload) as Draft;
+    withCollections = Boolean(payload.collection_ids?.length);
+    const result = await request(withCollections ? '/mobile/library/submissions' : '/contents/submissions', 'POST', payload, {
       ownerId, idempotencyKey: job.id,
     }) as Material;
     if (!Number.isSafeInteger(result?.id) || result.id <= 0) throw new ApiError(502);
@@ -20,7 +23,10 @@ export async function dispatch(job: Job, ownerId: number, request: Request, now:
     if (error.status === 409 && error.existingId) return { state: 'needs_action', reason: 'duplicate', serverId: error.existingId };
     if (error.status === 409) return { state: 'needs_action', reason: 'conflict' };
     if (error.status === 410) return { state: 'needs_action', reason: 'deleted' };
-    if (error.status === 404) return { state: 'needs_action', reason: 'category' };
+    if (error.status === 404) {
+      if (error.code === 'collection_missing') return { state: 'needs_action', reason: 'collection' };
+      return { state: 'needs_action', reason: withCollections && error.code !== 'category_missing' ? 'unavailable' : 'category' };
+    }
     if (error.status === 405) return { state: 'needs_action', reason: 'unavailable' };
     if (error.status === 422) return { state: 'needs_action', reason: 'invalid' };
     if (error.status === 0 || error.status === 429 || error.status >= 500) {

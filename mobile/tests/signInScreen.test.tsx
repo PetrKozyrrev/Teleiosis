@@ -5,7 +5,7 @@ import type { AuthController } from '../src/auth/controller';
 import SignIn from '../src/app/sign-in';
 
 jest.mock('../src/auth/context', () => ({ useAuth: jest.fn() }));
-jest.mock('../src/auth/config', () => ({ API_ORIGIN: 'https://example.com', STAGING_GATE: false }));
+jest.mock('../src/auth/config', () => ({ ...jest.requireActual<Record<string, unknown>>('../src/auth/config'), API_ORIGIN: 'https://example.com', STAGING_GATE: false }));
 jest.mock('expo-router', () => ({ router: { replace: jest.fn(), push: jest.fn() }, Redirect: () => null }));
 const signIn = jest.fn<AuthController['signIn']>();
 beforeEach(() => {

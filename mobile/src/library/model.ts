@@ -19,6 +19,7 @@ export type Material = {
   content_type?: string;
   title: string;
   url: string | null;
+  image_url?: string | null;
   description: string | null;
   note: string | null;
   category_id: number | null;
@@ -35,20 +36,22 @@ export type Filters = {
   searchIn?: keyof typeof searchScopes;
   status: Status | '';
   source: Source | '';
+  contentType?: 'article' | 'video' | '';
   category: number | 'none' | '';
   sort: keyof typeof sorts;
   tag?: number | '';
   collection?: number | '';
 };
-export const initialFilters: Filters = { q: '', searchIn: '', status: '', source: '', category: '', sort: 'newest', tag: '', collection: '' };
+export const initialFilters: Filters = { q: '', searchIn: '', status: '', source: '', contentType: '', category: '', sort: 'newest', tag: '', collection: '' };
 export const pageSize = 20;
 export const maxOffset = 1_000_000;
 
-export function listPath({ q, searchIn, status, source, category, sort, tag, collection }: Filters, offset: number): LibraryPath {
+export function listPath({ q, searchIn, status, source, contentType, category, sort, tag, collection }: Filters, offset: number): LibraryPath {
   const query = new URLSearchParams({ sort, limit: String(pageSize), offset: String(offset) });
   if (q.trim()) query.set('q', q.trim());
   if (status) query.set('status', status);
   if (source) query.set('source', source);
+  if (contentType) query.set('content_type', contentType);
   if (category === 'none') query.set('uncategorized', 'true');
   else if (category) query.set('category_id', String(category));
   if (tag) query.set('tag_id', String(tag));
@@ -73,6 +76,18 @@ export function originalUrl(value: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+export function linkInput(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed || /\s/.test(trimmed) || trimmed.length > 2048) return null;
+  const url = originalUrl(trimmed.includes('://') ? trimmed : `https://${trimmed}`);
+  return url && new URL(url).hostname.includes('.') ? url : null;
+}
+
+export function linkDomain(value: string | null) {
+  const url = originalUrl(value);
+  return url ? new URL(url).hostname.replace(/^www\./, '') : null;
 }
 
 export function errorMessage(error: unknown, validation = 'Проверьте данные и повторите.') {

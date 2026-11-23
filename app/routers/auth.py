@@ -55,7 +55,7 @@ def start_session(request: Request, response: Response, db: DbSession, user: Use
     response.headers["Cache-Control"] = "no-store"
 
 
-def register_user(data: RegisterRequest, request: Request, db: DbSession) -> User:
+def register_user(data: RegisterRequest, request: Request, db: DbSession, *, display_name: str | None = None) -> User:
     # Лимит проверяется до хэширования: заблокированный запрос ничего не стоит.
     # Считаются все попытки, дошедшие до этого места (ошибки формата не считаются).
     ip_key = make_key(client_ip(request))
@@ -68,6 +68,7 @@ def register_user(data: RegisterRequest, request: Request, db: DbSession) -> Use
     extra = {"timezone": data.timezone} if data.timezone else {}
     user = User(
         email=data.email,
+        display_name=display_name,
         password_hash=password_hash,
         consent_at=datetime.now(timezone.utc),
         consent_version=CONSENT_VERSION,

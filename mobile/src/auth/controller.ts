@@ -118,11 +118,11 @@ export class AuthController {
     return response;
   };
 
-  async signIn(mode: 'login' | 'register', email: string, password: string, consent?: boolean) {
+  async signIn(mode: 'login' | 'register', email: string, password: string, consent?: boolean, displayName?: string) {
     if (!this.api.origin) throw new Error('Подключение к серверу ещё не настроено в этой сборке.');
     if (this.token) throw new Error('Сначала завершите текущую сессию на устройстве.');
     await this.exclusive(async () => {
-      const issued = await this.api.signIn(mode, email, password, consent);
+      const issued = await this.api.signIn(mode, email, password, consent, displayName);
       try { await this.storage.save(this.api.origin!, issued.token, issued.user.id); }
       catch (error) {
         // Do not report a successful sign-in if durable storage failed.

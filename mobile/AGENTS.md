@@ -55,3 +55,5 @@ On 2026-11-22 the user accepted standalone PDF creation on the S25 with 0.8.1 an
 On 2026-11-22 the user accepted the weekly plan in APK 0.9.0 on the S25 and deferred block 11 AI analysis until after release. The user selected manual reinforcement as the next stage.
 
 The user explicitly selected local block 12 (manual cards and repetition) on 2026-11-22 after deferring AI until after release. See ../docs/mobile_reinforcement.md. Staging rollout remains a separate approval.
+
+On 2026-11-23 the user accepted manual cards and repetition in APK 0.10.0/code17 on the S25 after the approved staging rollout. AI remains deferred until after release. The user chose preparation of the first free release. See ../docs/mobile_first_free_release.md for owner actions and technical prerequisites.

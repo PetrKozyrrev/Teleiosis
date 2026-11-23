@@ -8,10 +8,13 @@ import { useAuth } from '../src/auth/context';
 import { ApiError } from '../src/auth/api';
 import type { AuthController } from '../src/auth/controller';
 import Library from '../src/app/(tabs)/index';
+import AddLink from '../src/app/(tabs)/add-link';
 import MaterialRoute from '../src/app/library/[id]';
 import { pickPdf } from '../src/library/pdf';
 
-jest.mock('../src/offline/store', () => ({ enqueue: jest.fn(), subscribe: () => () => {}, ownerKey: () => 'account-1', unassigned: '' }));
+jest.mock('../src/offline/store', () => ({
+  enqueue: jest.fn(), generation: () => 0, subscribe: () => () => {}, ownerKey: () => 'account-1', unassigned: '',
+}));
 jest.mock('../src/offline/cache', () => ({ readOnline: async (_owner: unknown, request: Request, path: Parameters<Request>[0]) => ({
   value: await request(path, 'GET'),
 }), remember: async () => {}, forgetMaterial: async () => {} }));
@@ -24,6 +27,7 @@ jest.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
 }));
 jest.mock('expo-linking', () => ({ openURL: jest.fn() }));
+jest.mock('expo-clipboard', () => ({ getStringAsync: async () => 'https://example.com/saved' }));
 jest.mock('../src/library/pdf', () => ({
   ...jest.requireActual<typeof import('../src/library/pdf')>('../src/library/pdf'),
   pickPdf: jest.fn(),
@@ -67,6 +71,19 @@ test('opens category management from the library with filters closed', async () 
   await press('Фильтры и сортировка');
   expect(screen.getByRole('button', { name: 'Категория · Все категории' })).toBeTruthy();
   expect(screen.getAllByRole('button', { name: 'Управлять категориями' })).toHaveLength(1);
+});
+
+test('pastes a link and persists the selected collection in the offline queue', async () => {
+  request.mockResolvedValue([{ id: 8, name: 'На выходные', contents_count: 0 }]);
+  await render(<AddLink />);
+  expect(screen.getByRole('button', { name: 'Сохранить в библиотеку' }).props.accessibilityState.disabled).toBe(true);
+  await press('Вставить');
+  expect(screen.getByLabelText('Ссылка').props.value).toBe('https://example.com/saved');
+  await press('Коллекции · Не выбраны');
+  await fireEvent.press(screen.getByRole('checkbox', { name: 'На выходные' }));
+  await press('Сохранить в библиотеку');
+  expect(enqueue).toHaveBeenCalledWith('account-1', { url: 'https://example.com/saved', collection_ids: [8] });
+  expect(router.push).toHaveBeenCalledWith('/queue');
 });
 
 test('saves a PDF link in the local queue with its category', async () => {

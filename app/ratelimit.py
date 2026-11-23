@@ -43,6 +43,7 @@ VERIFY_IP = Rule("verify_ip", 10, timedelta(hours=1))
 PASSWORD_USER = Rule("password_user", 5, timedelta(minutes=15))
 
 EXPORT_USER = Rule("export_user", 5, timedelta(hours=1))
+LINK_PREVIEW_USER = Rule("link_preview_user", 30, timedelta(minutes=5))
 
 
 def client_ip(request: Request) -> str:

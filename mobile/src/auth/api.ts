@@ -5,6 +5,7 @@ export type User = {
   id: number; email: string; timezone: string;
   reminders_enabled: boolean; reminder_time: string; email_verified_at: string | null;
 };
+export type Profile = User & { display_name: string | null; weekly_reading_goal: number };
 export type Session = { user: User; expires_at: string; absolute_expires_at: string };
 export type IssuedSession = Session & { token: string; token_type: 'Bearer' };
 type ImportPath = '/mobile/library/imports/preview' | '/mobile/library/imports/apply';
@@ -15,7 +16,8 @@ type PlanPath = '/mobile/plan' | `/mobile/plan?day=${string}` | '/mobile/plan/go
   | `/mobile/plan/weeks/${string}/budget`;
 type ReviewPath = '/mobile/review' | `/mobile/review?${string}` | `/mobile/review/${number}`
   | `/mobile/review/${number}/answers` | `/mobile/review/${number}/history?${string}`;
-export type LibraryPath = ReviewPath | PlanPath | '/contents' | '/contents/submissions' | `/contents?${string}` | `/contents/${number}`
+export type LibraryPath = ReviewPath | PlanPath | '/contents' | '/contents/submissions' | '/mobile/library/submissions' | `/contents?${string}` | `/contents/${number}`
+  | '/mobile/profile' | `/mobile/reading-progress?${string}` | '/mobile/library/link-preview'
   | `/contents/${number}/open` | `/contents/${number}/versioned` | `/contents/${number}/reminder` | '/me' | '/me/settings' | '/me/export' | '/stats' | '/auth/change-password' | '/auth/delete-account' | '/categories' | `/categories/${number}`
   | '/mobile/library/tags' | '/mobile/library/collections'
   | `/mobile/library/tags/${number}` | `/mobile/library/collections/${number}`
@@ -98,7 +100,8 @@ export class AuthApi {
       if (!response.ok) {
         const retry = Number(response.headers.get('Retry-After'));
         let existingId = null;
-        if (response.status === 409 && method === 'POST' && (path === '/contents' || path === '/contents/submissions')) {
+        const submission = path === '/contents/submissions' || path === '/mobile/library/submissions';
+        if (response.status === 409 && ((method === 'POST' && (path === '/contents' || submission)) || path.endsWith('/versioned'))) {
           const result = await response.json().catch(() => null);
           const id = result?.detail?.existing_id;
           if (Number.isSafeInteger(id) && id > 0) existingId = id;
@@ -106,9 +109,18 @@ export class AuthApi {
         let code: string | null = null;
         let location: (string | number)[] = [];
         if ((importFile && [409, 413, 415, 422].includes(response.status))
+          || (path === '/mobile/auth/register' && response.status === 422)
+          || (response.status === 404 && (submission || path.endsWith('/versioned')))
           || (pdf && !basicChallenge)
           || (response.status === 409 && (path.startsWith('/mobile/library/') || path.startsWith('/mobile/plan/')))) {
           const result = await response.json().catch(() => null);
+          const issue = Array.isArray(result?.detail) && result.detail.length === 1 ? result.detail[0] : null;
+          if (path === '/mobile/auth/register' && issue?.type === 'extra_forbidden'
+            && Array.isArray(issue.loc) && issue.loc.length === 2 && issue.loc[0] === 'body' && issue.loc[1] === 'display_name') {
+            code = 'registration_name_unsupported';
+          }
+          if (result?.detail?.code === 'collection_missing') code = result.detail.code;
+          if (path === '/mobile/library/submissions' && response.status === 404 && result?.detail === 'Category not found') code = 'category_missing';
           if (['group_name_exists', 'group_limit_reached'].includes(result?.detail?.code)) code = result.detail.code;
           if (path.startsWith('/mobile/plan/') && ['already_planned', 'goal_limit', 'task_completed'].includes(result?.detail?.code)) code = result.detail.code;
           if (pdf && /^(pdf_[a-z_]+|invalid_pdf(?:_name|_title)?|unsafe_pdf|unsupported_pdf)$/.test(result?.detail?.code)) {
@@ -146,8 +158,16 @@ export class AuthApi {
     } finally { clearTimeout(timeout); }
   }
 
-  async signIn(mode: 'login' | 'register', email: string, password: string, consent = false): Promise<IssuedSession> {
-    const result = await this.request(mode, { email, password, ...(mode === 'register' ? { consent, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } : {}) });
+  async signIn(mode: 'login' | 'register', email: string, password: string, consent = false, displayName?: string): Promise<IssuedSession> {
+    const body = { email, password, ...(mode === 'register' ? {
+      consent, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    } : {}) };
+    const name = mode === 'register' ? displayName : undefined;
+    const result = await this.request(mode, name ? { ...body, display_name: name } : body).catch((error: unknown) => {
+      // The older API rejects this field during validation, before creating an account.
+      if (name && error instanceof ApiError && error.code === 'registration_name_unsupported') return this.request(mode, body);
+      throw error;
+    });
     const s = session(result);
     const issued = result as IssuedSession;
     if (issued.token_type !== 'Bearer' || !/^[A-Za-z0-9_-]{16,128}$/.test(issued.token)) throw new ApiError(502);

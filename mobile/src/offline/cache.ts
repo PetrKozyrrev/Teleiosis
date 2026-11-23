@@ -40,6 +40,7 @@ export function filterDownloaded(items: Material[], filters: Filters) {
     (!q || item.title.toLocaleLowerCase('ru').includes(q)) &&
     (!filters.status || item.status === filters.status) &&
     (!filters.source || item.source === filters.source) &&
+    (!filters.contentType || item.content_type === filters.contentType) &&
     (!filters.category || item.category_id === (filters.category === 'none' ? null : filters.category))
   ).sort((a, b) => filters.sort === 'title'
     ? title.compare(a.title, b.title) || a.id - b.id

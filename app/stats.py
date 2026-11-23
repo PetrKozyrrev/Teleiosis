@@ -5,6 +5,7 @@
 не должно ронять запрос."""
 
 from datetime import datetime, time, timedelta, timezone
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
@@ -15,6 +16,7 @@ from app.models import Category, Content, User
 DAYS = 7
 TOP_CATEGORIES = 5
 STATUSES = ("unseen", "planned", "studied", "irrelevant")
+ReadingPeriod = Literal["week", "month", "all"]
 
 
 def user_zone(name: str) -> ZoneInfo:
@@ -27,6 +29,48 @@ def user_zone(name: str) -> ZoneInfo:
 
 def share(part: int, whole: int) -> float | None:
     return round(part / whole, 4) if whole else None
+
+
+def reading_progress(db: Session, user: User, period: ReadingPeriod, offset: int, now: datetime | None = None) -> dict:
+    zone = user_zone(user.timezone)
+    today = (now or datetime.now(timezone.utc)).astimezone(zone).date()
+    week_start = today - timedelta(days=today.weekday())
+    month_start = today.replace(day=1)
+    day = func.date(func.timezone(zone.key, Content.studied_at))
+    owned = (Content.user_id == user.id, Content.studied_at.is_not(None))
+    # Use the same current material status as /stats. Reverting a status clears its completion date.
+    daily = dict(db.execute(select(day, func.count()).where(*owned, day <= today).group_by(day)).all())
+    week_count = sum(amount for date, amount in daily.items() if date >= week_start)
+    start = {"week": week_start, "month": month_start, "all": None}[period]
+    period_days = {date: amount for date, amount in daily.items() if start is None or date >= start}
+    streak_end = today if today in daily else today - timedelta(days=1)
+    streak = 0
+    while streak_end - timedelta(days=streak) in daily:
+        streak += 1
+
+    if period == "week":
+        buckets = [week_start + timedelta(days=index) for index in range(7)]
+        activity = [{"day": date, "count": period_days.get(date, 0)} for date in buckets]
+    elif period == "month":
+        activity = [{"day": month_start + timedelta(days=index), "count": period_days.get(month_start + timedelta(days=index), 0)}
+                    for index in range((today - month_start).days + 1)]
+    else:
+        monthly = {}
+        for date, amount in sorted(period_days.items()):
+            month = date.replace(day=1)
+            monthly[month] = monthly.get(month, 0) + amount
+        activity = [{"day": date, "count": amount} for date, amount in list(monthly.items())[-12:]]
+
+    recent = select(Content.id, Content.title, Content.url, Content.content_type, Content.image_url, Content.studied_at).where(*owned, day <= today)
+    if start is not None:
+        recent = recent.where(Content.studied_at >= datetime.combine(start, time.min, tzinfo=zone))
+    rows = db.execute(recent.order_by(Content.studied_at.desc(), Content.id.desc()).offset(offset).limit(21)).mappings().all()
+    return {
+        "today": today, "weekly_goal": user.weekly_reading_goal, "weekly_completed": week_count,
+        "completed": sum(period_days.values()), "streak": streak, "activity": activity,
+        "recent": [dict(row) | {"local_day": row["studied_at"].astimezone(zone).date()} for row in rows[:20]],
+        "next_offset": offset + 20 if len(rows) > 20 else None,
+    }
 
 
 def compute_stats(db: Session, user: User, now: datetime | None = None) -> dict:
