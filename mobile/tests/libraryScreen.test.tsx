@@ -13,7 +13,7 @@ import MaterialRoute from '../src/app/library/[id]';
 import { pickPdf } from '../src/library/pdf';
 
 jest.mock('../src/offline/store', () => ({
-  enqueue: jest.fn(), generation: () => 0, subscribe: () => () => {}, ownerKey: () => 'account-1', unassigned: '',
+  enqueue: jest.fn(), getJob: async () => null, generation: () => 0, subscribe: () => () => {}, ownerKey: () => 'account-1', unassigned: '',
 }));
 jest.mock('../src/offline/cache', () => ({ readOnline: async (_owner: unknown, request: Request, path: Parameters<Request>[0]) => ({
   value: await request(path, 'GET'),
@@ -21,7 +21,7 @@ jest.mock('../src/offline/cache', () => ({ readOnline: async (_owner: unknown, r
 jest.mock('../src/auth/config', () => ({ ...jest.requireActual<Record<string, unknown>>('../src/auth/config'), API_ORIGIN: 'https://example.com' }));
 jest.mock('../src/auth/context', () => ({ useAuth: jest.fn() }));
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), replace: jest.fn() },
+  router: { push: jest.fn(), replace: jest.fn(), navigate: jest.fn() },
   useFocusEffect: (callback: () => void) => jest.requireActual<typeof import('react')>('react').useEffect(callback, [callback]),
   useLocalSearchParams: () => ({ id: mockRequestedId }),
   useNavigation: () => ({ isFocused: () => true }),
@@ -73,17 +73,32 @@ test('opens category management from the library with filters closed', async () 
   expect(screen.getAllByRole('button', { name: 'Управлять категориями' })).toHaveLength(1);
 });
 
-test('pastes a link and persists the selected collection in the offline queue', async () => {
+test('uses a user category as a quick filter', async () => {
+  request.mockImplementation(async path => path === '/categories'
+    ? [{ id: 3, name: 'Техника', contents_count: 1 }] : page([]));
+  await render(<Library />);
+  expect(screen.queryByRole('button', { name: 'Статьи' })).toBeNull();
+  await press('Техника');
+  await waitFor(() => expect(request.mock.calls.some(([path]) => path.startsWith('/contents?')
+    && new URLSearchParams(path.split('?')[1]).get('category_id') === '3')).toBe(true));
+});
+
+test('pastes a link, persists the selected collection and confirms saving on the same tab', async () => {
   request.mockResolvedValue([{ id: 8, name: 'На выходные', contents_count: 0 }]);
+  jest.mocked(enqueue).mockResolvedValue('new-job');
   await render(<AddLink />);
   expect(screen.getByRole('button', { name: 'Сохранить в библиотеку' }).props.accessibilityState.disabled).toBe(true);
   await press('Вставить');
   expect(screen.getByLabelText('Ссылка').props.value).toBe('https://example.com/saved');
+  await press('Добавить в подборку');
   await press('Коллекции · Не выбраны');
   await fireEvent.press(screen.getByRole('checkbox', { name: 'На выходные' }));
   await press('Сохранить в библиотеку');
   expect(enqueue).toHaveBeenCalledWith('account-1', { url: 'https://example.com/saved', collection_ids: [8] });
-  expect(router.push).toHaveBeenCalledWith('/queue');
+  expect(router.push).not.toHaveBeenCalledWith('/queue');
+  expect(screen.getByText('Ссылка сохранена на устройстве и появится в библиотеке после отправки.')).toBeTruthy();
+  await press('Открыть библиотеку');
+  expect(router.navigate).toHaveBeenCalledWith('/');
 });
 
 test('saves a PDF link in the local queue with its category', async () => {
@@ -183,6 +198,7 @@ test('offers organization outside filters and combines tag and collection filter
   await press('Теги и коллекции');
   expect(router.push).toHaveBeenCalledWith('/library/organization');
   await press('Фильтры и сортировка');
+  await press('Фильтры по тегам и коллекциям');
   await press('Тег · Все теги');
   await fireEvent.press(screen.getByRole('radio', { name: 'Метка' }));
   await press('Коллекция · Все коллекции');

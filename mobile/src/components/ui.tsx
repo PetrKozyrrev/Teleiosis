@@ -7,11 +7,9 @@ export function Page({ title, subtitle, brand, auth, footer, children, scrollRef
   scrollRef?: Ref<ComponentRef<typeof ScrollView>>;
 }>) {
   return <KeyboardAvoidingView style={[styles.page, auth && styles.auth]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    keyboardVerticalOffset={brand ? 0 : 48}>
+    keyboardVerticalOffset={brand || auth ? 0 : 48}>
     <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" style={styles.scroll} contentContainerStyle={[styles.content, auth && styles.authContent]}>
-    {brand && <View style={styles.brand} accessibilityLabel="Teleiosis" accessible>
-      <Image source={require('../../design/brand/teleiosis-wordmark.png')} style={styles.wordmark} resizeMode="contain" />
-    </View>}
+    {brand && <Wordmark />}
     <View style={styles.headingGroup}>
       <Text accessibilityRole="header" style={styles.title}>{title}</Text>
       {subtitle && <Body>{subtitle}</Body>}
@@ -20,6 +18,22 @@ export function Page({ title, subtitle, brand, auth, footer, children, scrollRef
     </ScrollView>
     {footer && <View style={styles.footer}>{footer}</View>}
   </KeyboardAvoidingView>;
+}
+
+export function Wordmark() {
+  return <Image source={require('../../design/brand/teleiosis-wordmark.png')} style={styles.wordmark}
+    resizeMode="contain" accessibilityLabel="Teleiosis" accessible />;
+}
+
+export function BrandToggle({ label, checked, onChange, disabled = false, role = 'switch' }: {
+  label: string; checked: boolean; onChange: (value: boolean) => void; disabled?: boolean; role?: 'switch' | 'checkbox';
+}) {
+  return <Pressable accessibilityLabel={label} accessibilityRole={role} accessibilityState={{ checked, disabled }}
+    disabled={disabled} onPress={() => onChange(!checked)} style={[styles.toggleTarget, disabled && styles.dimmed]}>
+    {role === 'checkbox'
+      ? <View style={[styles.checkbox, checked && styles.toggleOn]}>{checked && <Text style={styles.checkmark}>✓</Text>}</View>
+      : <View style={[styles.track, checked && styles.toggleOn, checked && styles.checkedTrack]}><View style={styles.thumb} /></View>}
+  </Pressable>;
 }
 
 export function Field({ label, style, leading, trailing, hideLabel, ...props }: TextInputProps & {
@@ -60,13 +74,19 @@ export function Action({ title, onPress, disabled = false, variant = 'primary' }
 export const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
-  auth: { backgroundImage: 'linear-gradient(160deg, #F7F5F7, #EAF0F3 43%, #F0E7EF 95%)' },
+  auth: { backgroundImage: 'linear-gradient(154deg, #FBF7FB 0%, #DEEAF1 42%, #EDDCEB 100%)' },
   content: { paddingHorizontal: 20, paddingTop: 12, gap: 16, paddingBottom: 24, width: '100%', maxWidth: 640, alignSelf: 'center' },
   authContent: { paddingTop: 54, maxWidth: 460 },
   footer: { paddingHorizontal: 20, paddingBottom: 14, paddingTop: 8, gap: 8, width: '100%', maxWidth: 640, alignSelf: 'center' },
   headingGroup: { gap: 3 },
-  brand: { marginBottom: 5, alignSelf: 'flex-start' },
-  wordmark: { width: 90, height: 29 },
+  wordmark: { width: 90, height: 29, marginBottom: 5, alignSelf: 'flex-start' },
+  toggleTarget: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1, borderColor: colors.muted, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  checkmark: { color: colors.surface, fontSize: 16, fontFamily: fonts.bold },
+  track: { width: 44, height: 26, padding: 3, borderRadius: 13, backgroundColor: colors.muted, justifyContent: 'center' },
+  toggleOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkedTrack: { alignItems: 'flex-end' },
+  thumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.surface },
   title: { color: colors.text, fontSize: 32, fontFamily: fonts.heading },
   heading: { color: colors.text, fontSize: 21, fontFamily: fonts.heading },
   body: { color: colors.muted, fontSize: 14, lineHeight: 21, fontFamily: fonts.body },

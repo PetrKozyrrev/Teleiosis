@@ -3,12 +3,12 @@ import Constants from 'expo-constants';
 import { openURL } from 'expo-linking';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState, type ComponentProps, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SignOut } from '../../account/SignOut';
 import { ApiError, type Profile, type User } from '../../auth/api';
 import { PUBLIC_LINKS, STAGING_GATE } from '../../auth/config';
 import { useAuth } from '../../auth/context';
-import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
+import { Action, Body, BrandToggle, Card, Field, Page, styles } from '../../components/ui';
 import { errorMessage, type Request } from '../../library/model';
 import { LibraryAccess, Loading, Notice } from '../../library/ui';
 import { colors } from '../../theme';
@@ -90,29 +90,32 @@ function ProfileView({ request }: { request: Request }) {
         <Ionicons name="pencil" color={colors.primary} size={20} />
       </Pressable>
     </View></Card>
-    {editing === 'name' && <Card>
-      <Field label="Имя" value={name} onChangeText={setName} editable={!busy} maxLength={80} autoCapitalize="words" />
-      <Action title="Сохранить имя" onPress={saveProfile} disabled={busy || offline} />
-      <Action variant="text" title="Отмена" onPress={() => setEditing(undefined)} disabled={busy} />
-    </Card>}
     <Text style={screenStyles.section}>Настройки чтения</Text>
     <Card>
       <ProfileRow icon="disc-outline" title="Недельная цель" value={profile ? `${profile.weekly_reading_goal} в неделю` : undefined}
         disabled={cannotEdit} onPress={() => { setEditing('goal'); setGoal(String(profile?.weekly_reading_goal ?? '')); }} />
       <View style={screenStyles.divider} />
-      <ProfileRow icon="notifications-outline" title="Напоминания о чтении" trailing={<Switch accessibilityLabel="Напоминания о чтении"
-        value={Boolean(user?.reminders_enabled)} disabled={!user || busy || offline} onValueChange={changeReminders} trackColor={{ true: colors.primary }} />} />
+      <ProfileRow icon="notifications-outline" title="Напоминания о чтении" trailing={<BrandToggle label="Напоминания о чтении"
+        checked={Boolean(user?.reminders_enabled)} disabled={!user || busy || offline} onChange={changeReminders} />} />
       <View style={screenStyles.divider} />
-      <ProfileRow icon="time-outline" title="Время и часовой пояс" onPress={() => router.push('/preferences')} />
+      <ProfileRow icon="time-outline" title="Время и часовой пояс" onPress={() => router.push('/reading-schedule')} />
     </Card>
-    {editing === 'goal' && <Card>
-      <Field label="Материалов в неделю" value={goal} onChangeText={setGoal} keyboardType="number-pad" maxLength={3} editable={!busy} />
-      <Body>Укажите число от 1 до 100.</Body>
-      <Action title="Сохранить цель" onPress={saveProfile} disabled={!validGoal || busy || offline} />
-      <Action variant="text" title="Отмена" onPress={() => setEditing(undefined)} disabled={busy} />
-    </Card>}
+    {editing && <Modal transparent animationType="fade" onRequestClose={() => { if (!busy) setEditing(undefined); }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={screenStyles.modal} accessibilityViewIsModal>
+        <View style={screenStyles.dialog}><Card>
+          <Text accessibilityRole="header" style={styles.heading}>{editing === 'name' ? 'Редактировать профиль' : 'Недельная цель'}</Text>
+          {editing === 'name'
+            ? <Field label="Имя" value={name} onChangeText={setName} editable={!busy} maxLength={80} autoCapitalize="words" />
+            : <Field label="Материалов в неделю" value={goal} onChangeText={setGoal} keyboardType="number-pad" maxLength={3} editable={!busy} />}
+          {editing === 'goal' && <Body>Укажите число от 1 до 100.</Body>}
+          {message && <Notice>{message}</Notice>}
+          <Action title="Сохранить" onPress={saveProfile} disabled={(editing === 'goal' && !validGoal) || busy || offline} />
+          <Action variant="outline" title="Отмена" onPress={() => setEditing(undefined)} disabled={busy} />
+        </Card></View>
+      </KeyboardAvoidingView>
+    </Modal>}
     {!profile && !message && <Loading />}
-    {message && <><Notice>{message}</Notice><Action variant="text" title="Обновить профиль" disabled={busy} onPress={() => setRevision(value => value + 1)} /></>}
+    {message && !editing && <><Notice>{message}</Notice><Action variant="text" title="Обновить профиль" disabled={busy} onPress={() => setRevision(value => value + 1)} /></>}
     <Text style={screenStyles.section}>Аккаунт и поддержка</Text>
     <Card>
       <ProfileRow icon="shield-checkmark-outline" title="Аккаунт и безопасность" onPress={() => router.push('/account')} />
@@ -156,4 +159,6 @@ const screenStyles = StyleSheet.create({
   row: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   version: { textAlign: 'center' },
+  modal: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#21212455', padding: 20 },
+  dialog: { width: '100%', maxWidth: 460 },
 });

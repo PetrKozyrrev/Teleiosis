@@ -66,7 +66,7 @@ export async function getJob(owner: string, id: string) {
 }
 
 export async function enqueue(owner: string, payload: Draft, edit?: string) {
-  await mutate(async db => {
+  const savedId = await mutate(async db => {
     const id = randomUUID();
     const serialized = JSON.stringify(payload);
     if (edit) {
@@ -82,9 +82,11 @@ export async function enqueue(owner: string, payload: Draft, edit?: string) {
     } else {
       await db.runAsync('INSERT INTO jobs(id,owner,payload,state,created_at) VALUES(?,?,?,?,?)',
         id, owner, serialized, owner ? 'pending' : 'draft', Date.now());
+      return id;
     }
   });
   changed();
+  return savedId;
 }
 
 export async function importDraft(payload: Draft, sourceId?: string) {

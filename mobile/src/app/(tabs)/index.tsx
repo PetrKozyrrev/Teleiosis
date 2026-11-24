@@ -27,6 +27,7 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryError, setCategoryError] = useState<{ revision: number; message: string } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [showOrganization, setShowOrganization] = useState(false);
   const [menu, setMenu] = useState<{ id: number; kind: 'item' | 'status'; x: number; y: number }>();
   const window = useWindowDimensions();
   const [mutationError, setMutationError] = useState('');
@@ -84,13 +85,13 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
 
   useFocusEffect(useCallback(() => {
     void revision; // Refresh available groups together with the list.
-    if (!showFilters) return;
+    if (!showFilters || !showOrganization) return;
     let active = true;
     void Promise.all([request(groupPath('tags'), 'GET'), request(groupPath('collections'), 'GET')]).then(([tags, collections]) => {
       if (active) { setGroups({ tags: tags as Group[], collections: collections as Group[] }); setGroupError(''); }
     }).catch(error => { if (active) setGroupError(organizationError(error, true)); });
     return () => { active = false; };
-  }, [showFilters, request, revision]));
+  }, [showFilters, showOrganization, request, revision]));
 
   function change(next: Partial<Filters>) {
     setMenu(undefined);
@@ -142,12 +143,10 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
     ]);
   }
 
-  const chips = [
-    { label: 'Все', selected: !filters.status && !filters.contentType, values: { status: '', contentType: '' } },
-    { label: 'К чтению', selected: filters.status === 'unseen' && !filters.contentType, values: { status: 'unseen', contentType: '' } },
-    { label: 'Видео', selected: filters.contentType === 'video', values: { status: '', contentType: 'video' } },
-    { label: 'Статьи', selected: filters.contentType === 'article', values: { status: '', contentType: 'article' } },
-  ] as const;
+  const chips: { id: number | ''; name: string }[] = [
+    { id: '', name: 'Все' },
+    ...categories,
+  ];
   const online = current?.cachedAt === undefined;
   const menuItem = online ? page?.items.find(item => item.id === menu?.id) : undefined;
   const menuWidth = Math.min(205, window.width - 24);
@@ -166,9 +165,9 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
       </Pressable>
     </View>
     <View style={libraryStyles.chips}>
-      {chips.map(chip => <Pressable key={chip.label} accessibilityRole="button" accessibilityState={{ selected: chip.selected }}
-        style={[libraryStyles.chip, chip.selected && libraryStyles.activeChip]} onPress={() => change(chip.values)}>
-        <Text style={[styles.label, chip.selected && libraryStyles.activeText]}>{chip.label}</Text>
+      {chips.map(chip => <Pressable key={chip.id} accessibilityRole="button" accessibilityState={{ selected: filters.category === chip.id }}
+        style={[libraryStyles.chip, filters.category === chip.id && libraryStyles.activeChip]} onPress={() => change({ category: chip.id })}>
+        <Text style={[styles.label, filters.category === chip.id && libraryStyles.activeText]}>{chip.name}</Text>
       </Pressable>)}
     </View>
     {showFilters && <Card>
@@ -181,12 +180,16 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
       <Choice label="Категория" value={filters.category} onChange={category => change({ category })}
         options={[{ value: '', label: 'Все категории' }, { value: 'none', label: 'Без категории' },
           ...categories.map(category => ({ value: category.id, label: category.name }))]} />
+      <Action variant="outline" title={showOrganization ? 'Скрыть теги и коллекции' : 'Фильтры по тегам и коллекциям'}
+        onPress={() => setShowOrganization(!showOrganization)} />
+      {showOrganization && <>
       <Choice label="Тег" value={filters.tag ?? ''} onChange={tag => change({ tag })}
         options={[{ value: '', label: 'Все теги' }, ...groups.tags.map(tag => ({ value: tag.id, label: tag.name }))]} />
       <Choice label="Коллекция" value={filters.collection ?? ''} onChange={collection => change({ collection })}
         options={[{ value: '', label: 'Все коллекции' }, ...groups.collections.map(collection => ({ value: collection.id, label: collection.name }))]} />
       <Body>Фильтры по тегам и коллекциям работают при подключении к серверу.</Body>
       {groupError && <Notice>{groupError}</Notice>}
+      </>}
     </Card>}
     {(filtered || filters.searchIn || filters.sort !== initialFilters.sort) &&
       <Action title="Сбросить поиск и фильтры" onPress={() => change(initialFilters)} />}
@@ -239,7 +242,7 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
     <View style={libraryStyles.chips}>
       <Action variant="text" title="Управлять категориями" onPress={() => router.push('/library/categories')} />
       <Action variant="text" title="Теги и коллекции" onPress={() => router.push('/library/organization')} />
-      <Action variant="text" title="Очередь и входящие" onPress={() => router.push('/queue')} />
+      <Action variant="text" title="Отправка и входящие" onPress={() => router.push('/queue')} />
       <Action variant="text" title="Обновить" onPress={() => setRevision(value => value + 1)} />
     </View>
     {menu && menuItem && <Modal transparent statusBarTranslucent navigationBarTranslucent onRequestClose={() => setMenu(undefined)}>

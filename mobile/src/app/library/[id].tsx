@@ -1,11 +1,11 @@
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { openURL } from 'expo-linking';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Text } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { ApiError } from '../../auth/api';
 import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
 import {
-  errorMessage, linkInput, originalUrl, parseId, sources, statuses,
+  errorMessage, linkDomain, linkInput, originalUrl, parseId, sources, statuses,
   type Category, type Material, type Request, type Status,
 } from '../../library/model';
 import { Choice, LibraryAccess, Loading, Notice, optionsOf } from '../../library/ui';
@@ -14,6 +14,8 @@ import { cachedCategories, cachedMaterial, forgetMaterial, readOnline, remember 
 import { enqueue, generation, getJob, unassigned, type Draft } from '../../offline/store';
 import { GroupSelection } from '../../library/GroupSelection';
 import { groupPath, organizationPath, type Group, type Organization } from '../../library/organization';
+import { MaterialThumbnail } from '../../library/MaterialThumbnail';
+import { colors } from '../../theme';
 
 export default function MaterialRoute() {
   const { id: param, draftId, inbox, edit } = useLocalSearchParams<{ id: string; draftId?: string; inbox?: string; edit?: string }>();
@@ -41,6 +43,7 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
   const [revision, setRevision] = useState(0);
   const [categoryRevision, setCategoryRevision] = useState(0);
   const [editing, setEditing] = useState(id === 'new');
+  const [showActions, setShowActions] = useState(false);
   const [url, setUrl] = useState('');
   const [kind, setKind] = useState<'link' | 'note' | 'pdf'>('link');
   const [selectedPdf, setSelectedPdf] = useState<SelectedPdf | null>(null);
@@ -74,6 +77,7 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
     setInitialCollections([]);
     setCollectionError('');
     hydratedCollections.current = false;
+    setShowActions(false);
     setMessage('');
     setEditing(true);
   }, []);
@@ -287,38 +291,48 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
 
   const categoryOptions = [{ value: null, label: 'Без категории' },
     ...categories.map(category => ({ value: category.id, label: category.name }))];
-  return <Page title={id === 'new' ? 'Добавить материал' : editing ? 'Редактировать материал' : 'Материал'}
-    brand={editing} subtitle={editing && id !== 'new' ? 'Обновите сведения о материале.' : undefined}>
+  return <Page title={id === 'new' ? 'Добавить материал' : editing ? 'Редактировать материал' : item?.title ?? 'Материал'}
+    brand subtitle={editing && id !== 'new' ? 'Обновите сведения о материале.' : undefined}>
     {id !== 'new' && !item && (loadError ? <Card>
       <Notice>{loadError}</Notice>
       <Action title="Повторить загрузку" onPress={() => { setLoadError(''); setRevision(value => value + 1); }} />
     </Card> : <Loading />)}
-    {item && !editing && <Card>
-      <Text accessibilityRole="header" style={styles.heading}>{item.title}</Text>
-      <Body>{[item.content_type === 'pdf' ? 'PDF' : sources[item.source], statuses[item.status], categories.find(category => category.id === item.category_id)?.name].filter(Boolean).join(' · ')}</Body>
-      {item.description && <Body>{item.description}</Body>}
-      {item.note && <Text selectable style={styles.body}>{item.note}</Text>}
-      {original && <>
-        {!item.description && <Body>Описание страницы недоступно.</Body>}
-        <Text selectable style={styles.body}>{original}</Text>
-        <Action title="Открыть оригинал" disabled={busy} onPress={() => void openOriginal()} />
-        <Body>Открытий оригинала · {item.open_count}</Body>
-      </>}
+    {item && !editing && <>
+      <Card>
+        <View style={detailStyles.overview}>
+          <MaterialThumbnail imageUrl={item.image_url} kind={item.content_type} />
+          <View style={detailStyles.metadata}>
+            <Body>{linkDomain(item.url) ?? (item.content_type === 'pdf' ? 'PDF' : sources[item.source])}</Body>
+            <Text style={detailStyles.badge}>{statuses[item.status]}</Text>
+            <Body>{categories.find(category => category.id === item.category_id)?.name}</Body>
+          </View>
+        </View>
+        {item.description && <Text selectable style={styles.body}>{item.description}</Text>}
+        {original && <>
+          {!item.description && <Body>Описание страницы недоступно.</Body>}
+          <Action title="Открыть оригинал" disabled={busy} onPress={() => void openOriginal()} />
+        </>}
+        {item.content_type === 'pdf' && <Action title="Открыть PDF" disabled={busy || cachedAt !== undefined}
+          onPress={() => router.push({ pathname: '/library/pdf', params: { id: String(id) } })} />}
+      </Card>
+      {item.note && <Card><Text style={styles.label}>Заметка</Text><Text selectable style={styles.body}>{item.note}</Text></Card>}
       {cachedAt !== undefined && <Notice>Загруженная карточка · {new Date(cachedAt).toLocaleString('ru-RU')}</Notice>}
-      <Action title="Карточки для повторения" disabled={busy || cachedAt !== undefined}
-        onPress={() => router.push({ pathname: '/review', params: { id: String(item.id) } })} />
-      <Action title="Добавить в недельный план" disabled={busy || cachedAt !== undefined}
-        onPress={() => router.push({ pathname: '/plan', params: { id: String(item.id) } })} />
-      <Action title="Теги и коллекции материала" disabled={busy || cachedAt !== undefined}
-        onPress={() => router.push({ pathname: '/library/organize', params: { id: String(id) } })} />
-      {item.content_type === 'pdf' && <Action title="Открыть PDF" disabled={busy || cachedAt !== undefined}
-        onPress={() => router.push({ pathname: '/library/pdf', params: { id: String(id) } })} />}
-      <Action title="Редактировать" disabled={busy || cachedAt !== undefined} onPress={() => beginEdit(item)} />
-      <Action title="Удалить материал" disabled={busy || cachedAt !== undefined} onPress={remove} />
-      {cachedAt !== undefined && <Action title="Обновить карточку" disabled={busy} onPress={() => {
+      <Action variant="outline" title="Редактировать" disabled={busy || cachedAt !== undefined} onPress={() => beginEdit(item)} />
+      <Action variant="text" title={showActions ? 'Скрыть действия' : 'Другие действия'} onPress={() => setShowActions(!showActions)} />
+      {showActions && <Card>
+        {original && <><Text selectable style={styles.body}>{original}</Text><Body>Открытий оригинала · {item.open_count}</Body></>}
+        <Action variant="text" title="Карточки для повторения" disabled={busy || cachedAt !== undefined}
+          onPress={() => router.push({ pathname: '/review', params: { id: String(item.id) } })} />
+        <Action variant="text" title="Добавить в недельный план" disabled={busy || cachedAt !== undefined}
+          onPress={() => router.push({ pathname: '/plan', params: { id: String(item.id) } })} />
+        <Action variant="text" title="Теги и коллекции материала" disabled={busy || cachedAt !== undefined}
+          onPress={() => router.push({ pathname: '/library/organize', params: { id: String(id) } })} />
+        <Action variant="danger" title="Удалить материал" disabled={busy || cachedAt !== undefined} onPress={remove} />
+      </Card>}
+      {cachedAt !== undefined && <Action variant="outline" title="Обновить карточку" disabled={busy} onPress={() => {
         setItem(null); setLoadError(''); setRevision(value => value + 1);
       }} />}
-    </Card>}
+    </>}
     {draftId && !draftReady && (loadError ? <Notice>{loadError}</Notice> : <Loading />)}
     {editing && draftReady && <>
       {id === 'new' && <Choice label="Вид материала" value={kind} onChange={value => { setKind(value); setMessage(''); }} disabled={busy}
@@ -334,14 +348,14 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
         maxLength={300} editable={!busy} autoCapitalize="sentences" />
       {id !== 'new' && editBase?.url && <Field label="Ссылка" value={url} onChangeText={setUrl}
         keyboardType="url" maxLength={2048} editable={!busy} />}
-      {!creatingPdf && groups && <GroupSelection label="Коллекции" items={groups} selected={selected}
-        onChange={setSelected} disabled={busy || Boolean(collectionError)} />}
-      {!creatingPdf && collectionError && <Notice>{collectionError}</Notice>}
       {id !== 'new' && <Choice label="Статус" value={status} onChange={setStatus} disabled={busy} options={optionsOf(statuses)} />}
       {!creatingPdf && <Field label={kind === 'note' || (item && !item.url && item.content_type !== 'pdf') ? 'Текст заметки' : 'Заметка (необязательно)'}
         value={note} onChangeText={setNote} multiline maxLength={10000} editable={!busy} autoCapitalize="sentences"
         style={{ minHeight: 120, maxHeight: 250, textAlignVertical: 'top' }} />}
       {owner !== unassigned && <Choice label="Категория" value={categoryId} onChange={setCategoryId} disabled={busy} options={categoryOptions} />}
+      {!creatingPdf && groups && <GroupSelection label="Коллекции (необязательно)" items={groups} selected={selected}
+        onChange={setSelected} disabled={busy || Boolean(collectionError)} />}
+      {!creatingPdf && collectionError && <Notice>{collectionError}</Notice>}
       {categoryError && <>
         <Notice>Категории не обновились. {categoryError}</Notice>
         <Action title="Обновить категории" disabled={busy} onPress={() => setCategoryRevision(value => value + 1)} />
@@ -359,3 +373,9 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
     {message && <Notice>{message}</Notice>}
   </Page>;
 }
+
+const detailStyles = StyleSheet.create({
+  overview: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  metadata: { flex: 1, gap: 4 },
+  badge: { ...styles.label, backgroundColor: colors.tint, color: colors.primary, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, alignSelf: 'flex-start' },
+});

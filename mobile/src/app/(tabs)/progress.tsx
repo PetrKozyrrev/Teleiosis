@@ -29,6 +29,7 @@ function ProgressView({ request }: { request: Request }) {
   const [revision, setRevision] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showTools, setShowTools] = useState(false);
   const [legacy, setLegacy] = useState(false);
   const [offset, setOffset] = useState(0);
   const data = result?.period === period ? result.value : undefined;
@@ -71,30 +72,32 @@ function ProgressView({ request }: { request: Request }) {
     </View>}
     {data && <>
       <Card>
-        <Text style={styles.label}>{period === 'week' ? 'Недельная цель' : 'Изучено за период'}</Text>
+        <Text style={styles.label}>{period === 'week' ? 'Завершено' : 'Изучено за период'}</Text>
         <View style={screenStyles.stat}>
           <Text style={screenStyles.count}>{period === 'week' ? `${data.weekly_completed} из ${data.weekly_goal}` : data.completed}</Text>
-          <Body>материалов</Body>
+          <Text style={screenStyles.caption}>материалов</Text>
         </View>
         {period === 'week' && <>
           <View accessibilityRole="progressbar" accessibilityLabel="Недельная цель"
             accessibilityValue={{ min: 0, max: data.weekly_goal, now: Math.min(data.weekly_goal, data.weekly_completed) }} style={screenStyles.track}>
             <View style={[screenStyles.fill, { width: `${Math.min(100, data.weekly_completed / data.weekly_goal * 100)}%` }]} />
           </View>
-          <Body>{data.weekly_completed >= data.weekly_goal ? 'Цель недели достигнута.' : `До цели осталось: ${data.weekly_goal - data.weekly_completed}.`}</Body>
+          <Text style={screenStyles.caption}>{data.weekly_completed >= data.weekly_goal ? 'Цель недели достигнута.' : `До цели осталось: ${data.weekly_goal - data.weekly_completed}.`}</Text>
         </>}
       </Card>
       <Card>
         <Text style={styles.label}>Активность</Text>
         <View style={screenStyles.between}>
-          <Body>{period === 'all' ? 'До 12 месяцев с активностью' : periods[period]}</Body>
+          <Text style={screenStyles.caption}>{period === 'all' ? 'До 12 месяцев с активностью' : periods[period]}</Text>
           {data.streak > 0 && <Text style={[styles.label, styles.link]}>Дней подряд: {data.streak}</Text>}
         </View>
         <Activity data={data} period={period} />
       </Card>
       <View style={screenStyles.between}>
         <Text style={styles.label}>Недавно изучено</Text>
-        {data.recent.length > 2 && <Action variant="text" title={expanded ? 'Свернуть' : 'Все материалы'} onPress={() => setExpanded(!expanded)} />}
+        {data.recent.length > 2 && <Pressable accessibilityRole="button" onPress={() => setExpanded(!expanded)} style={screenStyles.recentAction}>
+          <Text style={screenStyles.recentLink}>{expanded ? 'Свернуть' : 'Смотреть все'}</Text>
+        </Pressable>}
       </View>
       {recent.length === 0 && <Body>В этом периоде пока нет изученных материалов.</Body>}
       {recent.map(item => <Pressable key={item.id} accessibilityRole="button" style={screenStyles.material}
@@ -111,11 +114,14 @@ function ProgressView({ request }: { request: Request }) {
     </>}
     {!data && !message && <Loading />}
     {message && <><Notice>{message}</Notice><Action variant="outline" title="Обновить прогресс" onPress={() => setRevision(value => value + 1)} /></>}
-    <Action variant="outline" title="Недельный план" onPress={() => router.push('/plan')} />
-    <Action variant="outline" title="Повторить карточки" onPress={() => router.push('/review')} />
-    {!legacy && <Action variant="text" title={showDetails ? 'Скрыть статистику библиотеки' : 'Статистика библиотеки'}
-      onPress={() => setShowDetails(!showDetails)} />}
-    {(legacy || showDetails) && <LibraryStats request={request} />}
+    <Action variant="text" title={showTools ? 'Скрыть инструменты' : 'План и повторение'} onPress={() => setShowTools(!showTools)} />
+    {showTools && <Card>
+      <Action variant="outline" title="Недельный план" onPress={() => router.push('/plan')} />
+      <Action variant="outline" title="Повторить карточки" onPress={() => router.push('/review')} />
+      {!legacy && <Action variant="text" title={showDetails ? 'Скрыть статистику библиотеки' : 'Статистика библиотеки'}
+        onPress={() => setShowDetails(!showDetails)} />}
+    </Card>}
+    {(legacy || (showTools && showDetails)) && <LibraryStats request={request} />}
   </Page>;
 }
 
@@ -179,10 +185,13 @@ const screenStyles = StyleSheet.create({
   selected: { backgroundColor: colors.text },
   selectedText: { color: colors.surface },
   stat: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'baseline' },
-  count: { ...styles.heading, fontSize: 29 },
+  count: { ...styles.heading, fontSize: 28 },
+  caption: { ...styles.body, fontSize: 12, lineHeight: 17 },
   track: { height: 8, backgroundColor: colors.greenTint, borderRadius: 5 },
   fill: { height: '100%', borderRadius: 5, backgroundColor: colors.success },
   between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
+  recentAction: { minHeight: 36, justifyContent: 'center' },
+  recentLink: { ...styles.label, color: colors.secondary, fontSize: 12 },
   chart: { minHeight: 92, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2 },
   barColumn: { flex: 1, alignItems: 'center', gap: 5 },
   bar: { width: '68%', maxWidth: 24, borderRadius: 4 },

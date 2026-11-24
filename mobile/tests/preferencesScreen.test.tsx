@@ -1,6 +1,7 @@
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import Preferences from '../src/app/preferences';
+import ReadingSchedule from '../src/app/reading-schedule';
 import { useAuth } from '../src/auth/context';
 import type { AuthController } from '../src/auth/controller';
 import type { Request } from '../src/library/model';
@@ -29,11 +30,12 @@ beforeEach(() => {
   });
 });
 test('saves the selected IANA timezone and time using the shared API', async () => {
-  await render(<Preferences />);
-  await fireEvent.changeText(screen.getByLabelText('Часовой пояс IANA'), 'Europe/Moscow');
+  await render(<ReadingSchedule />);
+  expect(screen.queryByLabelText('Текущий пароль')).toBeNull();
+  await fireEvent.changeText(screen.getByLabelText('Часовой пояс'), 'Europe/Moscow');
   await fireEvent.changeText(screen.getByLabelText('Время ежедневной подборки (ЧЧ:ММ)'), '10:30');
   await fireEvent.press(screen.getByRole('button', { name: 'Сохранить настройки' }));
-  expect(mockRequest).toHaveBeenCalledWith('/me/settings', 'PATCH', { timezone: 'Europe/Moscow', reminder_time: '10:30', reminders_enabled: true });
+  expect(mockRequest).toHaveBeenCalledWith('/me/settings', 'PATCH', { timezone: 'Europe/Moscow', reminder_time: '10:30' });
   expect(screen.getByText('Настройки сохранены.')).toBeTruthy();
 });
 

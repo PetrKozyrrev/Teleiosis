@@ -1,9 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts } from '../../theme';
+import { useAuth } from '../../auth/context';
+import { Loading } from '../../library/ui';
 
 export default function TabsLayout() {
+  const { state } = useAuth();
+  if (state.phase === 'signedOut') return <Redirect href="/sign-in" />;
+  if (state.phase === 'loading' || (state.phase === 'error' && state.busy)) {
+    return <SafeAreaView style={{ flex: 1, justifyContent: 'center', backgroundColor: colors.background }}><Loading /></SafeAreaView>;
+  }
+  if (!state.session && (state.phase === 'error' || !state.offlineOwner)) return <Redirect href="/account" />;
   return <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.background }}><Tabs screenOptions={{
     headerShown: false,
     tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted,

@@ -31,8 +31,9 @@ export default function RootLayout() {
       <Stack.Screen name="probe" options={{ title: 'Проверка устройства' }} />
       <Stack.Screen name="licenses" options={{ title: 'Лицензии шрифтов' }} />
       <Stack.Screen name="preferences" options={{ title: 'Настройки аккаунта' }} />
+      <Stack.Screen name="reading-schedule" options={{ title: 'Время и часовой пояс' }} />
       <Stack.Screen name="account" options={{ title: 'Аккаунт' }} />
-      <Stack.Screen name="sign-in" options={{ title: '', headerStyle: { backgroundColor: colors.background }, headerShadowVisible: false }} />
+      <Stack.Screen name="sign-in" options={{ headerShown: false }} />
       <Stack.Screen name="reset-password" options={{ title: 'Восстановление доступа' }} />
       <Stack.Screen name="email-action" options={{ title: 'Ссылка из письма' }} />
       <Stack.Screen name="staging-access" options={{ title: 'Доступ к тестовому стенду' }} />

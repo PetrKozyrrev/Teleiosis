@@ -47,7 +47,8 @@ function GroupManager({ kind, setKind, request }: { kind: GroupKind; setKind: (k
   return <Page title="Теги и коллекции" scrollRef={scrollRef}>
     <Choice label="Раздел" value={kind} onChange={setKind} disabled={busy}
       options={[{ value: 'tags', label: groupLabels.tags }, { value: 'collections', label: groupLabels.collections }]} />
-    <Body>{kind === 'tags' ? 'Отмечайте темы материалов несколькими тегами.' : 'Собирайте материалы в именованные подборки.'} Изменения доступны при подключении к серверу.</Body>
+    <Body>Категория — основной раздел материала. Теги отмечают темы, а коллекции собирают материалы из разных разделов в подборки.</Body>
+    <Body>{kind === 'tags' ? 'Например, «UX» и «Исследования».' : 'Например, «На выходные».'} Изменения доступны при подключении к серверу.</Body>
     <Card>
       <Text accessibilityRole="header" style={styles.heading}>{editing ? 'Переименование' : kind === 'tags' ? 'Новый тег' : 'Новая коллекция'}</Text>
       <Field label={kind === 'tags' ? 'Название тега' : 'Название коллекции'} value={name} onChangeText={setName}

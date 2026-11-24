@@ -7,9 +7,20 @@ from app.db import Base
 from tests.test_email_auth_migration import migration_db  # noqa: F401
 
 
-def schema_before(connection, *tables):
-    def include_object(_object, name, type_, _reflected, _compare_to):
-        return type_ != "table" or name not in (*tables, "study_goals", "week_budgets", "study_tasks", "study_task_events", "review_cards", "review_answers", "review_creations")
+REVIEW_TABLES = ("review_cards", "review_answers", "review_creations")
+PLAN_TABLES = ("study_goals", "week_budgets", "study_tasks", "study_task_events")
+LIBRARY_LATER_TABLES = (*PLAN_TABLES, *REVIEW_TABLES)
+
+
+def schema_before_redesign(connection, *later_tables):
+    def include_object(obj, name, kind, reflected, _compare_to):
+        if reflected:
+            return True
+        return (
+            (kind != "table" or name not in later_tables)
+            and (kind != "column" or obj.table.name != "users" or name not in {"display_name", "weekly_reading_goal"})
+            and (kind != "index" or name != "ix_contents_user_studied")
+        )
     return MigrationContext.configure(connection, opts={"include_object": include_object})
 
 
@@ -20,7 +31,7 @@ def test_organization_migration_preserves_legacy_material_and_session(migration_
     content = connection.scalar(text("INSERT INTO contents (user_id,title,note) VALUES (:owner,'Legacy','Preserve') RETURNING id"), {"owner": owner})
     connection.execute(text("INSERT INTO auth_sessions (user_id,token_hash,client_type,expires_at) VALUES (:owner,:hash,'mobile',now()+interval '1 day')"), {"owner": owner, "hash": "c" * 64})
     migration.upgrade()
-    assert compare_metadata(schema_before(connection, "library_imports", "pdf_objects"), Base.metadata) == []
+    assert compare_metadata(schema_before_redesign(connection, *LIBRARY_LATER_TABLES, "library_imports", "pdf_objects"), Base.metadata) == []
     tag = connection.scalar(text("INSERT INTO library_groups (user_id,kind,name) VALUES (:owner,'tag','Migrated') RETURNING id"), {"owner": owner})
     connection.execute(text("INSERT INTO content_groups(user_id,content_id,group_id) VALUES (:owner,:content,:tag)"), {"owner": owner, "content": content, "tag": tag})
     migration.downgrade()
@@ -30,7 +41,7 @@ def test_organization_migration_preserves_legacy_material_and_session(migration_
     migration.upgrade()
     assert connection.scalar(text("SELECT count(*) FROM library_groups")) == 0
     assert connection.scalar(text("SELECT version FROM contents WHERE id=:content"), {"content": content}) == 1
-    assert compare_metadata(schema_before(connection, "library_imports", "pdf_objects"), Base.metadata) == []
+    assert compare_metadata(schema_before_redesign(connection, *LIBRARY_LATER_TABLES, "library_imports", "pdf_objects"), Base.metadata) == []
 
 
 @pytest.mark.parametrize("migration_db", ["p6e8f0a2b4c5"], indirect=True)
@@ -43,7 +54,7 @@ def test_import_migration_preserves_existing_library_and_memberships(migration_d
                        {"owner": owner, "content": content, "tag": tag})
 
     migration.upgrade()
-    assert compare_metadata(schema_before(connection, "pdf_objects"), Base.metadata) == []
+    assert compare_metadata(schema_before_redesign(connection, *LIBRARY_LATER_TABLES, "pdf_objects"), Base.metadata) == []
     connection.execute(text("INSERT INTO library_imports(user_id,digest,summary) VALUES (:owner,:digest,'{}')"),
                        {"owner": owner, "digest": "d" * 64})
     migration.downgrade()
@@ -52,4 +63,4 @@ def test_import_migration_preserves_existing_library_and_memberships(migration_d
     assert connection.scalar(text("SELECT note FROM contents WHERE id=:content"), {"content": content}) == "Preserve"
     migration.upgrade()
     assert connection.scalar(text("SELECT count(*) FROM library_imports")) == 0
-    assert compare_metadata(schema_before(connection, "pdf_objects"), Base.metadata) == []
+    assert compare_metadata(schema_before_redesign(connection, *LIBRARY_LATER_TABLES, "pdf_objects"), Base.metadata) == []

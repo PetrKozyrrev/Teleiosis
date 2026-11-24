@@ -4,12 +4,13 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
+import { cachedCategories, readOnline } from '../../offline/cache';
 import { GroupSelection } from '../../library/GroupSelection';
 import { MaterialThumbnail } from '../../library/MaterialThumbnail';
-import { linkDomain, linkInput, type Request } from '../../library/model';
+import { linkDomain, linkInput, type Category, type Request } from '../../library/model';
 import { groupPath, type Group } from '../../library/organization';
-import { LibraryAccess, Notice } from '../../library/ui';
-import { enqueue } from '../../offline/store';
+import { Choice, LibraryAccess, Notice } from '../../library/ui';
+import { enqueue, getJob, subscribe, type Job } from '../../offline/store';
 import { colors } from '../../theme';
 
 type Preview = { title: string | null; image_url: string | null; content_type: string };
@@ -23,8 +24,13 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
   const [note, setNote] = useState('');
   const [collections, setCollections] = useState<Group[]>();
   const [selected, setSelected] = useState<number[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [category, setCategory] = useState<number | null>(null);
+  const [showCollections, setShowCollections] = useState(false);
   const [preview, setPreview] = useState<{ url: string; data: Preview }>();
   const [message, setMessage] = useState('');
+  const [submission, setSubmission] = useState<string>();
+  const [job, setJob] = useState<Job | null>();
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const normalized = linkInput(url);
@@ -33,11 +39,34 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
 
   useFocusEffect(useCallback(() => {
     let active = true;
+    void readOnline(owner, request, '/categories', cachedCategories).then(({ value }) => {
+      if (active && Array.isArray(value)) setCategories(value);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [request, owner]));
+
+  useEffect(() => {
+    if (!showCollections) return;
+    let active = true;
     void request(groupPath('collections'), 'GET').then(value => {
       if (active) setCollections(value as Group[]);
     }).catch(() => {});
     return () => { active = false; };
-  }, [request]));
+  }, [request, showCollections]);
+
+  useFocusEffect(useCallback(() => {
+    if (!owner || !submission) return;
+    let revision = 0;
+    function update() {
+      const current = ++revision;
+      void getJob(owner!, submission!).then(next => {
+        if (revision === current) setJob(next);
+      }).catch(() => {});
+    }
+    const unsubscribe = subscribe(update);
+    update();
+    return () => { revision += 1; unsubscribe(); };
+  }, [owner, submission]));
 
   useEffect(() => {
     if (!normalized || preview?.url === normalized) return;
@@ -53,6 +82,8 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
   function changeUrl(value: string) {
     setUrl(value);
     setMessage('');
+    setSubmission(undefined);
+    setJob(undefined);
   }
 
   async function paste() {
@@ -71,13 +102,16 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
     setBusy(true);
     setMessage('');
     try {
-      await enqueue(owner, { url: url.trim(), ...(note.trim() ? { note: note.trim() } : {}),
+      const id = await enqueue(owner, { url: url.trim(), ...(note.trim() ? { note: note.trim() } : {}),
+        ...(category !== null ? { category_id: category } : {}),
         ...(selected.length ? { collection_ids: selected } : {}) });
       setUrl('');
       setNote('');
       setSelected([]);
+      setCategory(null);
       setPreview(undefined);
-      router.push('/queue');
+      setJob(undefined);
+      setSubmission(id);
     } catch {
       setMessage('Не удалось сохранить черновик на устройстве. Повторите попытку.');
     } finally {
@@ -103,6 +137,14 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
     <Body>Статьи, видео и другие материалы, которые вы хотите перечитать.</Body>
     {url.trim() && !normalized && <Notice>Укажите действительный адрес сайта.</Notice>}
     {message && <Notice>{message}</Notice>}
+    {submission && <Card>
+      <Notice>{job?.state === 'synced' ? 'Ссылка добавлена в библиотеку.'
+        : job?.reason === 'duplicate' ? 'Эта ссылка уже есть в библиотеке.'
+        : job?.state === 'needs_action' ? 'Ссылка сохранена на устройстве. Для отправки нужно действие.'
+        : 'Ссылка сохранена на устройстве и появится в библиотеке после отправки.'}</Notice>
+      <Action variant="text" title={job?.state === 'needs_action' && job.reason !== 'duplicate' ? 'Проверить отправку' : 'Открыть библиотеку'}
+        onPress={() => router.navigate(job?.state === 'needs_action' && job.reason !== 'duplicate' ? '/queue' : '/')} />
+    </Card>}
     {normalized && <>
       <Text style={styles.label}>Предпросмотр</Text>
       <Card><View style={screenStyles.preview}>
@@ -112,8 +154,12 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
           {metadata?.title && <Body>{domain}</Body>}
         </View>
       </View></Card>
-      {collections ? <GroupSelection label="Коллекции" items={collections} selected={selected} onChange={setSelected} disabled={busy} />
-        : <Body>Для выбора коллекции подключитесь к серверу.</Body>}
+      <Choice label="Категория" value={category} onChange={setCategory} disabled={busy}
+        options={[{ value: null, label: 'Без категории' }, ...categories.map(item => ({ value: item.id, label: item.name }))]} />
+      <Action variant="text" title={showCollections ? 'Скрыть коллекции' : 'Добавить в подборку'} disabled={busy}
+        onPress={() => setShowCollections(!showCollections)} />
+      {showCollections && (collections ? <GroupSelection label="Коллекции" items={collections} selected={selected} onChange={setSelected} disabled={busy} />
+        : <Body>Для выбора коллекции подключитесь к серверу.</Body>)}
       <Field label="Заметка (необязательно)" placeholder="Зачем вы сохраняете материал?" value={note} onChangeText={setNote} multiline
         maxLength={10000} editable={!busy} autoCapitalize="sentences" style={screenStyles.note} />
     </>}
