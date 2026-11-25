@@ -5,8 +5,10 @@ import { API_ORIGIN } from '../auth/config';
 import { Action, Body } from '../components/ui';
 import { Notice } from '../library/ui';
 import { clearAccount, listJobs, ownerKey } from '../offline/store';
+import { useTranslation } from '../i18n';
 
 export function SignOut() {
+  const t = useTranslation();
   const { controller, state } = useAuth();
   const isCurrent = controller.captureSession();
   const [message, setMessage] = useState('');
@@ -27,9 +29,9 @@ export function SignOut() {
     try {
       const jobs = owner ? await listJobs(owner) : [];
       if (jobs.some(job => job.state !== 'synced')) {
-        Alert.alert('Удалить черновики и выйти?', 'Материалы, уже сохранённые на сервере, останутся в библиотеке.', [
-          { text: 'Остаться', style: 'cancel' },
-          { text: 'Удалить и выйти', style: 'destructive', onPress: () => void signOut(true) },
+        Alert.alert(t('Удалить черновики и выйти?'), t('Материалы, уже сохранённые на сервере, останутся в библиотеке.'), [
+          { text: t('Остаться'), style: 'cancel' },
+          { text: t('Удалить и выйти'), style: 'destructive', onPress: () => void signOut(true) },
         ]);
       } else {
         await signOut(false);
@@ -39,11 +41,11 @@ export function SignOut() {
     }
   }
   return <>
-    <Action variant="danger" title="Выйти" disabled={state.busy} onPress={() => void exit()} />
+    <Action variant="danger" title={t('Выйти')} disabled={state.busy} onPress={() => void exit()} />
     {message && <Notice>{message}</Notice>}
     {localLogout && <>
-      <Body>Можно удалить сессию только с устройства. Отзыв на сервере не будет подтверждён; серверная сессия завершится по сроку действия.</Body>
-      <Action variant="outline" title="Выйти только на устройстве" disabled={state.busy} onPress={() => void exit(true)} />
+      <Body>{t('Можно удалить сессию только с устройства. Отзыв на сервере не будет подтверждён; серверная сессия завершится по сроку действия.')}</Body>
+      <Action variant="outline" title={t('Выйти только на устройстве')} disabled={state.busy} onPress={() => void exit(true)} />
     </>}
   </>;
 }

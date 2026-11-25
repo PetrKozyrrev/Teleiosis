@@ -4,7 +4,7 @@ from urllib.parse import quote
 
 import pytest
 from pypdf import PdfWriter
-from pypdf.generic import NameObject
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 from sqlalchemy import select
 
 from app import pdf_storage as storage
@@ -24,6 +24,24 @@ def sample_pdf(*, width=100, protected=False, active=False):
     data = BytesIO()
     writer.write(data)
     return data.getvalue()
+
+
+def test_counts_only_text_from_pdf_pages():
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=100, height=100)
+    name = NameObject
+    page[name("/Resources")] = DictionaryObject({name("/Font"): DictionaryObject({
+        name("/F1"): DictionaryObject({name("/Type"): name("/Font"), name("/Subtype"): name("/Type1"),
+                                       name("/BaseFont"): name("/Helvetica")}),
+    })})
+    stream = DecodedStreamObject()
+    stream.set_data(b"BT /F1 10 Tf 10 30 Td (Synthetic text) Tj ET")
+    page.replace_contents(stream)
+    data = BytesIO()
+    writer.write(data)
+
+    assert storage.pdf_character_count(data.getvalue()) == len("Synthetic text")
+    assert storage.pdf_character_count(sample_pdf()) is None
 
 
 CREATE = "/mobile/library/pdf"

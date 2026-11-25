@@ -180,7 +180,9 @@ def save_content(data: ContentCreate, db: DbSession, user: CurrentUser, *,
         description=meta.description if meta else None,
         image_url=meta.image_url if meta else None,
         note=data.note,
-        content_type=content_type,
+        content_type="video" if meta and meta.video_duration_seconds else content_type,
+        video_duration_seconds=meta.video_duration_seconds if meta else None,
+        text_character_count=meta.text_character_count if meta else None,
         source=source,
     )
     try:
@@ -337,6 +339,10 @@ def change_content(content_id: int, data: ContentUpdate | MobileContentUpdate, d
         content.url = new_url
         content.url_normalized = normalized
         content.source, content.content_type = detect_source(new_url)
+        if meta and meta.video_duration_seconds:
+            content.content_type = "video"
+        content.video_duration_seconds = meta.video_duration_seconds if meta else None
+        content.text_character_count = meta.text_character_count if meta else None
         content.description = meta.description if meta else None
         content.image_url = meta.image_url if meta else None
     if collections is not None:

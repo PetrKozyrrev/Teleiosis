@@ -2,11 +2,19 @@ import { useEffect, useState } from 'react';
 import { AppState, Linking, Platform, Text } from 'react-native';
 import { router } from 'expo-router';
 import { clearSharedPayloads, getSharedPayloads } from 'expo-sharing';
+import { API_ORIGIN } from '../auth/config';
+import { useAuth } from '../auth/context';
 import { Action, Body, Card, Page } from '../components/ui';
+import { PendingMaterials } from '../library/PendingMaterials';
 import { inspectShare, type ShareResult } from '../platform/share';
-import { importDraft } from '../offline/store';
+import { importDraft, ownerKey } from '../offline/store';
+import { useTranslation } from '../i18n';
 
 export default function IncomingShare() {
+  const t = useTranslation();
+  const { state } = useAuth();
+  const id = state.session?.user.id ?? (state.phase === 'offline' ? state.offlineOwner : null);
+  const owner = API_ORIGIN && id ? ownerKey(API_ORIGIN, id) : null;
   const [result, setResult] = useState<ShareResult | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(false);
@@ -46,19 +54,21 @@ export default function IncomingShare() {
   }, [revision]);
 
   function dismissUnsupported() {
-    try { clearSharedPayloads(); router.replace('/queue'); }
+    try { clearSharedPayloads(); router.replace('/'); }
     catch { setError(true); }
   }
 
-  return <Page title="Входящий материал"><Card>
-    {error ? <>
-      <Body>Не удалось обработать входящие данные. Повторите локальное сохранение.</Body>
-      <Action title="Повторить" onPress={() => setRevision(value => value + 1)} />
-    </> : result?.ok ? <>
-      {saved && <Body>Черновик сохранён на устройстве. Выберите его во входящих и подтвердите добавление в аккаунт.</Body>}
-      <Text selectable>{result.item.value}</Text>
-    </> : <Body>{result ? result.message : 'Откройте входящие или поделитесь одной ссылкой или текстом.'}</Body>}
-    <Action title="Открыть входящие" onPress={() => router.replace('/queue')} />
-    {result && !result.ok && <Action title="Закрыть и очистить входящий материал" onPress={dismissUnsupported} />}
-  </Card></Page>;
+  return <Page title={t('Входящий материал')}>
+    {error && <Card>
+      <Body>{t('Не удалось обработать входящие данные. Повторите локальное сохранение.')}</Body>
+      <Action title={t('Повторить')} onPress={() => setRevision(value => value + 1)} />
+    </Card>}
+    {!error && result?.ok && !saved && <Text selectable>{result.item.value}</Text>}
+    {!error && result && !result.ok && <Card>
+      <Body>{t(result.message)}</Body>
+      <Action title={t('Закрыть и очистить входящий материал')} onPress={dismissUnsupported} />
+    </Card>}
+    <PendingMaterials owner={owner} inboxOnly onAssigned={() => router.replace('/')} />
+    <Action variant="text" title={t('В библиотеку')} onPress={() => router.replace('/')} />
+  </Page>;
 }

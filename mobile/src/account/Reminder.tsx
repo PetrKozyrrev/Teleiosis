@@ -4,8 +4,11 @@ import { Action, Body, Card, Field } from '../components/ui';
 import { Notice } from '../library/ui';
 import { errorMessage, type Request } from '../library/model';
 import { reminderInstant } from './reminderTime';
+import { useLocale, useTranslation } from '../i18n';
 
 export function Reminder({ id, request }: { id: number; request: Request }) {
+  const t = useTranslation();
+  const locale = useLocale();
   const [current, setCurrent] = useState<{ scheduled_at: string } | null>();
   const [date, setDate] = useState('');
   const [message, setMessage] = useState('');
@@ -38,13 +41,13 @@ export function Reminder({ id, request }: { id: number; request: Request }) {
     } finally { lock.current = false; setBusy(false); }
   }
   return <Card>
-    <Body>Напоминание</Body>
-    <Body>{current ? new Date(current.scheduled_at).toLocaleString('ru-RU') : current === null ? 'Не задано' : 'Загрузка…'}</Body>
-    <Body>Время со смещением UTC, например 2026-12-01T10:00+03:00. Доставка письма зависит от подтверждения почты и настроек напоминаний.</Body>
-    <Field label="Дата и время напоминания" value={date} onChangeText={setDate} editable={!busy} maxLength={22} />
-    <Action title={current ? 'Перенести напоминание' : 'Назначить напоминание'} disabled={busy || !date || current === undefined} onPress={() => void update()} />
-    {current && <Action title="Отменить напоминание" disabled={busy} onPress={() => void update(true)} />}
-    <Action title="Обновить напоминание" disabled={busy} onPress={() => { setCurrent(undefined); setRevision(value => value + 1); }} />
+    <Body>{t('Напоминание')}</Body>
+    <Body>{current ? new Date(current.scheduled_at).toLocaleString(locale) : current === null ? t('Не задано') : t('Загрузка…')}</Body>
+    <Body>{t('Время со смещением UTC, например 2026-12-01T10:00+03:00. Доставка письма зависит от подтверждения почты и настроек напоминаний.')}</Body>
+    <Field label={t('Дата и время напоминания')} value={date} onChangeText={setDate} editable={!busy} maxLength={22} />
+    <Action title={current ? t('Перенести напоминание') : t('Назначить напоминание')} disabled={busy || !date || current === undefined} onPress={() => void update()} />
+    {current && <Action title={t('Отменить напоминание')} disabled={busy} onPress={() => void update(true)} />}
+    <Action title={t('Обновить напоминание')} disabled={busy} onPress={() => { setCurrent(undefined); setRevision(value => value + 1); }} />
     {message && <Notice>{message}</Notice>}
   </Card>;
 }

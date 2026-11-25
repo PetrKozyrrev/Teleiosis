@@ -2,6 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { isAvailableAsync, shareAsync } from 'expo-sharing';
 import type { Request } from '../library/model';
 import { ApiError } from '../auth/api';
+import { translate } from '../i18n';
 
 export async function exportAccount(request: Request, isCurrent = () => true) {
   if (!await isAvailableAsync()) throw new Error('Системная отправка файлов недоступна.');
@@ -20,7 +21,7 @@ export async function exportAccount(request: Request, isCurrent = () => true) {
   try {
     file.create({ overwrite: true });
     file.write(JSON.stringify(data, null, 2));
-    await shareAsync(file.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: 'Выгрузка Телеосис' });
+    await shareAsync(file.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: translate('Выгрузка Телеосис') });
   } finally {
     if (file.exists) file.delete();
   }

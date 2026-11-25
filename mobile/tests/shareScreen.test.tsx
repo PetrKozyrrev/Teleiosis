@@ -4,15 +4,35 @@ import { AppState, Platform, type AppStateStatus } from 'react-native';
 import { router } from 'expo-router';
 import { clearSharedPayloads, getSharedPayloads } from 'expo-sharing';
 import IncomingShare from '../src/app/share-probe';
-import { importDraft } from '../src/offline/store';
+import { assignDraft, importDraft, listJobs, type Job } from '../src/offline/store';
 
-jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
+jest.mock('expo-router', () => ({
+  router: { replace: jest.fn() },
+  useFocusEffect: (callback: () => void) => jest.requireActual<typeof import('react')>('react').useEffect(callback, [callback]),
+}));
 jest.mock('expo-sharing', () => ({ getSharedPayloads: jest.fn(), clearSharedPayloads: jest.fn() }));
-jest.mock('../src/offline/store', () => ({ importDraft: jest.fn() }));
+jest.mock('../src/offline/store', () => ({
+  importDraft: jest.fn(), listJobs: jest.fn(), assignDraft: jest.fn(), ownerKey: () => 'account-1', unassigned: '',
+  subscribe: (callback: () => void) => { mockNotify = callback; return () => { mockNotify = () => {}; }; },
+}));
+jest.mock('../src/auth/config', () => ({ ...jest.requireActual<Record<string, unknown>>('../src/auth/config'), API_ORIGIN: 'https://example.com' }));
+jest.mock('../src/auth/context', () => ({
+  useAuth: () => ({ controller: { snapshot: () => auth, captureSession: () => () => true }, state: auth }),
+}));
+
+const auth = { phase: 'signedIn', busy: false, session: { user: { id: 1, email: 'test@example.com' } } };
+let mockNotify = () => {};
 
 beforeEach(() => {
   Platform.OS = 'android';
-  jest.mocked(importDraft).mockReset().mockResolvedValue(undefined);
+  jest.mocked(listJobs).mockReset().mockResolvedValue([]);
+  jest.mocked(assignDraft).mockReset().mockResolvedValue(undefined);
+  jest.mocked(importDraft).mockReset().mockImplementation(async payload => {
+    const draft: Job = { id: 'incoming-1', owner: '', state: 'draft', payload: JSON.stringify(payload),
+      reason: null, server_id: null, attempts: 0, next_at: 0, tried_at: null };
+    jest.mocked(listJobs).mockResolvedValue([draft]);
+    mockNotify();
+  });
   jest.mocked(clearSharedPayloads).mockReset().mockImplementation(() => { jest.mocked(getSharedPayloads).mockReturnValue([]); });
   jest.mocked(getSharedPayloads).mockReset().mockReturnValue([{ shareType: 'text', value: 'Проверочный текст' }]);
   jest.mocked(router.replace).mockClear();
@@ -23,8 +43,9 @@ test('persists the share as a draft before clearing the native payload', async (
   expect(screen.getByText('Проверочный текст')).toBeTruthy();
   expect(importDraft).toHaveBeenCalledWith({ note: 'Проверочный текст' });
   expect(jest.mocked(importDraft).mock.invocationCallOrder[0]).toBeLessThan(jest.mocked(clearSharedPayloads).mock.invocationCallOrder[0]);
-  await fireEvent.press(screen.getByRole('button', { name: 'Открыть входящие' }));
-  expect(router.replace).toHaveBeenCalledWith('/queue');
+  await fireEvent.press(screen.getByRole('button', { name: 'Добавить в этот аккаунт' }));
+  expect(assignDraft).toHaveBeenCalledWith('incoming-1', 'account-1');
+  expect(router.replace).toHaveBeenCalledWith('/');
 });
 
 test('retains the native payload when SQLite cannot persist it', async () => {

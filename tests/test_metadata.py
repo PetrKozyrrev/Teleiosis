@@ -241,6 +241,12 @@ def test_network_error_is_swallowed():
 
 def test_youtube_uses_oembed():
     def handler(request):
+        if request.url.path == "/watch":
+            assert request.url.params["v"] == "dQw4w9WgXcQ"
+            return httpx2.Response(200, headers={"content-type": "text/html"}, text=(
+                " " * metadata.MAX_BYTES + '<script>var ytInitialPlayerResponse = {"videoDetails": '
+                '{"videoId":"dQw4w9WgXcQ","lengthSeconds":"213"}};</script>'
+            ))
         assert request.url.path == "/oembed"
         return httpx2.Response(
             200,
@@ -255,6 +261,21 @@ def test_youtube_uses_oembed():
     )
     assert result.title == "Never Gonna Give You Up"
     assert result.image_url.startswith("https://i.ytimg.com/")
+    assert result.video_duration_seconds == 213
+
+
+def test_counts_article_text_without_navigation_or_script():
+    html = "<head><title>Title</title></head><body><nav>Menu</nav><main><article>First <b>paragraph</b>.<script>hidden</script> Second</article></main></body>"
+    result = fetch_metadata("https://example.com/article", transport=page(html))
+    assert result.text_character_count == len("First paragraph. Second")
+    assert result.video_duration_seconds is None
+
+
+def test_public_video_metadata_has_duration_without_estimated_reading_time():
+    html = '<head><meta property="og:type" content="video.other"><meta itemprop="duration" content="PT12M30S"></head><body>Video description</body>'
+    result = fetch_metadata("https://example.com/video", transport=page(html))
+    assert result.video_duration_seconds == 750
+    assert result.text_character_count is None
 
 
 def test_youtube_error_returns_none():

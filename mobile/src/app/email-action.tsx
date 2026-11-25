@@ -4,6 +4,7 @@ import { Action, Body, Card, Field, Page } from '../components/ui';
 import { useAuth } from '../auth/context';
 import { API_ORIGIN } from '../auth/config';
 import { clearEmailAction, emailActionSnapshot, receiveEmailLink, subscribeEmailActions, type EmailAction } from '../auth/emailLinks';
+import { useTranslation } from '../i18n';
 
 export default function EmailActionScreen() {
   const action = useSyncExternalStore(subscribeEmailActions, emailActionSnapshot, emailActionSnapshot);
@@ -12,6 +13,7 @@ export default function EmailActionScreen() {
 }
 
 function EmailActionForm({ action, notice, onResult }: { action: EmailAction | null; notice: string | null; onResult: (value: string | null) => void }) {
+  const t = useTranslation();
   const { controller, state } = useAuth();
   const [link, setLink] = useState('');
   const [password, setPassword] = useState('');
@@ -31,21 +33,21 @@ function EmailActionForm({ action, notice, onResult }: { action: EmailAction | n
       clearEmailAction(action.id);
     } catch (error) { setPassword(''); setRepeat(''); setMessage(error instanceof Error ? error.message : 'Не удалось применить ссылку.'); }
   }
-  return <Page title={action?.kind === 'reset' ? 'Новый пароль' : action?.kind === 'verify' ? 'Подтвердить почту' : 'Ссылка из письма'}><Card>
+  return <Page title={action?.kind === 'reset' ? t('Новый пароль') : action?.kind === 'verify' ? t('Подтвердить почту') : t('Ссылка из письма')}><Card>
     {action ? <>
-      <Body>{action.kind === 'reset' ? 'После сброса все сессии этого аккаунта завершатся. Потребуется войти заново.' : 'Подтвердите адрес электронной почты по полученной ссылке.'}</Body>
+      <Body>{action.kind === 'reset' ? t('После сброса все сессии этого аккаунта завершатся. Потребуется войти заново.') : t('Подтвердите адрес электронной почты по полученной ссылке.')}</Body>
       {action.kind === 'reset' && <>
-        <Field label="Новый пароль" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" maxLength={128} editable={!state.busy} />
-        <Field label="Повторите новый пароль" value={repeat} onChangeText={setRepeat} secureTextEntry maxLength={128} editable={!state.busy} />
+        <Field label={t('Новый пароль')} value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" maxLength={128} editable={!state.busy} />
+        <Field label={t('Повторите новый пароль')} value={repeat} onChangeText={setRepeat} secureTextEntry maxLength={128} editable={!state.busy} />
       </>}
-      <Action title={action.kind === 'reset' ? 'Изменить пароль' : 'Подтвердить адрес'} disabled={state.busy || (action.kind === 'reset' && (password.length < 10 || password !== repeat))} onPress={() => void confirm()} />
-      <Action title="Отменить" disabled={state.busy} onPress={() => { onResult(null); clearEmailAction(action.id); }} />
+      <Action title={action.kind === 'reset' ? t('Изменить пароль') : t('Подтвердить адрес')} disabled={state.busy || (action.kind === 'reset' && (password.length < 10 || password !== repeat))} onPress={() => void confirm()} />
+      <Action title={t('Отменить')} disabled={state.busy} onPress={() => { onResult(null); clearEmailAction(action.id); }} />
     </> : <>
-      <Body>Откройте ссылку из письма или вставьте её сюда. Текст ссылки не сохраняется.</Body>
-      <Field label="Ссылка из письма" value={link} onChangeText={setLink} secureTextEntry autoComplete="off" editable={!state.busy} maxLength={2048} />
-      <Action title="Открыть ссылку" disabled={state.busy || !link.trim()} onPress={open} />
+      <Body>{t('Откройте ссылку из письма или вставьте её сюда. Текст ссылки не сохраняется.')}</Body>
+      <Field label={t('Ссылка из письма')} value={link} onChangeText={setLink} secureTextEntry autoComplete="off" editable={!state.busy} maxLength={2048} />
+      <Action title={t('Открыть ссылку')} disabled={state.busy || !link.trim()} onPress={open} />
     </>}
-    {message && <Text accessibilityLiveRegion="polite">{message}</Text>}
-    {!action && !message && notice && <Text accessibilityLiveRegion="polite">{notice}</Text>}
+    {message && <Text accessibilityLiveRegion="polite">{t(message)}</Text>}
+    {!action && !message && notice && <Text accessibilityLiveRegion="polite">{t(notice)}</Text>}
   </Card></Page>;
 }

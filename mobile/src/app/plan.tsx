@@ -5,6 +5,7 @@ import { Action, Body, Card, Field, Page } from '../components/ui';
 import { Choice, LibraryAccess, Loading, Notice } from '../library/ui';
 import { parseId, type Request } from '../library/model';
 import { minutesValid, planError, priorities, shiftDay, validDay, type Task, type Week } from '../plan/model';
+import { useTranslation } from '../i18n';
 
 type Save = (operation: () => Promise<unknown>, after?: (result: unknown) => void) => Promise<void>;
 
@@ -14,6 +15,7 @@ export default function PlanRoute() {
 }
 
 function Planner({ request, contentId }: { request: Request; contentId: number | null }) {
+  const t = useTranslation();
   const [anchor, setAnchor] = useState('');
   const [revision, setRevision] = useState(0);
   const [week, setWeek] = useState<Week>();
@@ -74,61 +76,62 @@ function Planner({ request, contentId }: { request: Request; contentId: number |
   const selected = week?.goals.find(goal => goal.id === goalId);
   const summary = week?.summary;
   const next = week?.tasks.find(task => task.id === summary?.next_id);
-  return <Page title="Недельный план">
+  return <Page title={t('Недельный план')}>
     {message ? <Notice>{message}</Notice> : null}
     {week && summary ? <>
       <Card><Body>{week.week} — {week.end}</Body>
-        <Body>{summary.total ? `Выполнено ${summary.done} из ${summary.total} · ${Math.round(summary.done * 100 / summary.total)} %` : 'Пока нет заданий'}</Body>
-        <Body>По плану {summary.planned_minutes} мин · выполнено на {summary.done_minutes} мин</Body>
-        {week.budget !== null && <Body>Бюджет недели · {week.budget} мин</Body>}
-        {week.budget !== null && summary.planned_minutes > week.budget && <Body>План превышает бюджет на {summary.planned_minutes - week.budget} мин. Перенесите часть заданий.</Body>}
-        {next && <Body>Следующее по приоритету · {next.title} · {next.day}</Body>}
-        <Action title="Предыдущая неделя" disabled={busy || !validDay(shiftDay(week.week, -7))} onPress={() => navigateWeek(shiftDay(week.week, -7))} />
-        <Action title="Следующая неделя" disabled={busy || !validDay(shiftDay(week.week, 7))} onPress={() => navigateWeek(shiftDay(week.week, 7))} />
+        <Body>{summary.total ? t('Выполнено {0} из {1} · {2} %', summary.done, summary.total, Math.round(summary.done * 100 / summary.total)) : t('Пока нет заданий')}</Body>
+        <Body>{t('По плану')} {summary.planned_minutes} {t('мин · выполнено на')} {summary.done_minutes} {t('мин')}</Body>
+        {week.budget !== null && <Body>{t('Бюджет недели ·')} {week.budget} {t('мин')}</Body>}
+        {week.budget !== null && summary.planned_minutes > week.budget && <Body>{t('План превышает бюджет на')} {summary.planned_minutes - week.budget} {t('мин. Перенесите часть заданий.')}</Body>}
+        {next && <Body>{t('Следующее по приоритету ·')} {next.title} · {next.day}</Body>}
+        <Action title={t('Предыдущая неделя')} disabled={busy || !validDay(shiftDay(week.week, -7))} onPress={() => navigateWeek(shiftDay(week.week, -7))} />
+        <Action title={t('Следующая неделя')} disabled={busy || !validDay(shiftDay(week.week, 7))} onPress={() => navigateWeek(shiftDay(week.week, 7))} />
       </Card>
-      <Card><Field label="Бюджет недели в минутах" value={budget} onChangeText={setBudget} keyboardType="number-pad" maxLength={5} />
-        <Action title="Сохранить бюджет" disabled={disabled || !minutesValid(budget, 10080) || Number(budget) === week.budget}
+      <Card><Field label={t('Бюджет недели в минутах')} value={budget} onChangeText={setBudget} keyboardType="number-pad" maxLength={5} />
+        <Action title={t('Сохранить бюджет')} disabled={disabled || !minutesValid(budget, 10080) || Number(budget) === week.budget}
           onPress={() => void save(() => request(`/mobile/plan/weeks/${week.week}/budget`, 'PUT', { minutes: Number(budget), previous: week.budget }))} />
       </Card>
-      <Card><Field label="Название новой цели" value={goalName} maxLength={100} onChangeText={setGoalName} />
-        <Action title="Создать цель" disabled={disabled || !goalName.trim()} onPress={() => void save(
+      <Card><Field label={t('Название новой цели')} value={goalName} maxLength={100} onChangeText={setGoalName} />
+        <Action title={t('Создать цель')} disabled={disabled || !goalName.trim()} onPress={() => void save(
           () => request('/mobile/plan/goals', 'POST', { name: goalName.trim() }),
           goal => { setGoalId((goal as { id: number }).id); setGoalName(''); })} />
-        {week.goals.length > 0 && <Choice label="Цель" value={goalId} onChange={setGoalId} disabled={disabled}
+        {week.goals.length > 0 && <Choice label={t('Цель')} value={goalId} onChange={setGoalId} disabled={disabled}
           options={week.goals.map(goal => ({ value: goal.id, label: goal.name }))} />}
-        {selected && <Action title="Удалить выбранную цель" disabled={disabled} onPress={() => Alert.alert(
-          `Удалить «${selected.name}»?`, 'Задания этой цели за все недели будут удалены. Материалы останутся в библиотеке.',
-          [{ text: 'Отмена', style: 'cancel' }, { text: 'Удалить', style: 'destructive',
+        {selected && <Action title={t('Удалить выбранную цель')} disabled={disabled} onPress={() => Alert.alert(
+          t('Удалить «{0}»?', selected.name), t('Задания этой цели за все недели будут удалены. Материалы останутся в библиотеке.'),
+          [{ text: t('Отмена'), style: 'cancel' }, { text: t('Удалить'), style: 'destructive',
             onPress: () => void save(() => request(`/mobile/plan/goals/${selected.id}`, 'DELETE')) }])} />}
       </Card>
       {contentId && !added ? <Card><Body>{materialTitle}</Body>
-        <Field label="Дата задания (ГГГГ-ММ-ДД)" value={day} onChangeText={setDay} maxLength={10} />
-        <Field label="Длительность в минутах" value={minutes} onChangeText={setMinutes} keyboardType="number-pad" maxLength={4} />
-        <Choice label="Приоритет" value={priority} options={priorities} onChange={setPriority} disabled={disabled} />
-        <Action title="Запланировать материал" disabled={disabled || !selected || !validDay(day) || !minutesValid(minutes, 1440)}
+        <Field label={t('Дата задания (ГГГГ-ММ-ДД)')} value={day} onChangeText={setDay} maxLength={10} />
+        <Field label={t('Длительность в минутах')} value={minutes} onChangeText={setMinutes} keyboardType="number-pad" maxLength={4} />
+        <Choice label={t('Приоритет')} value={priority} options={priorities.map(option => ({ ...option, label: t(option.label) }))} onChange={setPriority} disabled={disabled} />
+        <Action title={t('Запланировать материал')} disabled={disabled || !selected || !validDay(day) || !minutesValid(minutes, 1440)}
           onPress={() => void save(() => request('/mobile/plan/tasks', 'POST', { goal_id: goalId, content_id: contentId,
             day, minutes: Number(minutes), priority }), () => { setAdded(true); setAnchor(day); })} />
-      </Card> : <Action title="Выбрать материал в библиотеке" disabled={busy} onPress={() => router.dismissTo('/')} />}
+      </Card> : <Action title={t('Выбрать материал в библиотеке')} disabled={busy} onPress={() => router.dismissTo('/')} />}
       {week.tasks.map(task => <TaskRow key={task.id} task={task} disabled={disabled} save={save} request={request} />)}
     </> : !message && <Loading />}
-    <Action title="Обновить план" disabled={busy} onPress={refresh} />
+    <Action title={t('Обновить план')} disabled={busy} onPress={refresh} />
   </Page>;
 }
 
 function TaskRow({ task, disabled, save, request }: { task: Task; disabled: boolean; save: Save; request: Request }) {
+  const t = useTranslation();
   const [day, setDay] = useState(task.day);
   const path = `/mobile/plan/tasks/${task.id}` as const;
   const options = { version: task.version };
   return <Card><Body>{task.title} · {task.goal_name}</Body>
-    <Body>{task.day} · {task.minutes} мин · {priorities.find(p => p.value === task.priority)?.label} приоритет</Body>
-    {task.completed_at ? <Body>Выполнено</Body> : <>
-      <Action title="Завершить задание" disabled={disabled} onPress={() => void save(() => request(`${path}/complete`, 'PUT', undefined, options))} />
-      <Field label="Перенести на дату (ГГГГ-ММ-ДД)" value={day} onChangeText={setDay} maxLength={10} />
-      <Action title="Перенести задание" disabled={disabled || day === task.day || !validDay(day)}
+    <Body>{task.day} · {task.minutes} {t('мин ·')} {t(priorities.find(p => p.value === task.priority)?.label ?? '')} {t('приоритет')}</Body>
+    {task.completed_at ? <Body>{t('Выполнено')}</Body> : <>
+      <Action title={t('Завершить задание')} disabled={disabled} onPress={() => void save(() => request(`${path}/complete`, 'PUT', undefined, options))} />
+      <Field label={t('Перенести на дату (ГГГГ-ММ-ДД)')} value={day} onChangeText={setDay} maxLength={10} />
+      <Action title={t('Перенести задание')} disabled={disabled || day === task.day || !validDay(day)}
         onPress={() => void save(() => request(`${path}/day`, 'PUT', { day }, options))} />
     </>}
-    <Action title="Открыть материал" onPress={() => router.push({ pathname: '/library/[id]', params: { id: String(task.content_id) } })} />
-    <Action title="Убрать задание" disabled={disabled} onPress={() => Alert.alert('Убрать задание из плана?', task.title,
-      [{ text: 'Отмена', style: 'cancel' }, { text: 'Убрать', style: 'destructive', onPress: () => void save(() => request(path, 'DELETE', undefined, options)) }])} />
+    <Action title={t('Открыть материал')} onPress={() => router.push({ pathname: '/library/[id]', params: { id: String(task.content_id) } })} />
+    <Action title={t('Убрать задание')} disabled={disabled} onPress={() => Alert.alert(t('Убрать задание из плана?'), task.title,
+      [{ text: t('Отмена'), style: 'cancel' }, { text: t('Убрать'), style: 'destructive', onPress: () => void save(() => request(path, 'DELETE', undefined, options)) }])} />
   </Card>;
 }

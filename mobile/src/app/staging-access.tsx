@@ -6,8 +6,10 @@ import { useAuth } from '../auth/context';
 import { API_ORIGIN, STAGING_GATE } from '../auth/config';
 import { vault } from '../auth/vault';
 import { ApiError } from '../auth/api';
+import { useTranslation } from '../i18n';
 
 export default function StagingAccess() {
+  const t = useTranslation();
   const { controller, state } = useAuth();
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -30,11 +32,11 @@ export default function StagingAccess() {
     }
     finally { setBusy(false); }
   }
-  return <Page title="Закрытый тестовый стенд"><Card>
-    <Body>Администратор выдаёт отдельный пароль доступа к стенду. Это не пароль вашего аккаунта.</Body>
-    <Body>Письма остаются у администратора. Используйте только вымышленные данные.</Body>
-    <Field label="Пароль доступа к стенду" value={password} onChangeText={setPassword} secureTextEntry autoComplete="off" maxLength={256} editable={!busy && !state.busy} />
-    <Action title={busy ? 'Проверяем доступ…' : 'Проверить и сохранить доступ'} disabled={busy || state.busy || !password.trim()} onPress={() => void save()} />
-    {message && <Text accessibilityLiveRegion="polite">{message}</Text>}
+  return <Page title={t('Закрытый тестовый стенд')}><Card>
+    <Body>{t('Администратор выдаёт отдельный пароль доступа к стенду. Это не пароль вашего аккаунта.')}</Body>
+    <Body>{t('Письма остаются у администратора. Используйте только вымышленные данные.')}</Body>
+    <Field label={t('Пароль доступа к стенду')} value={password} onChangeText={setPassword} secureTextEntry autoComplete="off" maxLength={256} editable={!busy && !state.busy} />
+    <Action title={busy ? t('Проверяем доступ…') : t('Проверить и сохранить доступ')} disabled={busy || state.busy || !password.trim()} onPress={() => void save()} />
+    {message && <Text accessibilityLiveRegion="polite">{t(message)}</Text>}
   </Card></Page>;
 }

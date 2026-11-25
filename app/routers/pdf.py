@@ -126,6 +126,7 @@ def create_pdf(db: DbSession, user: CurrentUser,
         check_category(db, owner, category_id)
         db.rollback()
         storage.scan_pdf(data)
+        characters = storage.pdf_character_count(data)
         lock_owner(db, owner)
         pending = matching_pdf(db, owner, digest)
         material = published_material(db, pending)
@@ -154,7 +155,8 @@ def create_pdf(db: DbSession, user: CurrentUser,
             raise HTTPException(409, {"code": "pdf_removed"})
         check_category(db, owner, category_id, lock=True)
         storage.put_pdf(pending.id, data)
-        material = Content(user_id=owner, title=title, category_id=category_id, content_type="pdf", source="other")
+        material = Content(user_id=owner, title=title, category_id=category_id, content_type="pdf", source="other",
+                           text_character_count=characters)
         db.add(material)
         db.flush()
         pending.user_id = owner

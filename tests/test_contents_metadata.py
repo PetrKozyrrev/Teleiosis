@@ -50,8 +50,23 @@ def test_fallback_title_when_metadata_has_no_title(client, monkeypatch):
 
 def test_note_does_not_trigger_fetch(client, monkeypatch):
     calls = stub(monkeypatch, Metadata("X", None, None))
-    assert save(client, note="просто заметка").status_code == 201
+    response = save(client, note="Я" * 1001)
+    assert response.status_code == 201
+    assert response.json()["reading_minutes"] == 2
     assert calls == []
+
+
+def test_list_includes_source_duration_and_reading_estimates(client, monkeypatch):
+    stub(monkeypatch, Metadata(video_duration_seconds=753))
+    video = save(client, url="https://youtu.be/dQw4w9WgXcQ").json()
+    stub(monkeypatch, Metadata(text_character_count=2400))
+    article = save(client, url="https://example.com/a").json()
+
+    items = {item["id"]: item for item in client.get("/contents", headers=auth(1)).json()["items"]}
+    assert items[video["id"]]["video_duration_seconds"] == 753
+    assert items[video["id"]]["reading_minutes"] is None
+    assert items[article["id"]]["reading_minutes"] == 3
+    assert "text_character_count" not in items[article["id"]]
 
 
 def test_duplicate_does_not_trigger_second_fetch(client, monkeypatch):

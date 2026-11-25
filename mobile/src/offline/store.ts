@@ -78,7 +78,7 @@ export async function enqueue(owner: string, payload: Draft, edit?: string) {
           (state = 'needs_action' AND reason IN ('invalid', 'category', 'collection'))
         )
       `, id, serialized, owner ? 'pending' : 'draft', owner, edit);
-      if (!result.changes) throw new Error('Этот черновик уже отправляется. Проверьте очередь.');
+      if (!result.changes) throw new Error('Этот черновик изменился или уже отправляется. Ошибки отправки видны на экране «Добавить ссылку».');
     } else {
       await db.runAsync('INSERT INTO jobs(id,owner,payload,state,created_at) VALUES(?,?,?,?,?)',
         id, owner, serialized, owner ? 'pending' : 'draft', Date.now());

@@ -27,6 +27,8 @@ export type Material = {
   source: Source;
   open_count: number;
   created_at?: string;
+  video_duration_seconds?: number | null;
+  reading_minutes?: number | null;
   version?: number;
 };
 export type MaterialPage = { items: Material[]; total: number; limit: number; offset: number };
@@ -46,8 +48,8 @@ export const initialFilters: Filters = { q: '', searchIn: '', status: '', source
 export const pageSize = 20;
 export const maxOffset = 1_000_000;
 
-export function listPath({ q, searchIn, status, source, contentType, category, sort, tag, collection }: Filters, offset: number): LibraryPath {
-  const query = new URLSearchParams({ sort, limit: String(pageSize), offset: String(offset) });
+export function listPath({ q, searchIn, status, source, contentType, category, sort, tag, collection }: Filters, offset: number, limit = pageSize): LibraryPath {
+  const query = new URLSearchParams({ sort, limit: String(limit), offset: String(offset) });
   if (q.trim()) query.set('q', q.trim());
   if (status) query.set('status', status);
   if (source) query.set('source', source);

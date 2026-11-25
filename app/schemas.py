@@ -9,6 +9,7 @@ from pydantic import (
     Field,
     StrictBool,
     StringConstraints,
+    computed_field,
     field_serializer,
     field_validator,
     model_validator,
@@ -160,6 +161,18 @@ class ContentOut(BaseModel):
     last_opened_at: datetime | None
     open_count: int
     version: int
+    video_duration_seconds: int | None = None
+    text_character_count: int | None = Field(default=None, exclude=True)
+
+    @computed_field
+    @property
+    def reading_minutes(self) -> int | None:
+        if self.content_type == "video":
+            return None
+        characters = self.text_character_count
+        if self.url is None and self.content_type != "pdf" and self.note:
+            characters = len(" ".join(self.note.split()))
+        return (characters + 999) // 1000 if characters else None
 
 class ContentPage(BaseModel):
     items: list[ContentOut]

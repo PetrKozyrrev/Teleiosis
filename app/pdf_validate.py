@@ -56,7 +56,13 @@ def main() -> int:
     resource.setrlimit(resource.RLIMIT_CPU, (5, 5))
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     try:
-        return 0 if is_static_pdf(sys.stdin.buffer.read(10 * 1024**2 + 1)) else 1
+        data = sys.stdin.buffer.read(10 * 1024**2 + 1)
+        if sys.argv[1:] == ["--count-text"]:
+            reader = PdfReader(io.BytesIO(data), strict=True, xref_stream_maximum_entries=30_000)
+            count = sum(len(" ".join(page.extract_text().split())) for page in reader.pages)
+            print(count)
+            return 0
+        return 0 if is_static_pdf(data) else 1
     except Exception:
         return 1
 

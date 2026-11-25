@@ -3,13 +3,15 @@ import { Alert, Text, type ScrollView } from 'react-native';
 import { ApiError } from '../../auth/api';
 import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
 import { errorMessage, uncertainCreate, type Category, type Request } from '../../library/model';
-import { LibraryAccess, Loading, Notice } from '../../library/ui';
+import { LibraryAccess, Loading, Notice, RenameAction } from '../../library/ui';
+import { useTranslation } from '../../i18n';
 
 export default function CategoriesRoute() {
   return <LibraryAccess>{request => <Categories request={request} />}</LibraryAccess>;
 }
 
 function Categories({ request }: { request: Request }) {
+  const t = useTranslation();
   const [items, setItems] = useState<Category[] | null>(null);
   const [name, setName] = useState('');
   const [editing, setEditing] = useState<Category | null>(null);
@@ -57,36 +59,36 @@ function Categories({ request }: { request: Request }) {
   }
 
   function remove(category: Category) {
-    Alert.alert('Удалить категорию?', 'Материалы останутся в библиотеке без категории.', [
-      { text: 'Отмена', style: 'cancel' },
-      { text: 'Удалить', style: 'destructive', onPress: () => void change(category, 'DELETE') },
+    Alert.alert(t('Удалить категорию?'), t('Материалы останутся в библиотеке без категории.'), [
+      { text: t('Отмена'), style: 'cancel' },
+      { text: t('Удалить'), style: 'destructive', onPress: () => void change(category, 'DELETE') },
     ]);
   }
 
-  return <Page title="Категории" scrollRef={scrollRef}>
+  return <Page title={t('Категории')} scrollRef={scrollRef}>
     <Card>
-      <Text accessibilityRole="header" style={styles.heading}>{editing ? 'Переименовать категорию' : 'Новая категория'}</Text>
-      <Field label="Название категории" value={name} onChangeText={setName}
+      <Text accessibilityRole="header" style={styles.heading}>{editing ? t('Переименовать категорию') : t('Новая категория')}</Text>
+      <Field label={t('Название категории')} value={name} onChangeText={setName}
         maxLength={50} autoCapitalize="sentences" editable={!busy} />
-      <Action title={busy ? 'Сохранение…' : 'Сохранить категорию'} disabled={busy || !name.trim()}
+      <Action title={busy ? t('Сохранение…') : t('Сохранить категорию')} disabled={busy || !name.trim()}
         onPress={() => void change(editing, editing ? 'PATCH' : 'POST')} />
-      {editing && <Action title="Отменить переименование" disabled={busy} onPress={() => { setEditing(null); setName(''); setMessage(''); }} />}
+      {editing && <Action title={t('Отменить переименование')} disabled={busy} onPress={() => { setEditing(null); setName(''); setMessage(''); }} />}
       {message && <Notice>{message}</Notice>}
     </Card>
     {loadError && <>
       <Notice>{loadError}</Notice>
-      <Action title="Обновить список категорий" onPress={() => setRevision(value => value + 1)} />
+      <Action title={t('Обновить список категорий')} onPress={() => setRevision(value => value + 1)} />
     </>}
     {!items && !loadError && <Loading />}
-    {items?.length === 0 && <Body>Категорий пока нет.</Body>}
+    {items?.length === 0 && <Body>{t('Категорий пока нет.')}</Body>}
     {items?.map(category => <Card key={category.id}>
       <Text style={styles.heading}>{category.name}</Text>
-      <Body>Материалов · {category.contents_count}</Body>
-      <Action title={`Переименовать «${category.name}»`} disabled={busy} onPress={() => {
+      <Body>{t('Материалов ·')} {category.contents_count}</Body>
+      <RenameAction title={t('Переименовать «{0}»', category.name)} disabled={busy} onPress={() => {
         setEditing(category); setName(category.name); setMessage('');
         scrollRef.current?.scrollTo({ y: 0, animated: true });
       }} />
-      <Action title={`Удалить «${category.name}»`} disabled={busy} onPress={() => remove(category)} />
+      <Action variant="danger" title={t('Удалить «{0}»', category.name)} disabled={busy} onPress={() => remove(category)} />
     </Card>)}
   </Page>;
 }

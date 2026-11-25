@@ -5,12 +5,14 @@ import { Action, Body, Card, Page } from '../../components/ui';
 import { importError, pickImportFile, submitImport, type ImportFile, type ImportSummary } from '../../library/import';
 import type { Request } from '../../library/model';
 import { LibraryAccess, Loading, Notice } from '../../library/ui';
+import { useTranslation } from '../../i18n';
 
 export default function ImportLibrary() {
   return <LibraryAccess>{request => <ImportView request={request} />}</LibraryAccess>;
 }
 
 function ImportView({ request }: { request: Request }) {
+  const t = useTranslation();
   const { controller, state } = useAuth();
   const [file, setFile] = useState<ImportFile | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
@@ -67,22 +69,22 @@ function ImportView({ request }: { request: Request }) {
     }, mode === 'apply');
   }
 
-  return <Page title="Импорт библиотеки"><Card>
-    <Body>Выберите JSON-выгрузку Teleiosis до 2 МиБ и 500 материалов. Для проверки и импорта требуется подключение.</Body>
-    {state.session?.user.email && <Body>Аккаунт: {state.session.user.email}</Body>}
-    <Action title="Выбрать файл" disabled={busy} onPress={choose} />
+  return <Page title={t('Импорт библиотеки')}><Card>
+    <Body>{t('Выберите JSON-выгрузку Teleiosis до 2 МиБ и 500 материалов. Для проверки и импорта требуется подключение.')}</Body>
+    {state.session?.user.email && <Body>{t('Аккаунт:')} {state.session.user.email}</Body>}
+    <Action title={t('Выбрать файл')} disabled={busy} onPress={choose} />
     {file && <>
       <Body>{file.name}</Body>
-      <Action title={summary ? 'Проверить ещё раз' : 'Проверить файл'} disabled={busy} onPress={() => send('preview')} />
+      <Action title={summary ? t('Проверить ещё раз') : t('Проверить файл')} disabled={busy} onPress={() => send('preview')} />
     </>}
     {summary && <>
-      <Notice>{summary.replayed ? 'Этот файл уже был импортирован. Результат первого импорта.' :
-        applied ? 'Импорт завершён.' : 'Предварительный результат'}</Notice>
-      <Body>Материалы: {summary.materials} · Повторы: {summary.duplicates}</Body>
-      <Body>Категории: {summary.categories} · Теги: {summary.tags} · Коллекции: {summary.collections} · Назначения: {summary.memberships}</Body>
+      <Notice>{summary.replayed ? t('Этот файл уже был импортирован. Результат первого импорта.') :
+        applied ? t('Импорт завершён.') : t('Предварительный результат')}</Notice>
+      <Body>{t('Материалы:')} {summary.materials} {t('· Повторы:')} {summary.duplicates}</Body>
+      <Body>{t('Категории:')} {summary.categories} {t('· Теги:')} {summary.tags} {t('· Коллекции:')} {summary.collections} {t('· Назначения:')} {summary.memberships}</Body>
       {!applied && <>
-        <Body>У повторов сохранятся существующие данные и назначения.</Body>
-        <Action title="Импортировать" disabled={busy} onPress={() => send('apply')} />
+        <Body>{t('У повторов сохранятся существующие данные и назначения.')}</Body>
+        <Action title={t('Импортировать')} disabled={busy} onPress={() => send('apply')} />
       </>}
     </>}
     {busy && <Loading />}

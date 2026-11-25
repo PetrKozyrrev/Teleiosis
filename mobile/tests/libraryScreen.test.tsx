@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import { router } from 'expo-router';
 import { openURL } from 'expo-linking';
-import { enqueue } from '../src/offline/store';
+import { enqueue, getJob, listJobs, retry, type Job } from '../src/offline/store';
 import type { Material, MaterialPage, Request } from '../src/library/model';
 import { useAuth } from '../src/auth/context';
 import { ApiError } from '../src/auth/api';
@@ -13,7 +13,8 @@ import MaterialRoute from '../src/app/library/[id]';
 import { pickPdf } from '../src/library/pdf';
 
 jest.mock('../src/offline/store', () => ({
-  enqueue: jest.fn(), getJob: async () => null, generation: () => 0, subscribe: () => () => {}, ownerKey: () => 'account-1', unassigned: '',
+  enqueue: jest.fn(), getJob: jest.fn(), listJobs: jest.fn(), retry: jest.fn(), generation: () => 0,
+  subscribe: () => () => {}, ownerKey: () => 'account-1', unassigned: '',
 }));
 jest.mock('../src/offline/cache', () => ({ readOnline: async (_owner: unknown, request: Request, path: Parameters<Request>[0]) => ({
   value: await request(path, 'GET'),
@@ -21,7 +22,7 @@ jest.mock('../src/offline/cache', () => ({ readOnline: async (_owner: unknown, r
 jest.mock('../src/auth/config', () => ({ ...jest.requireActual<Record<string, unknown>>('../src/auth/config'), API_ORIGIN: 'https://example.com' }));
 jest.mock('../src/auth/context', () => ({ useAuth: jest.fn() }));
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), replace: jest.fn(), navigate: jest.fn() },
+  router: { push: jest.fn(), replace: jest.fn(), navigate: jest.fn(), dismissTo: jest.fn() },
   useFocusEffect: (callback: () => void) => jest.requireActual<typeof import('react')>('react').useEffect(callback, [callback]),
   useLocalSearchParams: () => ({ id: mockRequestedId }),
   useNavigation: () => ({ isFocused: () => true }),
@@ -39,7 +40,7 @@ const item: Material = {
   status: 'unseen', source: 'web', category_id: 3, open_count: 0, version: 1,
 };
 const user = { id: 1, email: 'test@example.com', timezone: 'UTC', reminders_enabled: false, reminder_time: '10:00', email_verified_at: null };
-const page = (items: Material[], total = items.length, offset = 0): MaterialPage => ({ items, total, limit: 20, offset });
+const page = (items: Material[], total = items.length, offset = 0): MaterialPage => ({ items, total, limit: 10, offset });
 let mockRequestedId: string;
 
 function press(name: string) {
@@ -50,12 +51,17 @@ beforeEach(() => {
   mockRequestedId = 'new';
   jest.mocked(pickPdf).mockReset();
   jest.mocked(enqueue).mockReset().mockResolvedValue(undefined);
+  jest.mocked(getJob).mockReset().mockResolvedValue(null);
+  jest.mocked(listJobs).mockReset().mockResolvedValue([]);
+  jest.mocked(retry).mockReset().mockResolvedValue(undefined);
   request.mockReset().mockImplementation(async path => path === '/categories' ? [{ id: 3, name: 'Техника', contents_count: 1 }] : item);
   jest.mocked(router.replace).mockClear();
   jest.mocked(router.push).mockClear();
+  jest.mocked(router.navigate).mockClear();
+  jest.mocked(router.dismissTo).mockClear();
   jest.mocked(openURL).mockReset().mockResolvedValue(true);
   jest.mocked(useAuth).mockReturnValue({
-    controller: { library: request, captureSession: () => () => true } as unknown as AuthController,
+    controller: { library: request, captureSession: () => () => true, snapshot: () => ({ busy: false }) } as unknown as AuthController,
     state: { phase: 'signedIn', session: { user, expires_at: '', absolute_expires_at: '' }, busy: false, message: null },
   });
 });
@@ -73,6 +79,27 @@ test('opens category management from the library with filters closed', async () 
   expect(screen.getAllByRole('button', { name: 'Управлять категориями' })).toHaveLength(1);
 });
 
+test('shows only incoming drafts in the library and offers retry on Add Link', async () => {
+  const job: Job = { id: 'unsent', owner: 'account-1', state: 'needs_action', payload: '{"note":"Неотправленный текст"}',
+    reason: 'unavailable', server_id: null, attempts: 1, next_at: 0, tried_at: null };
+  jest.mocked(listJobs).mockImplementation(async owner => owner ? [job, { ...job, id: 'waiting', state: 'pending' }, { ...job, id: 'saved', state: 'synced' }]
+    : [{ ...job, id: 'incoming', owner: '', state: 'draft', reason: null, attempts: 0, payload: '{"note":"Из Поделиться"}' }]);
+  request.mockImplementation(async path => path === '/categories' ? [] : page([]));
+  const library = await render(<Library />);
+  expect(screen.queryByRole('button', { name: 'Отправка и входящие' })).toBeNull();
+  await press('Входящие материалы · 1');
+  expect(screen.getByText('Из Поделиться')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: /Неотправленные материалы|Ошибки отправки/ })).toBeNull();
+  expect(listJobs).not.toHaveBeenCalledWith('account-1');
+  await library.unmount();
+
+  await render(<AddLink />);
+  await press('Ошибки отправки · 1');
+  await press('Повторить отправку');
+  expect(retry).toHaveBeenCalledWith('account-1', 'unsent');
+  expect(screen.queryByText('Сохранено на сервере')).toBeNull();
+});
+
 test('uses a user category as a quick filter', async () => {
   request.mockImplementation(async path => path === '/categories'
     ? [{ id: 3, name: 'Техника', contents_count: 1 }] : page([]));
@@ -81,6 +108,20 @@ test('uses a user category as a quick filter', async () => {
   await press('Техника');
   await waitFor(() => expect(request.mock.calls.some(([path]) => path.startsWith('/contents?')
     && new URLSearchParams(path.split('?')[1]).get('category_id') === '3')).toBe(true));
+});
+
+test('shows a saved date, exact video length and approximate reading time on library cards', async () => {
+  const materials = [
+    { ...item, id: 1, title: 'Запись', content_type: 'video', video_duration_seconds: 750, created_at: '2026-11-25T12:00:00Z' },
+    { ...item, id: 2, title: 'Статья', content_type: 'article', reading_minutes: 3 },
+    { ...item, id: 3, title: 'Старый PDF', content_type: 'pdf', created_at: 'invalid', reading_minutes: null },
+  ];
+  request.mockImplementation(async path => path === '/categories' ? [] : page(materials));
+  await render(<Library />);
+
+  expect(await screen.findByText(/Добавлено .* · 12 мин 30 с/)).toBeTruthy();
+  expect(screen.getByText('≈ 3 мин чтения')).toBeTruthy();
+  expect(screen.queryByText(/invalid/i)).toBeNull();
 });
 
 test('pastes a link, persists the selected collection and confirms saving on the same tab', async () => {
@@ -101,6 +142,34 @@ test('pastes a link, persists the selected collection and confirms saving on the
   expect(router.navigate).toHaveBeenCalledWith('/');
 });
 
+test('dismisses confirmation five seconds after syncing or when opening the library', async () => {
+  jest.useFakeTimers();
+  const success = 'Ссылка добавлена в библиотеку.';
+  jest.mocked(enqueue).mockResolvedValueOnce('first-job').mockResolvedValueOnce('second-job');
+  const syncedJob: Job = { id: 'first-job', owner: 'account-1', state: 'synced', payload: '{}', reason: null,
+    server_id: 12, attempts: 1, next_at: 0, tried_at: 1 };
+  jest.mocked(getJob).mockResolvedValueOnce(syncedJob).mockResolvedValueOnce({ ...syncedJob, id: 'second-job' });
+  try {
+    await render(<AddLink />);
+    await press('Вставить');
+    await press('Сохранить в библиотеку');
+    await act(() => jest.advanceTimersByTime(4_999));
+    expect(screen.getByText(success)).toBeTruthy();
+    await act(() => jest.advanceTimersByTime(1));
+    expect(screen.queryByText(success)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Открыть библиотеку' })).toBeNull();
+
+    await press('Вставить');
+    await press('Сохранить в библиотеку');
+    expect(screen.getByText(success)).toBeTruthy();
+    await press('Открыть библиотеку');
+    expect(router.navigate).toHaveBeenCalledWith('/');
+    expect(screen.queryByText(success)).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 test('saves a PDF link in the local queue with its category', async () => {
   await render(<MaterialRoute />);
   await fireEvent.changeText(screen.getByLabelText('Ссылка'), item.url!);
@@ -108,7 +177,7 @@ test('saves a PDF link in the local queue with its category', async () => {
   await fireEvent.press(screen.getByRole('radio', { name: 'Техника' }));
   await press('Сохранить');
   expect(enqueue).toHaveBeenCalledWith('account-1', { url: item.url!, category_id: 3 }, undefined);
-  expect(router.replace).toHaveBeenCalledWith('/queue');
+  expect(router.dismissTo).toHaveBeenCalledWith('/');
 });
 
 test('edits only changed fields, displays fallback and hands the original to the OS', async () => {
@@ -165,11 +234,12 @@ test('ignores older search replies and queries the next page of the current sear
   jest.useFakeTimers();
   try {
     let resolveOld!: (value: MaterialPage) => void;
+    const materials = Array.from({ length: 18 }, (_, index) => ({ ...item, id: index + 20, title: `Материал ${index + 1}` }));
     request.mockImplementation(async path => {
       if (path === '/categories') return [];
       if (path.includes('q=old')) return new Promise<MaterialPage>(resolve => { resolveOld = resolve; });
-      if (path.includes('offset=20')) return page([{ ...item, title: 'Результат второй страницы' }], 21, 20);
-      return page([item], 21);
+      if (path.includes('offset=10')) return page(materials.slice(10), 18, 10);
+      return page(materials.slice(0, 10), 18);
     });
     await render(<Library />);
     const search = screen.getByLabelText('Поиск по названию');
@@ -177,16 +247,57 @@ test('ignores older search replies and queries the next page of the current sear
     await act(async () => { jest.advanceTimersByTime(250); });
     await fireEvent.changeText(search, 'new');
     await act(async () => { jest.advanceTimersByTime(250); });
-    expect(screen.getByText(item.title)).toBeTruthy();
+    expect(screen.getByText('Сначала новые')).toBeTruthy();
+    expect(screen.queryByText('Сортировка · Сначала новые')).toBeNull();
+    expect(screen.getAllByText(/^Материал \d+$/)).toHaveLength(10);
+    expect(screen.queryByText('Материал 11')).toBeNull();
     await act(async () => { resolveOld(page([{ ...item, title: 'Устаревший результат' }])); });
     expect(screen.queryByText('Устаревший результат')).toBeNull();
-    await press('Следующая страница');
+    await press('Показать больше');
     await act(async () => { jest.advanceTimersByTime(250); });
-    expect(request).toHaveBeenLastCalledWith('/contents?sort=newest&limit=20&offset=20&q=new', 'GET');
-    expect(screen.getByText('Результат второй страницы')).toBeTruthy();
+    expect(request).toHaveBeenLastCalledWith('/contents?sort=newest&limit=10&offset=10&q=new', 'GET');
+    expect(screen.getAllByText(/^Материал \d+$/)).toHaveLength(18);
+    expect(screen.getByText('Материал 1')).toBeTruthy();
+    expect(screen.getByText('Материал 18')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Показать больше' })).toBeNull();
+    request.mockClear();
+    await press('Скрыть лишнее');
+    expect(screen.getAllByText(/^Материал \d+$/)).toHaveLength(10);
+    expect(screen.queryByRole('button', { name: 'Скрыть лишнее' })).toBeNull();
+    await act(async () => { jest.advanceTimersByTime(250); });
+    expect(request).not.toHaveBeenCalled();
+    await press('Показать больше');
+    await act(async () => { jest.advanceTimersByTime(250); });
+    expect(request).toHaveBeenLastCalledWith('/contents?sort=newest&limit=10&offset=10&q=new', 'GET');
+    expect(screen.getAllByText(/^Материал \d+$/)).toHaveLength(18);
+    await press('Сортировка · Сначала новые');
+    await fireEvent.press(screen.getByRole('radio', { name: 'Сначала старые' }));
+    await act(async () => { jest.advanceTimersByTime(250); });
+    expect(request).toHaveBeenLastCalledWith('/contents?sort=oldest&limit=10&offset=0&q=new', 'GET');
+    expect(screen.getByText('Сначала старые')).toBeTruthy();
+    expect(screen.getAllByText(/^Материал \d+$/)).toHaveLength(10);
   } finally {
     jest.useRealTimers();
   }
+});
+
+test('retains the visible materials when loading more fails and retries the same offset', async () => {
+  const morePath = '/contents?sort=newest&limit=10&offset=10';
+  let attempts = 0;
+  request.mockImplementation(async path => {
+    if (path === '/categories') return [];
+    if (path === morePath) {
+      if (++attempts === 1) throw new ApiError(0);
+      return page([{ ...item, id: 13, title: 'Следующий материал' }], 11, 10);
+    }
+    return page([item], 11);
+  });
+  await render(<Library />);
+  await fireEvent.press(await screen.findByRole('button', { name: 'Показать больше' }));
+  await fireEvent.press(await screen.findByRole('button', { name: 'Повторить загрузку' }));
+  expect(screen.getByText(item.title)).toBeTruthy();
+  expect(await screen.findByText('Следующий материал')).toBeTruthy();
+  expect(request.mock.calls.filter(([path]) => path === morePath)).toHaveLength(2);
 });
 
 
@@ -216,14 +327,14 @@ test('advanced search resets pagination, ignores stale results and requires a co
       if (path === '/categories' || path === '/mobile/library/tags' || path === '/mobile/library/collections') return [];
       if (path.includes('search_in=note')) return new Promise<MaterialPage>(resolve => { resolveOld = resolve; });
       if (path.includes('search_in=url')) throw new ApiError(0);
-      return page([item], 21);
+      return path.includes('offset=10') ? page([{ ...item, id: 13 }], 21, 10) : page([item], 21);
     });
     await render(<Library />);
     await fireEvent.changeText(screen.getByLabelText('Поиск по названию'), 'текст');
     await act(async () => { jest.advanceTimersByTime(250); });
-    await press('Следующая страница');
+    await press('Показать больше');
     await act(async () => { jest.advanceTimersByTime(250); });
-    expect(request).toHaveBeenLastCalledWith(expect.stringContaining('offset=20'), 'GET');
+    expect(request).toHaveBeenLastCalledWith(expect.stringContaining('offset=10'), 'GET');
     await press('Фильтры и сортировка');
     await press('Искать в · Название · доступно офлайн');
     await fireEvent.press(screen.getByRole('radio', { name: 'Заметка' }));

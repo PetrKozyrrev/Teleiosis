@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
 import { Action, Body, Page } from '../components/ui';
+import { useTranslation } from '../i18n';
 
 export default function NotFound() {
-  return <Page title="Страница не найдена">
-    <Body>Этот адрес пока не поддерживается приложением.</Body>
-    <Action title="В библиотеку" onPress={() => router.replace('/')} />
+  const t = useTranslation();
+  return <Page title={t('Страница не найдена')}>
+    <Body>{t('Этот адрес пока не поддерживается приложением.')}</Body>
+    <Action title={t('В библиотеку')} onPress={() => router.replace('/')} />
   </Page>;
 }

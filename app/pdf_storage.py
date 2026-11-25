@@ -181,3 +181,18 @@ def scan_pdf(data: bytes) -> None:
         raise PdfServiceUnavailable from None
     if checked.returncode != 0:
         raise InvalidPdf("unsupported_pdf")
+
+
+def pdf_character_count(data: bytes) -> int | None:
+    """Count text in a previously screened PDF without affecting the ability to save it."""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "app.pdf_validate", "--count-text"], input=data, timeout=3,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env={"PATH": os.defpath},
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0 or not re.fullmatch(rb"[0-9]{1,10}\n", result.stdout):
+        return None
+    count = int(result.stdout)
+    return count if 0 < count <= 2_147_483_647 else None

@@ -125,6 +125,8 @@ class Content(Base):
     content_type: Mapped[str] = mapped_column(Text, server_default="other")
     source: Mapped[str] = mapped_column(Text, server_default="other")
     image_url: Mapped[str | None] = mapped_column(Text)
+    video_duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    text_character_count: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(Text, server_default="unseen")
     studied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

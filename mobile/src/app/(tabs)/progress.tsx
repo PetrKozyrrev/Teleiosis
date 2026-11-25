@@ -9,6 +9,7 @@ import { MaterialThumbnail } from '../../library/MaterialThumbnail';
 import { errorMessage, linkDomain, statuses, type Material, type Request } from '../../library/model';
 import { shiftDay } from '../../plan/model';
 import { colors } from '../../theme';
+import { translate, useLocale, useTranslation } from '../../i18n';
 
 const periods = { week: 'Эта неделя', month: 'Этот месяц', all: 'Всё время' } as const;
 type Period = keyof typeof periods;
@@ -19,10 +20,13 @@ type ProgressData = {
 };
 
 export default function Progress() {
-  return <LibraryAccess title="Прогресс" brand>{request => <ProgressView request={request} />}</LibraryAccess>;
+  const t = useTranslation();
+  return <LibraryAccess title={t('Прогресс')} brand>{request => <ProgressView request={request} />}</LibraryAccess>;
 }
 
 function ProgressView({ request }: { request: Request }) {
+  const t = useTranslation();
+  const locale = useLocale();
   const [period, setPeriod] = useState<Period>('week');
   const [result, setResult] = useState<{ period: Period; offset: number; value: ProgressData }>();
   const [message, setMessage] = useState('');
@@ -62,63 +66,63 @@ function ProgressView({ request }: { request: Request }) {
   }, [offset, period, request, revision]));
 
   const recent = data?.recent.slice(0, expanded ? undefined : 2) ?? [];
-  return <Page brand title="Прогресс" subtitle="Маленькие шаги к тому, что важно.">
+  return <Page brand title={t('Прогресс')} subtitle={t('Маленькие шаги к тому, что важно.')}>
     {!legacy && <View style={screenStyles.periods}>
       {(Object.keys(periods) as Period[]).map(value => <Pressable key={value} accessibilityRole="button"
         accessibilityState={{ selected: period === value }} onPress={() => { setPeriod(value); setOffset(0); setExpanded(false); }}
         style={[screenStyles.period, period === value && screenStyles.selected]}>
-        <Text style={[styles.label, period === value && screenStyles.selectedText]}>{periods[value]}</Text>
+        <Text style={[styles.label, period === value && screenStyles.selectedText]}>{t(periods[value])}</Text>
       </Pressable>)}
     </View>}
     {data && <>
       <Card>
-        <Text style={styles.label}>{period === 'week' ? 'Завершено' : 'Изучено за период'}</Text>
+        <Text style={styles.label}>{period === 'week' ? t('Завершено') : t('Изучено за период')}</Text>
         <View style={screenStyles.stat}>
-          <Text style={screenStyles.count}>{period === 'week' ? `${data.weekly_completed} из ${data.weekly_goal}` : data.completed}</Text>
-          <Text style={screenStyles.caption}>материалов</Text>
+          <Text style={screenStyles.count}>{period === 'week' ? t('{0} из {1}', data.weekly_completed, data.weekly_goal) : data.completed}</Text>
+          <Text style={screenStyles.caption}>{t('материалов')}</Text>
         </View>
         {period === 'week' && <>
-          <View accessibilityRole="progressbar" accessibilityLabel="Недельная цель"
+          <View accessibilityRole="progressbar" accessibilityLabel={t('Недельная цель')}
             accessibilityValue={{ min: 0, max: data.weekly_goal, now: Math.min(data.weekly_goal, data.weekly_completed) }} style={screenStyles.track}>
             <View style={[screenStyles.fill, { width: `${Math.min(100, data.weekly_completed / data.weekly_goal * 100)}%` }]} />
           </View>
-          <Text style={screenStyles.caption}>{data.weekly_completed >= data.weekly_goal ? 'Цель недели достигнута.' : `До цели осталось: ${data.weekly_goal - data.weekly_completed}.`}</Text>
+          <Text style={screenStyles.caption}>{data.weekly_completed >= data.weekly_goal ? t('Цель недели достигнута.') : t('До цели осталось: {0}.', data.weekly_goal - data.weekly_completed)}</Text>
         </>}
       </Card>
       <Card>
-        <Text style={styles.label}>Активность</Text>
+        <Text style={styles.label}>{t('Активность')}</Text>
         <View style={screenStyles.between}>
-          <Text style={screenStyles.caption}>{period === 'all' ? 'До 12 месяцев с активностью' : periods[period]}</Text>
-          {data.streak > 0 && <Text style={[styles.label, styles.link]}>Дней подряд: {data.streak}</Text>}
+          <Text style={screenStyles.caption}>{period === 'all' ? t('До 12 месяцев с активностью') : t(periods[period])}</Text>
+          {data.streak > 0 && <Text style={[styles.label, styles.link]}>{t('Дней подряд:')} {data.streak}</Text>}
         </View>
         <Activity data={data} period={period} />
       </Card>
       <View style={screenStyles.between}>
-        <Text style={styles.label}>Недавно изучено</Text>
+        <Text style={styles.label}>{t('Недавно изучено')}</Text>
         {data.recent.length > 2 && <Pressable accessibilityRole="button" onPress={() => setExpanded(!expanded)} style={screenStyles.recentAction}>
-          <Text style={screenStyles.recentLink}>{expanded ? 'Свернуть' : 'Смотреть все'}</Text>
+          <Text style={screenStyles.recentLink}>{expanded ? t('Свернуть') : t('Смотреть все')}</Text>
         </Pressable>}
       </View>
-      {recent.length === 0 && <Body>В этом периоде пока нет изученных материалов.</Body>}
+      {recent.length === 0 && <Body>{t('В этом периоде пока нет изученных материалов.')}</Body>}
       {recent.map(item => <Pressable key={item.id} accessibilityRole="button" style={screenStyles.material}
         onPress={() => router.push({ pathname: '/library/[id]', params: { id: String(item.id) } })}>
         <MaterialThumbnail size={48} imageUrl={item.image_url} kind={item.content_type} />
         <View style={screenStyles.details}>
           <Text style={styles.label}>{item.title}</Text>
-          <Body>{[linkDomain(item.url), relativeDay(item.local_day, data.today)].filter(Boolean).join(' · ')}</Body>
+          <Body>{[linkDomain(item.url), relativeDay(item.local_day, data.today, locale)].filter(Boolean).join(' · ')}</Body>
         </View>
         <Ionicons name="checkmark-circle" color={colors.success} size={20} />
       </Pressable>)}
-      {expanded && data.next_offset !== null && <Action variant="outline" title="Показать ещё" disabled={loadingMore}
+      {expanded && data.next_offset !== null && <Action variant="outline" title={t('Показать ещё')} disabled={loadingMore}
         onPress={() => { if (data.next_offset !== null) setOffset(data.next_offset); }} />}
     </>}
     {!data && !message && <Loading />}
-    {message && <><Notice>{message}</Notice><Action variant="outline" title="Обновить прогресс" onPress={() => setRevision(value => value + 1)} /></>}
-    <Action variant="text" title={showTools ? 'Скрыть инструменты' : 'План и повторение'} onPress={() => setShowTools(!showTools)} />
+    {message && <><Notice>{message}</Notice><Action variant="outline" title={t('Обновить прогресс')} onPress={() => setRevision(value => value + 1)} /></>}
+    <Action variant="text" title={showTools ? t('Скрыть инструменты') : t('План и повторение')} onPress={() => setShowTools(!showTools)} />
     {showTools && <Card>
-      <Action variant="outline" title="Недельный план" onPress={() => router.push('/plan')} />
-      <Action variant="outline" title="Повторить карточки" onPress={() => router.push('/review')} />
-      {!legacy && <Action variant="text" title={showDetails ? 'Скрыть статистику библиотеки' : 'Статистика библиотеки'}
+      <Action variant="outline" title={t('Недельный план')} onPress={() => router.push('/plan')} />
+      <Action variant="outline" title={t('Повторить карточки')} onPress={() => router.push('/review')} />
+      {!legacy && <Action variant="text" title={showDetails ? t('Скрыть статистику библиотеки') : t('Статистика библиотеки')}
         onPress={() => setShowDetails(!showDetails)} />}
     </Card>}
     {(legacy || (showTools && showDetails)) && <LibraryStats request={request} />}
@@ -132,6 +136,7 @@ type Stats = {
 };
 
 function LibraryStats({ request }: { request: Request }) {
+  const t = useTranslation();
   const [stats, setStats] = useState<Stats>();
   const [error, setError] = useState('');
   useFocusEffect(useCallback(() => {
@@ -143,34 +148,36 @@ function LibraryStats({ request }: { request: Request }) {
   }, [request]));
   if (error) return <Notice>{error}</Notice>;
   if (!stats) return <Loading />;
-  const percent = (value: number | null) => value === null ? 'Пока нет данных' : `${Math.round(value * 100)} %`;
+  const percent = (value: number | null) => value === null ? t('Пока нет данных') : `${Math.round(value * 100)} %`;
   return <Card>
-    <Text style={styles.label}>Материалов: {stats.total}</Text>
-    {Object.entries(statuses).map(([key, label]) => <Body key={key}>{label} · {stats.by_status[key as keyof typeof statuses]}</Body>)}
-    <Body>Доля изученного · {percent(stats.studied_share)}</Body>
-    <Body>Возврат к оригиналу · {percent(stats.return_share)}</Body>
-    <Body>За последние семь дней добавлено {stats.added_7d}, изучено {stats.studied_7d}.</Body>
+    <Text style={styles.label}>{t('Материалов:')} {stats.total}</Text>
+    {Object.entries(statuses).map(([key, label]) => <Body key={key}>{t(label)} · {stats.by_status[key as keyof typeof statuses]}</Body>)}
+    <Body>{t('Доля изученного ·')} {percent(stats.studied_share)}</Body>
+    <Body>{t('Возврат к оригиналу ·')} {percent(stats.return_share)}</Body>
+    <Body>{t('За последние семь дней добавлено')} {stats.added_7d}{t(', изучено')} {stats.studied_7d}.</Body>
     {stats.top_categories.map(category => <Body key={category.id}>{category.name} · {category.count}</Body>)}
   </Card>;
 }
 
-function relativeDay(day: string, today: string) {
-  if (day === today) return 'Сегодня';
-  if (day === shiftDay(today, -1)) return 'Вчера';
-  return new Date(`${day}T00:00:00Z`).toLocaleDateString('ru-RU', { timeZone: 'UTC' });
+function relativeDay(day: string, today: string, locale: string) {
+  if (day === today) return translate('Сегодня');
+  if (day === shiftDay(today, -1)) return translate('Вчера');
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString(locale, { timeZone: 'UTC' });
 }
 
 const weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 function Activity({ data, period }: { data: ProgressData; period: Period }) {
-  if (!data.activity.length) return <Body>Пока нет активности.</Body>;
+  const t = useTranslation();
+  const locale = useLocale();
+  if (!data.activity.length) return <Body>{t('Пока нет активности.')}</Body>;
   const max = Math.max(1, ...data.activity.map(point => point.count));
-  const formatter = new Intl.DateTimeFormat('ru-RU', { month: 'short', timeZone: 'UTC' });
+  const formatter = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' });
   return <View style={screenStyles.chart}>
     {data.activity.map((point, index) => {
-      const label = period === 'week' ? weekdays[index] : period === 'month' ? point.day.slice(-2)
+      const label = period === 'week' ? t(weekdays[index] ?? '') : period === 'month' ? point.day.slice(-2)
         : formatter.format(new Date(`${point.day}T00:00:00Z`));
       const showLabel = period === 'week' || (period === 'month' ? index % 5 === 0 : index % 2 === 0);
-      return <View key={point.day} accessible accessibilityLabel={`${point.day}, изучено: ${point.count}`} style={screenStyles.barColumn}>
+      return <View key={point.day} accessible accessibilityLabel={t('{0}, изучено: {1}', point.day, point.count)} style={screenStyles.barColumn}>
         <View style={[screenStyles.bar, { height: Math.max(3, (point.count / max) * 64),
           backgroundColor: point.day === data.today ? colors.primary : point.count ? colors.secondary : colors.coolTint }]} />
         <Text style={screenStyles.barLabel} numberOfLines={1}>{showLabel ? label : ' '}</Text>

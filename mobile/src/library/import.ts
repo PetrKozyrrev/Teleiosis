@@ -1,6 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { ApiError } from '../auth/api';
+import { translate } from '../i18n';
 import { errorMessage, type Request } from './model';
 
 const maxBytes = 2 * 1024 * 1024;
@@ -52,7 +53,7 @@ export function importError(error: unknown, applying: boolean) {
   if (error.status === 422) {
     const path = error.location.reduce<string>((text, part) =>
       typeof part === 'number' ? `${text}[${part + 1}]` : [text, part].filter(Boolean).join('.'), '');
-    return path ? `Проверьте данные или лимиты файла (${path}).` : 'Проверьте данные и лимиты файла.';
+    return path ? translate('Проверьте данные или лимиты файла ({0}).', path) : 'Проверьте данные и лимиты файла.';
   }
   return errorMessage(error);
 }

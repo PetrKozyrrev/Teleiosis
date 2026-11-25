@@ -6,15 +6,18 @@ import { parseId, type Request } from '../../library/model';
 import { groupPath, organizationError, organizationPath, type Group, type Organization } from '../../library/organization';
 import { GroupSelection } from '../../library/GroupSelection';
 import { LibraryAccess, Loading, Notice } from '../../library/ui';
+import { useTranslation } from '../../i18n';
 
 export default function OrganizeRoute() {
+  const t = useTranslation();
   const params = useLocalSearchParams<{ id: string }>();
   const id = parseId(params.id);
   return <LibraryAccess>{request => id ? <Organize key={id} id={id} request={request} />
-    : <Page title="Теги и коллекции материала"><Notice>Материал не найден.</Notice></Page>}</LibraryAccess>;
+    : <Page title={t('Теги и коллекции материала')}><Notice>{t('Материал не найден.')}</Notice></Page>}</LibraryAccess>;
 }
 
 function Organize({ id, request }: { id: number; request: Request }) {
+  const t = useTranslation();
   const [result, setResult] = useState<{ organization: Organization; tags: Group[]; collections: Group[] } | null>(null);
   const [tags, setTags] = useState<number[]>([]);
   const [collections, setCollections] = useState<number[]>([]);
@@ -56,18 +59,18 @@ function Organize({ id, request }: { id: number; request: Request }) {
       setMessage(uncertain ? 'Ответ не получен. Изменения могли сохраниться. Обновите данные перед повтором.' : organizationError(error));
     } finally { locked.current = false; setBusy(false); }
   }
-  return <Page title="Теги и коллекции материала">
-    <Body>У материала может быть до 20 тегов и 20 коллекций. Изменения требуют подключения к серверу.</Body>
+  return <Page title={t('Теги и коллекции материала')}>
+    <Body>{t('У материала может быть до 20 тегов и 20 коллекций. Изменения требуют подключения к серверу.')}</Body>
     {loadError && <Notice>{loadError}</Notice>}
     {!result && !loadError && <Loading />}
     {result && <Card>
-      <GroupSelection label="Теги" items={result.tags} selected={tags} onChange={setTags} disabled={busy} />
-      <GroupSelection label="Коллекции" items={result.collections} selected={collections} onChange={setCollections} disabled={busy} />
-      <Action title={busy ? 'Сохранение…' : 'Сохранить теги и коллекции'} disabled={busy || !dirty || mustReload} onPress={() => void save()} />
+      <GroupSelection label={t('Теги')} items={result.tags} selected={tags} onChange={setTags} disabled={busy} />
+      <GroupSelection label={t('Коллекции')} items={result.collections} selected={collections} onChange={setCollections} disabled={busy} />
+      <Action title={busy ? t('Сохранение…') : t('Сохранить теги и коллекции')} disabled={busy || !dirty || mustReload} onPress={() => void save()} />
     </Card>}
     {message && <Notice>{message}</Notice>}
-    <Action title="Загрузить актуальные теги и коллекции" disabled={busy} onPress={() => { setMessage(''); setRevision(value => value + 1); }} />
-    <Action title="Управлять тегами и коллекциями" disabled={busy || Boolean(dirty)} onPress={() => router.push('/library/organization')} />
-    {dirty && <Body>Сохраните выбор перед переходом к управлению тегами и коллекциями.</Body>}
+    <Action title={t('Загрузить актуальные теги и коллекции')} disabled={busy} onPress={() => { setMessage(''); setRevision(value => value + 1); }} />
+    <Action title={t('Управлять тегами и коллекциями')} disabled={busy || Boolean(dirty)} onPress={() => router.push('/library/organization')} />
+    {dirty && <Body>{t('Сохраните выбор перед переходом к управлению тегами и коллекциями.')}</Body>}
   </Page>;
 }

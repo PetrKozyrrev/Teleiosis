@@ -6,7 +6,6 @@ import { errorMessage, type Request } from './model';
 
 export const pdfSizeLimit = 10 * 1024 * 1024;
 
-export type PdfMetadata = { name: string; size_bytes: number; published: boolean };
 export type SelectedPdf = { name: string; bytes: ArrayBuffer };
 
 class PdfFileError extends Error {}
@@ -43,14 +42,6 @@ export async function createPdf(request: Request, selected: SelectedPdf, title: 
   const result = await request(path, 'POST', selected.bytes, { pdfFilename: selected.name, pdfTitle: title }) as { id?: number } | null;
   if (!result || typeof result.id !== 'number' || !Number.isSafeInteger(result.id) || result.id < 1) throw new ApiError(502);
   return result.id;
-}
-
-export async function readPdf(request: Request, id: number): Promise<PdfMetadata> {
-  const result = await request(pdfPath(id), 'GET') as Partial<PdfMetadata> | null;
-  if (!result || typeof result.name !== 'string' || result.published !== true ||
-    typeof result.size_bytes !== 'number' || !Number.isSafeInteger(result.size_bytes) ||
-    result.size_bytes < 1 || result.size_bytes > pdfSizeLimit) throw new ApiError(502);
-  return result as PdfMetadata;
 }
 
 function previews() {

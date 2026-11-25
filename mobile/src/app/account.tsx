@@ -5,8 +5,10 @@ import { Action, Body, Card, Page } from '../components/ui';
 import { useAuth } from '../auth/context';
 import { STAGING_GATE } from '../auth/config';
 import { SignOut } from '../account/SignOut';
+import { useTranslation } from '../i18n';
 
 export default function Account() {
+  const t = useTranslation();
   const { controller, state } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
   async function run(action: () => Promise<void>, success?: string) {
@@ -16,16 +18,16 @@ export default function Account() {
   }
   const user = state.session?.user;
   if (state.phase === 'signedOut') return <Redirect href="/sign-in" />;
-  return <Page title="Аккаунт"><Card>
-    {state.phase === 'loading' ? <Body>Проверяем сессию…</Body> : user ? <>
+  return <Page title={t('Аккаунт')}><Card>
+    {state.phase === 'loading' ? <Body>{t('Проверяем сессию…')}</Body> : user ? <>
       <Body>{user.email}</Body>
-      <Body>{user.email_verified_at ? 'Почта подтверждена' : 'Почта ещё не подтверждена'}</Body>
-      {!user.email_verified_at && <Action title="Отправить письмо подтверждения" disabled={state.busy} onPress={() => void run(() => controller.requestVerification(), 'Запрос принят. Проверьте письмо; на тестовом стенде ссылку читает администратор.')} />}
-    </> : <Body>{state.phase === 'offline' ? 'Не удалось проверить сохранённую сессию. Повторите при наличии сети.' : 'Войдите в существующий аккаунт или зарегистрируйтесь.'}</Body>}
-    {(message || state.message) && <Text accessibilityLiveRegion="polite">{message ?? state.message}</Text>}
-    {(state.phase === 'error' || state.phase === 'offline') && <Action variant="outline" title="Повторить проверку сессии" disabled={state.busy} onPress={() => void run(() => state.phase === 'error' ? controller.initialize() : controller.refresh())} />}
+      <Body>{user.email_verified_at ? t('Почта подтверждена') : t('Почта ещё не подтверждена')}</Body>
+      {!user.email_verified_at && <Action title={t('Отправить письмо подтверждения')} disabled={state.busy} onPress={() => void run(() => controller.requestVerification(), 'Запрос принят. Проверьте письмо; на тестовом стенде ссылку читает администратор.')} />}
+    </> : <Body>{state.phase === 'offline' ? t('Не удалось проверить сохранённую сессию. Повторите при наличии сети.') : t('Войдите в существующий аккаунт или зарегистрируйтесь.')}</Body>}
+    {(message || state.message) && <Text accessibilityLiveRegion="polite">{t(message ?? state.message ?? '')}</Text>}
+    {(state.phase === 'error' || state.phase === 'offline') && <Action variant="outline" title={t('Повторить проверку сессии')} disabled={state.busy} onPress={() => void run(() => state.phase === 'error' ? controller.initialize() : controller.refresh())} />}
     {(user || state.phase === 'offline' || state.phase === 'error') && <SignOut />}
-    <Action title="Открыть ссылку из письма" disabled={state.busy} onPress={() => router.push('/email-action')} />
-    {STAGING_GATE && <Action title="Доступ к тестовому стенду" disabled={state.busy} onPress={() => router.push('/staging-access')} />}
+    <Action title={t('Открыть ссылку из письма')} disabled={state.busy} onPress={() => router.push('/email-action')} />
+    {STAGING_GATE && <Action title={t('Доступ к тестовому стенду')} disabled={state.busy} onPress={() => router.push('/staging-access')} />}
   </Card></Page>;
 }

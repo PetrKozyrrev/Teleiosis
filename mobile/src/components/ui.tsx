@@ -2,13 +2,17 @@ import type { ComponentRef, PropsWithChildren, ReactNode, Ref } from 'react';
 import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { colors, fonts } from '../theme';
 
-export function Page({ title, subtitle, brand, auth, footer, children, scrollRef }: PropsWithChildren<{
+export function Page({ title, subtitle, brand, auth, footer, children, scrollRef, keyboardOffset, revealFocusedField }: PropsWithChildren<{
   title: string; subtitle?: string; brand?: boolean; auth?: boolean; footer?: ReactNode;
   scrollRef?: Ref<ComponentRef<typeof ScrollView>>;
+  keyboardOffset?: number;
+  revealFocusedField?: () => void;
 }>) {
-  return <KeyboardAvoidingView style={[styles.page, auth && styles.auth]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    keyboardVerticalOffset={brand || auth ? 0 : 48}>
-    <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" style={styles.scroll} contentContainerStyle={[styles.content, auth && styles.authContent]}>
+  const avoidKeyboard = Platform.OS === 'ios' || (Platform.OS === 'android' && keyboardOffset !== undefined);
+  return <KeyboardAvoidingView style={[styles.page, auth && styles.auth]} behavior={avoidKeyboard ? 'padding' : undefined}
+    keyboardVerticalOffset={keyboardOffset ?? (brand || auth ? 0 : 48)}>
+    <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" onKeyboardDidShow={revealFocusedField} onLayout={revealFocusedField}
+      style={styles.scroll} contentContainerStyle={[styles.content, auth && styles.authContent]}>
     {brand && <Wordmark />}
     <View style={styles.headingGroup}>
       <Text accessibilityRole="header" style={styles.title}>{title}</Text>
