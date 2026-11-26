@@ -16,8 +16,12 @@ type PlanPath = '/mobile/plan' | `/mobile/plan?day=${string}` | '/mobile/plan/go
   | `/mobile/plan/weeks/${string}/budget`;
 type ReviewPath = '/mobile/review' | `/mobile/review?${string}` | `/mobile/review/${number}`
   | `/mobile/review/${number}/answers` | `/mobile/review/${number}/history?${string}`;
-export type LibraryPath = ReviewPath | PlanPath | '/contents' | '/contents/submissions' | '/mobile/library/submissions' | `/contents?${string}` | `/contents/${number}`
-  | '/mobile/profile' | `/mobile/reading-progress?${string}` | '/mobile/library/link-preview'
+type GoalPath = '/mobile/learning/goals' | `/mobile/learning/goals?${string}` | `/mobile/learning/goals/${number}`
+  | `/mobile/learning/goals/${number}/materials` | `/mobile/learning/goals/${number}/materials?${string}`
+  | `/mobile/learning/goals/${number}/materials/${number}`;
+type CompletionPath = `/mobile/learning/materials/${number}/${'completion' | 'reflection'}`;
+export type LibraryPath = ReviewPath | PlanPath | GoalPath | CompletionPath | '/contents' | '/contents/submissions' | '/mobile/library/submissions' | `/contents?${string}` | `/contents/${number}`
+  | '/mobile/profile' | `/mobile/reading-progress?${string}` | '/mobile/library/link-preview' | '/mobile/learning/today'
   | `/contents/${number}/open` | `/contents/${number}/versioned` | `/contents/${number}/reminder` | '/me' | '/me/settings' | '/me/export' | '/stats' | '/auth/change-password' | '/auth/delete-account' | '/categories' | `/categories/${number}`
   | '/mobile/library/tags' | '/mobile/library/collections'
   | `/mobile/library/tags/${number}` | `/mobile/library/collections/${number}`
@@ -112,7 +116,8 @@ export class AuthApi {
           || (path === '/mobile/auth/register' && response.status === 422)
           || (response.status === 404 && (submission || path.endsWith('/versioned')))
           || (pdf && !basicChallenge)
-          || (response.status === 409 && (path.startsWith('/mobile/library/') || path.startsWith('/mobile/plan/')))) {
+          || (response.status === 409 && (path.startsWith('/mobile/library/') || path.startsWith('/mobile/plan/')))
+          || (path.startsWith('/mobile/learning/') && [404, 409, 412].includes(response.status))) {
           const result = await response.json().catch(() => null);
           const issue = Array.isArray(result?.detail) && result.detail.length === 1 ? result.detail[0] : null;
           if (path === '/mobile/auth/register' && issue?.type === 'extra_forbidden'
@@ -122,7 +127,9 @@ export class AuthApi {
           if (result?.detail?.code === 'collection_missing') code = result.detail.code;
           if (path === '/mobile/library/submissions' && response.status === 404 && result?.detail === 'Category not found') code = 'category_missing';
           if (['group_name_exists', 'group_limit_reached'].includes(result?.detail?.code)) code = result.detail.code;
-          if (path.startsWith('/mobile/plan/') && ['already_planned', 'goal_limit', 'task_completed'].includes(result?.detail?.code)) code = result.detail.code;
+          if (path.startsWith('/mobile/plan/') && ['already_planned', 'goal_limit', 'task_completed', 'goal_archive_required'].includes(result?.detail?.code)) code = result.detail.code;
+          if (path.startsWith('/mobile/learning/') && ['completion_task_missing', 'completion_key_reused',
+            'reflection_version_changed', 'content_version_changed', 'goal_limit', 'goal_name_taken'].includes(result?.detail?.code)) code = result.detail.code;
           if (pdf && /^(pdf_[a-z_]+|invalid_pdf(?:_name|_title)?|unsafe_pdf|unsupported_pdf)$/.test(result?.detail?.code)) {
             code = result.detail.code;
           }

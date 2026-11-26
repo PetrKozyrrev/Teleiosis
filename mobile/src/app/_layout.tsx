@@ -22,9 +22,14 @@ export default function RootLayout() {
     <StatusBar style="dark" />
     <Stack screenOptions={{ headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.surface }, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="add-link" options={{ title: '' }} />
+      <Stack.Screen name="progress" options={{ title: '' }} />
       <Stack.Screen name="library/[id]" options={{ title: t('Материал') }} />
+      <Stack.Screen name="library/complete" options={{ title: t('Завершение изучения') }} />
       <Stack.Screen name="library/organization" options={{ title: t('Теги и коллекции') }} />
       <Stack.Screen name="library/organize" options={{ title: t('Теги и коллекции материала') }} />
+      <Stack.Screen name="library/goals" options={{ title: t('Добавить к цели') }} />
+      <Stack.Screen name="goals/[id]" options={{ title: t('Цель') }} />
       <Stack.Screen name="library/categories" options={{ title: t('Категории') }} />
       <Stack.Screen name="library/import" options={{ title: t('Импорт библиотеки') }} />
       <Stack.Screen name="review" options={{ title: t('Повторение') }} />

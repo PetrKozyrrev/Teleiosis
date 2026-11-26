@@ -82,7 +82,7 @@ function Review({ request, contentId }: { request: Request; contentId: number | 
               answer: answer.trim(), takeaway: takeaway.trim() }, { idempotencyKey: key }),
             () => { setQuestion(''); setAnswer(''); setTakeaway(''); setCreateKey(null); });
           }} />
-      </Panel> : <Action title={t('Добавить карточки из материала')} disabled={busy} onPress={() => router.dismissTo('/')} />}
+      </Panel> : <Action title={t('Добавить карточки из материала')} disabled={busy} onPress={() => router.dismissTo('/library')} />}
       {result.items.length === 0 && <Body>{due ? t('Карточек к повторению пока нет.') : t('Карточек пока нет.')}</Body>}
       {result.items.map(card => <ReviewItem key={card.id + '-' + card.version} card={card} request={request} save={save} disabled={disabled} />)}
       {offset > 0 && <Action title={t('Предыдущие карточки')} disabled={busy} onPress={() => { setMessage(''); setOffset(offset - 20); }} />}

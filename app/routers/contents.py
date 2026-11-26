@@ -328,11 +328,8 @@ def change_content(content_id: int, data: ContentUpdate | MobileContentUpdate, d
         content.title = data.title
     if "note" in changes:
         content.note = note
-    if "status" in changes and data.status != content.status:
-        content.status = data.status
-        content.studied_at = (
-            datetime.now(timezone.utc) if data.status == "studied" else None
-        )
+    if data.status is not None:
+        apply_content_status(content, data.status, datetime.now(timezone.utc))
 
     if new_url is not None and new_url != content.url:
         meta = fetch_metadata(new_url)
@@ -369,6 +366,12 @@ def change_content(content_id: int, data: ContentUpdate | MobileContentUpdate, d
     record_activity(db, user)
     db.refresh(content)
     return content
+
+
+def apply_content_status(content: Content, status: ContentStatus, now: datetime) -> None:
+    if content.status != status:
+        content.status = status
+        content.studied_at = now if status == "studied" else None
 
 
 @router.delete("/{content_id}", status_code=status.HTTP_204_NO_CONTENT)

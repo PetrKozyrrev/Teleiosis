@@ -21,9 +21,9 @@ export default function TabsLayout() {
     tabBarLabelStyle: { fontFamily: fonts.bold, fontSize: 11 },
     tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, paddingTop: 4 },
   }}>
-    <Tabs.Screen name="index" options={{ title: t('Библиотека'), tabBarIcon: ({ focused, size }) => <Ionicons name={focused ? 'bookmark' : 'bookmark-outline'} color={focused ? colors.primary : colors.muted} size={size} /> }} />
-    <Tabs.Screen name="add-link" options={{ title: t('Добавить'), tabBarIcon: ({ focused, size }) => <Ionicons name="add-circle-outline" color={focused ? colors.primary : colors.muted} size={size} /> }} />
-    <Tabs.Screen name="progress" options={{ title: t('Прогресс'), tabBarIcon: ({ focused, size }) => <Ionicons name="bar-chart-outline" color={focused ? colors.primary : colors.muted} size={size} /> }} />
+    <Tabs.Screen name="index" options={{ title: t('Сегодня'), tabBarIcon: ({ focused, size }) => <Ionicons name={focused ? 'today' : 'today-outline'} color={focused ? colors.primary : colors.muted} size={size} /> }} />
+    <Tabs.Screen name="library" options={{ title: t('Библиотека'), tabBarIcon: ({ focused, size }) => <Ionicons name={focused ? 'bookmark' : 'bookmark-outline'} color={focused ? colors.primary : colors.muted} size={size} /> }} />
+    <Tabs.Screen name="goals" options={{ title: t('Цели'), tabBarIcon: ({ focused, size }) => <Ionicons name={focused ? 'flag' : 'flag-outline'} color={focused ? colors.primary : colors.muted} size={size} /> }} />
     <Tabs.Screen name="settings" options={{ title: t('Профиль'), tabBarIcon: ({ focused, size }) => <Ionicons name={focused ? 'person' : 'person-outline'} color={focused ? colors.primary : colors.muted} size={size} /> }} />
   </Tabs></SafeAreaView>;
 }

@@ -45,7 +45,7 @@ test('persists the share as a draft before clearing the native payload', async (
   expect(jest.mocked(importDraft).mock.invocationCallOrder[0]).toBeLessThan(jest.mocked(clearSharedPayloads).mock.invocationCallOrder[0]);
   await fireEvent.press(screen.getByRole('button', { name: 'Добавить в этот аккаунт' }));
   expect(assignDraft).toHaveBeenCalledWith('incoming-1', 'account-1');
-  expect(router.replace).toHaveBeenCalledWith('/');
+  expect(router.replace).toHaveBeenCalledWith('/library');
 });
 
 test('retains the native payload when SQLite cannot persist it', async () => {

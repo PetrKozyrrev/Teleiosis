@@ -13,10 +13,11 @@ jest.mock('../src/library/ui', () => ({
   LibraryAccess: ({ children }: { children: (request: Request) => React.ReactNode }) => children(mockRequest),
 }));
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), dismissTo: jest.fn() }, useLocalSearchParams: () => ({ id: '7' }),
+  router: { push: jest.fn(), dismissTo: jest.fn() }, useLocalSearchParams: () => ({ id: '7', goalId: mockGoalId }),
   useFocusEffect: (cb: () => void) => jest.requireActual<typeof import('react')>('react').useEffect(cb, [cb]),
 }));
 const mockRequest = jest.fn<Request>();
+let mockGoalId: string | undefined;
 const week: Week = {
   week: '2026-11-16', end: '2026-11-22', today: '2026-11-22', budget: 30, goals: [{ id: 2, name: 'Reading' }],
   tasks: [{ id: 3, goal_id: 2, goal_name: 'Reading', content_id: 8, title: 'Synthetic task', day: '2026-11-16', minutes: 50, priority: 2, version: 2, completed_at: null }],
@@ -24,7 +25,21 @@ const week: Week = {
 };
 const press = (name: string) => fireEvent.press(screen.getByRole('button', { name }));
 beforeEach(() => {
+  mockGoalId = undefined;
   mockRequest.mockReset().mockImplementation(async path => path === '/contents/7' ? { title: 'Synthetic note' } : week);
+});
+
+test('uses the goal selected in goal detail when scheduling a material', async () => {
+  mockGoalId = '42';
+  mockRequest.mockImplementation(async path => path === '/contents/7' ? { title: 'Synthetic note' }
+    : { ...week, goals: [...week.goals, { id: 42, name: 'Python' }] });
+  await render(<PlanRoute />);
+  expect(screen.getByRole('button', { name: 'Цель · Python' })).toBeTruthy();
+  await fireEvent.changeText(screen.getByLabelText('Длительность в минутах'), '15');
+  await press('Запланировать материал');
+  expect(mockRequest).toHaveBeenCalledWith('/mobile/plan/tasks', 'POST', {
+    goal_id: 42, content_id: 7, day: '2026-11-22', minutes: 15, priority: 2,
+  });
 });
 
 test('uses the configured count-based progress and requires a manual duration', async () => {

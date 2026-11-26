@@ -202,3 +202,20 @@ test('tag and collection filters never fall back to an unfiltered downloaded lib
   expect(await cache.cachedList(owner, { ...initialFilters, tag: 7 }, 0)).toBeNull();
   expect(await cache.cachedList(owner, { ...initialFilters, collection: 8 }, 0)).toBeNull();
 });
+
+test('reflection drafts are owner-scoped, survive reopening and require explicit logout deletion', async () => {
+  let { store } = loadModules();
+  await store.saveReflectionDraft(owner, 9, 'A private thought', store.generation(owner));
+  expect(await store.hasPendingDrafts(owner)).toBe(true);
+  expect(await store.reflectionDraft(other, 9)).toBeNull();
+  mockDb.close();
+  jest.resetModules();
+  ({ store } = loadModules());
+  expect(await store.reflectionDraft(owner, 9)).toBe('A private thought');
+  const priorGeneration = store.generation(owner);
+  await expect(store.clearAccount(owner, false)).rejects.toThrow();
+  expect(await store.reflectionDraft(owner, 9)).toBe('A private thought');
+  await store.clearAccount(owner, true);
+  expect(await store.hasPendingDrafts(owner)).toBe(false);
+  await expect(store.saveReflectionDraft(owner, 9, 'Old write', priorGeneration)).rejects.toThrow();
+});

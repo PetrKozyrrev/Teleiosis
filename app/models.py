@@ -428,10 +428,27 @@ class StudyGoal(Base):
         UniqueConstraint("id", "user_id", name="uq_study_goal_owner"),
         Index("uq_study_goal_name", "user_id", text("lower(name)"), unique=True),
         CheckConstraint("char_length(name) BETWEEN 1 AND 100", name="ck_study_goal_name"),
+        CheckConstraint("status IN ('active','completed','archived')", name="ck_study_goal_status"),
+        Index("ix_study_goal_owner_status", "user_id", "status", "id"),
     )
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(Text)
+    result: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, server_default="active")
+    version: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+
+
+class StudyGoalMaterial(Base):
+    __tablename__ = "study_goal_materials"
+    __table_args__ = (
+        ForeignKeyConstraint(["goal_id", "user_id"], ["study_goals.id", "study_goals.user_id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(["content_id", "user_id"], ["contents.id", "contents.user_id"], ondelete="CASCADE"),
+        Index("ix_study_goal_material_owner_content", "user_id", "content_id", "goal_id"),
+    )
+    goal_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    content_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger)
 
 
 class WeekBudget(Base):
@@ -472,6 +489,31 @@ class StudyTaskEvent(Base):
     kind: Mapped[str] = mapped_column(Text)
     day: Mapped[date] = mapped_column(Date)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ContentReflection(Base):
+    __tablename__ = "content_reflections"
+    __table_args__ = (
+        ForeignKeyConstraint(["content_id", "user_id"], ["contents.id", "contents.user_id"], ondelete="CASCADE"),
+        CheckConstraint("char_length(thought) BETWEEN 1 AND 4000", name="ck_content_reflection_thought"),
+        Index("ix_reflection_owner_content", "user_id", "content_id"),
+    )
+    content_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    thought: Mapped[str] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(BigInteger, server_default=text("1"))
+
+
+class LearningCompletion(Base):
+    __tablename__ = "learning_completions"
+    __table_args__ = (
+        ForeignKeyConstraint(["content_id", "user_id"], ["contents.id", "contents.user_id"], ondelete="CASCADE"),
+        Index("ix_learning_completion_content", "content_id"),
+    )
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    key: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    content_id: Mapped[int] = mapped_column(BigInteger)
+    task_id: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class ReviewCard(Base):

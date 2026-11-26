@@ -10,8 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import (
-    Category, Content, ContentGroup, LibraryGroup, PdfObject, Reminder, ReviewCard, ReviewAnswer,
-    StudyGoal, StudyTask, StudyTaskEvent, User, UserActivity, WeekBudget,
+    Category, Content, ContentGroup, ContentReflection, LibraryGroup, PdfObject, Reminder, ReviewCard, ReviewAnswer,
+    StudyGoal, StudyGoalMaterial, StudyTask, StudyTaskEvent, User, UserActivity, WeekBudget,
 )
 
 EXPORT_VERSION = 1
@@ -53,8 +53,12 @@ def build_export(db: Session, user: User, now: datetime | None = None) -> dict:
         tasks = db.scalars(select(StudyTask).where(StudyTask.user_id == user.id).order_by(StudyTask.id))
         events = db.scalars(select(StudyTaskEvent).join(StudyTask).where(StudyTask.user_id == user.id)
                             .order_by(StudyTaskEvent.task_id, StudyTaskEvent.version))
+        goal_materials = db.execute(select(StudyGoalMaterial.goal_id, StudyGoalMaterial.content_id)
+            .where(StudyGoalMaterial.user_id == user.id)
+            .order_by(StudyGoalMaterial.goal_id, StudyGoalMaterial.content_id))
         plan = {"study_plan": {
-            "goals": [{"id": g.id, "name": g.name} for g in goals],
+            "goals": [{"id": g.id, "name": g.name, "result": g.result, "status": g.status} for g in goals],
+            "goal_materials": [{"goal_id": goal_id, "content_id": content_id} for goal_id, content_id in goal_materials],
             "budgets": [{"week": _iso(b.week), "minutes": b.minutes} for b in budgets],
             "tasks": [{"id": t.id, "goal_id": t.goal_id, "content_id": t.content_id, "day": _iso(t.day),
                        "minutes": t.minutes, "priority": t.priority, "completed_at": _iso(t.completed_at)} for t in tasks],
@@ -74,9 +78,13 @@ def build_export(db: Session, user: User, now: datetime | None = None) -> dict:
             "review_answers": [{"card_id": a.card_id, "rating": a.rating, "due_on": _iso(a.due_on),
                                 "occurred_at": _iso(a.occurred_at)} for a in answers]}
 
+    reflections = db.scalars(select(ContentReflection).where(ContentReflection.user_id == user.id)
+                             .order_by(ContentReflection.content_id)).all()
     return {
         **reviews,
         **plan,
+        **({"reflections": [{"content_id": item.content_id, "thought": item.thought} for item in reflections]}
+           if reflections else {}),
         **({"pdf_attachments": [
             {"content_id": pdf.content_id, "name": pdf.name, "size_bytes": pdf.size_bytes, "sha256": pdf.digest}
             for pdf in pdfs

@@ -58,15 +58,19 @@ export async function readOnline<T>(owner: string | null, request: Request, path
   } catch (error) {
     if (!owner || generation(owner) !== expected || !(error instanceof ApiError) || (error.status !== 0 && error.status < 500)) throw error;
     const cached = await fallback(owner);
-    if (!cached) throw error;
+    if (!cached || generation(owner) !== expected) throw error;
     return cached;
   }
 }
 
-export async function cachedCategories(owner: string): Promise<Read<Category[]> | null> {
+export async function cachedSnapshot<T>(owner: string, path: LibraryPath): Promise<Read<T> | null> {
   const row = await (await database()).getFirstAsync<Snapshot>(
-    "SELECT * FROM snapshots WHERE owner = ? AND path = '/categories'", owner);
-  return row ? { value: JSON.parse(row.payload) as Category[], cachedAt: row.updated_at } : null;
+    'SELECT * FROM snapshots WHERE owner = ? AND path = ?', owner, path);
+  return row ? { value: JSON.parse(row.payload) as T, cachedAt: row.updated_at } : null;
+}
+
+export function cachedCategories(owner: string) {
+  return cachedSnapshot<Category[]>(owner, '/categories');
 }
 
 export async function cachedMaterial(owner: string, id: number): Promise<Read<Material> | null> {

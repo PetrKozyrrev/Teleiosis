@@ -10,11 +10,12 @@ import { useTranslation } from '../i18n';
 type Save = (operation: () => Promise<unknown>, after?: (result: unknown) => void) => Promise<void>;
 
 export default function PlanRoute() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
-  return <LibraryAccess>{request => <Planner key={id ?? 'week'} request={request} contentId={parseId(id)} />}</LibraryAccess>;
+  const { id, goalId } = useLocalSearchParams<{ id?: string; goalId?: string }>();
+  return <LibraryAccess>{request => <Planner key={`${id ?? 'week'}:${goalId ?? ''}`} request={request}
+    contentId={parseId(id)} preferredGoal={parseId(goalId)} />}</LibraryAccess>;
 }
 
-function Planner({ request, contentId }: { request: Request; contentId: number | null }) {
+function Planner({ request, contentId, preferredGoal }: { request: Request; contentId: number | null; preferredGoal: number | null }) {
   const t = useTranslation();
   const [anchor, setAnchor] = useState('');
   const [revision, setRevision] = useState(0);
@@ -25,7 +26,7 @@ function Planner({ request, contentId }: { request: Request; contentId: number |
   const epoch = useRef(0);
   const locked = useRef(false);
   const [goalName, setGoalName] = useState('');
-  const [goalId, setGoalId] = useState<number | null>(null);
+  const [goalId, setGoalId] = useState(preferredGoal);
   const [day, setDay] = useState('');
   const [minutes, setMinutes] = useState('');
   const [priority, setPriority] = useState(2);
@@ -45,11 +46,11 @@ function Planner({ request, contentId }: { request: Request; contentId: number |
       setWeek(result);
       setMaterialTitle((material as { title: string } | null)?.title ?? '');
       setBudget(result.budget?.toString() ?? '');
-      setGoalId(previous => result.goals.find(goal => goal.id === previous)?.id ?? result.goals[0]?.id ?? null);
+      setGoalId(previous => result.goals.find(goal => goal.id === previous)?.id ?? (preferredGoal ? null : result.goals[0]?.id ?? null));
       setDay(previous => previous || (anchor || result.today));
     }).catch(error => { if (current === epoch.current) setMessage(planError(error, true)); });
     return () => { epoch.current++; };
-  }, [request, revision, anchor, contentId]));
+  }, [request, revision, anchor, contentId, preferredGoal]));
 
   function refresh() {
     setMessage(''); setWeek(undefined); setRevision(value => value + 1);
@@ -110,7 +111,7 @@ function Planner({ request, contentId }: { request: Request; contentId: number |
         <Action title={t('Запланировать материал')} disabled={disabled || !selected || !validDay(day) || !minutesValid(minutes, 1440)}
           onPress={() => void save(() => request('/mobile/plan/tasks', 'POST', { goal_id: goalId, content_id: contentId,
             day, minutes: Number(minutes), priority }), () => { setAdded(true); setAnchor(day); })} />
-      </Card> : <Action title={t('Выбрать материал в библиотеке')} disabled={busy} onPress={() => router.dismissTo('/')} />}
+      </Card> : <Action title={t('Выбрать материал в библиотеке')} disabled={busy} onPress={() => router.dismissTo('/library')} />}
       {week.tasks.map(task => <TaskRow key={task.id} task={task} disabled={disabled} save={save} request={request} />)}
     </> : !message && <Loading />}
     <Action title={t('Обновить план')} disabled={busy} onPress={refresh} />
@@ -130,7 +131,9 @@ function TaskRow({ task, disabled, save, request }: { task: Task; disabled: bool
       <Action title={t('Перенести задание')} disabled={disabled || day === task.day || !validDay(day)}
         onPress={() => void save(() => request(`${path}/day`, 'PUT', { day }, options))} />
     </>}
-    <Action title={t('Открыть материал')} onPress={() => router.push({ pathname: '/library/[id]', params: { id: String(task.content_id) } })} />
+    <Action title={t('Открыть материал')} onPress={() => router.push({ pathname: '/library/[id]', params: {
+      id: String(task.content_id), ...(!task.completed_at ? { taskId: String(task.id) } : {}),
+    } })} />
     <Action title={t('Убрать задание')} disabled={disabled} onPress={() => Alert.alert(t('Убрать задание из плана?'), task.title,
       [{ text: t('Отмена'), style: 'cancel' }, { text: t('Убрать'), style: 'destructive', onPress: () => void save(() => request(path, 'DELETE', undefined, options)) }])} />
   </Card>;

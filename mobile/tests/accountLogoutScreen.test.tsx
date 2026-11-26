@@ -4,7 +4,7 @@ import { Alert } from 'react-native';
 import { AuthApi, type IssuedSession } from '../src/auth/api';
 import { AuthController } from '../src/auth/controller';
 import type { Vault } from '../src/auth/vault';
-import { clearAccount, listJobs } from '../src/offline/store';
+import { clearAccount, hasPendingDrafts } from '../src/offline/store';
 import Account from '../src/app/account';
 
 jest.mock('expo/fetch', () => ({ fetch: jest.fn() }));
@@ -12,7 +12,7 @@ jest.mock('expo-router', () => ({ router: { push: jest.fn() } }));
 jest.mock('../src/auth/config', () => ({ ...jest.requireActual<typeof import('../src/auth/config')>('../src/auth/config'), API_ORIGIN: 'https://example.com', STAGING_GATE: false }));
 jest.mock('../src/auth/context', () => ({ useAuth: () => ({ controller: mockController, state: mockController.snapshot() }) }));
 jest.mock('../src/offline/store', () => ({
-  clearAccount: jest.fn(), listJobs: jest.fn(), ownerKey: (origin: string, id: number) => `${origin}/${id}`,
+  clearAccount: jest.fn(), hasPendingDrafts: jest.fn(), ownerKey: (origin: string, id: number) => `${origin}/${id}`,
 }));
 
 let mockController: AuthController;
@@ -34,8 +34,7 @@ beforeEach(async () => {
   jest.spyOn(api, 'signIn').mockResolvedValue({ ...first, token: 'b'.repeat(43), user: { ...first.user, id: 2, email: 'synthetic-b@example.com' } });
   mockController = new AuthController(api, storage);
   await mockController.initialize();
-  jest.mocked(listJobs).mockResolvedValue([{ id: 'synthetic-job', owner: 'https://example.com/1', state: 'pending',
-    payload: '{"note":"synthetic draft"}', attempts: 0, tried_at: null, next_at: 0, reason: null, server_id: null }]);
+  jest.mocked(hasPendingDrafts).mockResolvedValue(true);
   jest.mocked(clearAccount).mockResolvedValue();
 });
 

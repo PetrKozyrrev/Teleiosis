@@ -4,7 +4,7 @@
 Дни считаются в Python (zoneinfo), а не в SQL: неверное название пояса
 не должно ронять запрос."""
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal
 from zoneinfo import ZoneInfo
 
@@ -31,13 +31,21 @@ def share(part: int, whole: int) -> float | None:
     return round(part / whole, 4) if whole else None
 
 
+def calendar_week_start(day: date) -> date:
+    return day - timedelta(days=day.weekday())
+
+
+def studied_materials(user: User):
+    return (Content.user_id == user.id, Content.studied_at.is_not(None))
+
+
 def reading_progress(db: Session, user: User, period: ReadingPeriod, offset: int, now: datetime | None = None) -> dict:
     zone = user_zone(user.timezone)
     today = (now or datetime.now(timezone.utc)).astimezone(zone).date()
-    week_start = today - timedelta(days=today.weekday())
+    week_start = calendar_week_start(today)
     month_start = today.replace(day=1)
     day = func.date(func.timezone(zone.key, Content.studied_at))
-    owned = (Content.user_id == user.id, Content.studied_at.is_not(None))
+    owned = studied_materials(user)
     # Use the same current material status as /stats. Reverting a status clears its completion date.
     daily = dict(db.execute(select(day, func.count()).where(*owned, day <= today).group_by(day)).all())
     week_count = sum(amount for date, amount in daily.items() if date >= week_start)

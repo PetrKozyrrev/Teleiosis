@@ -31,6 +31,7 @@ export function planError(error: unknown, reading = false) {
     if (error.status === 412) return 'План изменился на другом устройстве. Обновите план перед повтором.';
     if (error.code === 'already_planned') return 'В этой цели уже есть задание с этим материалом.';
     if (error.code === 'goal_limit') return 'Достигнут лимит в 100 целей.';
+    if (error.code === 'goal_archive_required') return 'Эту цель можно архивировать на экране «Цели».';
     if (error.code === 'task_completed') return 'Это задание уже завершено.';
   }
   return errorMessage(error, 'Проверьте дату, длительность и цель.');

@@ -3,17 +3,17 @@ import { getStringAsync } from 'expo-clipboard';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
-import { cachedCategories, readOnline } from '../../offline/cache';
-import { GroupSelection } from '../../library/GroupSelection';
-import { MaterialThumbnail } from '../../library/MaterialThumbnail';
-import { PendingMaterialActions, PendingMaterials } from '../../library/PendingMaterials';
-import { linkDomain, linkInput, type Category, type Request } from '../../library/model';
-import { groupPath, type Group } from '../../library/organization';
-import { Choice, LibraryAccess, Notice } from '../../library/ui';
-import { enqueue, getJob, subscribe, type Job } from '../../offline/store';
-import { colors } from '../../theme';
-import { useTranslation } from '../../i18n';
+import { Action, Body, Card, Field, Page, styles } from '../components/ui';
+import { cachedCategories, readOnline } from '../offline/cache';
+import { GroupSelection } from '../library/GroupSelection';
+import { MaterialThumbnail } from '../library/MaterialThumbnail';
+import { PendingMaterialActions, PendingMaterials } from '../library/PendingMaterials';
+import { linkDomain, linkInput, type Category, type Request } from '../library/model';
+import { groupPath, type Group } from '../library/organization';
+import { Choice, LibraryAccess, Notice } from '../library/ui';
+import { enqueue, getJob, subscribe, type Job } from '../offline/store';
+import { colors } from '../theme';
+import { useTranslation } from '../i18n';
 
 type Preview = { title: string | null; image_url: string | null; content_type: string };
 const successNoticeDuration = 5_000;
@@ -162,7 +162,7 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
         ? <PendingMaterialActions job={job} owner={owner} onDiscarded={() => setSubmission(undefined)} />
         : <Action variant="text" title={t('Открыть библиотеку')} onPress={() => {
           if (confirmedSubmission) setSubmission(undefined);
-          router.navigate('/');
+          router.navigate('/library');
         }} />}
     </Card>}
     {normalized && <>

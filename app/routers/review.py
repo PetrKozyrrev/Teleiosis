@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from hashlib import sha256
 import json
 from typing import Annotated, Literal
@@ -54,6 +54,10 @@ def today(user):
     return datetime.now(user_zone(user.timezone)).date()
 
 
+def due_card_filters(day: date):
+    return (ReviewCard.paused.is_(False), ReviewCard.due_on <= day)
+
+
 def card_out(card):
     return {key: getattr(card, key) for key in
             ("id", "content_id", "question", "answer", "takeaway", "due_on", "paused", "stage", "version")}
@@ -67,17 +71,18 @@ def answer_out(answer):
 @router.get("")
 def list_cards(db: DbSession, user: CurrentUser, due: bool = True, content_id: ContentId | None = None,
                limit: Limit = 20, offset: Offset = 0):
+    local_day = today(user)
     filters = [ReviewCard.user_id == user.id]
     if content_id is not None:
         get_own_content(db, user, content_id)
         filters.append(ReviewCard.content_id == content_id)
     if due:
-        filters.extend([ReviewCard.paused.is_(False), ReviewCard.due_on <= today(user)])
+        filters.extend(due_card_filters(local_day))
     total = db.scalar(select(func.count()).select_from(ReviewCard).where(*filters))
     rows = db.execute(select(ReviewCard, Content.title).join(Content, Content.id == ReviewCard.content_id)
                       .where(*filters).order_by(ReviewCard.due_on, ReviewCard.id).limit(limit).offset(offset))
     return {"items": [dict(card_out(card), title=title) for card, title in rows],
-            "total": total, "limit": limit, "offset": offset, "today": today(user)}
+            "total": total, "limit": limit, "offset": offset, "today": local_day}
 
 
 @router.post("")

@@ -2,7 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'exp
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { openURL } from 'expo-linking';
 import { useCallback, useContext, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Alert, Keyboard, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Keyboard, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ApiError } from '../../auth/api';
 import { useAuth } from '../../auth/context';
 import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
@@ -17,25 +17,26 @@ import { enqueue, generation, getJob, unassigned, type Draft } from '../../offli
 import { GroupSelection } from '../../library/GroupSelection';
 import { groupPath, organizationPath, type Group, type Organization } from '../../library/organization';
 import { MaterialThumbnail } from '../../library/MaterialThumbnail';
+import { useSourceReturn } from '../../learning/sourceReturn';
 import { colors } from '../../theme';
 import { useLocale, useTranslation } from '../../i18n';
 
 export default function MaterialRoute() {
   const t = useTranslation();
-  const { id: param, draftId, inbox, edit } = useLocalSearchParams<{ id: string; draftId?: string; inbox?: string; edit?: string }>();
+  const { id: param, draftId, inbox, edit, taskId } = useLocalSearchParams<{ id: string; draftId?: string; inbox?: string; edit?: string; taskId?: string }>();
   const id = param === 'new' ? 'new' : parseId(param);
   if (id === 'new' && draftId && inbox === '1') {
     return <MaterialScreen key={draftId} request={async () => { throw new ApiError(401); }} id={id} owner={unassigned} draftId={draftId} />;
   }
   return <LibraryAccess>{(request, owner) => id
     ? <MaterialScreen key={draftId ?? id} request={request} id={id} owner={owner} draftId={id === 'new' ? draftId : undefined}
-      openEditor={edit === '1'} />
+      openEditor={edit === '1'} taskId={parseId(taskId)} />
     : <Page title={t('Материал')}><Notice>{t('Материал не найден.')}</Notice></Page>}
   </LibraryAccess>;
 }
 
-function MaterialScreen({ id, request, owner, draftId, openEditor }: {
-  id: number | 'new'; request: Request; owner: string | null; draftId?: string; openEditor?: boolean;
+function MaterialScreen({ id, request, owner, draftId, openEditor, taskId }: {
+  id: number | 'new'; request: Request; owner: string | null; draftId?: string; openEditor?: boolean; taskId?: number | null;
 }) {
   const t = useTranslation();
   const navigation = useNavigation();
@@ -74,12 +75,14 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
   const launchEditor = useRef(openEditor);
   const pdfPreview = useRef<ReturnType<typeof writePdfPreview> | null>(null);
   const focusRevision = useRef(0);
+  const { prompt, start: watchSource, dismiss: dismissPrompt } = useSourceReturn();
 
   useFocusEffect(useCallback(() => () => {
+    dismissPrompt();
     focusRevision.current += 1;
     removePreview(pdfPreview.current);
     pdfPreview.current = null;
-  }, []));
+  }, [dismissPrompt]));
 
   const beginEdit = useCallback((material: Material) => {
     setEditBase(material);
@@ -234,7 +237,7 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
         }, draftId);
         if (navigation.isFocused()) {
           if (draftId && navigation.canGoBack()) router.back();
-          else router.dismissTo(owner === unassigned ? '/share-probe' : '/');
+          else router.dismissTo(owner === unassigned ? '/share-probe' : '/library');
         }
       } else if (editBase) {
         const collectionsChanged = Boolean(groups) && (selected.length !== initialCollections.length
@@ -290,7 +293,7 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
         try { await request(`/contents/${id}`, 'DELETE'); }
         catch (error) { if (!(error instanceof ApiError && error.status === 404 && !error.gateway)) throw error; }
         if (owner) await forgetMaterial(owner, id).catch(() => {});
-        if (navigation.isFocused()) router.dismissTo('/');
+        if (navigation.isFocused()) router.dismissTo('/library');
       }) },
     ]);
   }
@@ -303,8 +306,14 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
         setItem(current => current && { ...current, open_count: current.open_count + 1 });
       }
       if (!navigation.isFocused()) return;
-      try { await openURL(original); }
-      catch { setMessage('Устройство не смогло открыть ссылку.'); }
+      const finish = watchSource();
+      try {
+        await openURL(original);
+        finish(true);
+      } catch {
+        finish(false);
+        setMessage('Устройство не смогло открыть ссылку.');
+      }
     });
   }
 
@@ -319,13 +328,23 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
       const file = writePdfPreview(data);
       removePreview(pdfPreview.current);
       pdfPreview.current = file;
-      try { await file.preview(); }
+      const finish = watchSource();
+      try { await file.preview(); finish(true, Platform.OS === 'ios'); }
       catch (error) {
+        finish(false);
         removePreview(file);
         if (pdfPreview.current === file) pdfPreview.current = null;
         throw error;
       }
     }, error => canOpen() ? pdfError(error) : '');
+  }
+
+  function openCompletion(reflection = false) {
+    if (id === 'new') return;
+    dismissPrompt();
+    router.push({ pathname: '/library/complete', params: {
+      id: String(id), ...(reflection ? { mode: 'reflection' } : taskId ? { taskId: String(taskId) } : {}),
+    } });
   }
 
   function revealFocusedField() {
@@ -362,11 +381,20 @@ function MaterialScreen({ id, request, owner, draftId, openEditor }: {
         {item.content_type === 'pdf' && <Action title={t('Открыть PDF')} disabled={busy || cachedAt !== undefined} onPress={openPdf} />}
       </Card>
       {item.note && <Card><Text style={styles.label}>{t('Заметка')}</Text><Text selectable style={styles.body}>{item.note}</Text></Card>}
+      {item.status === 'studied' && <Action variant="outline" title={t('Главная мысль')} disabled={busy} onPress={() => openCompletion(true)} />}
+      {(item.status !== 'studied' || taskId) && (prompt ? <Card>
+        <Text accessibilityRole="header" style={styles.label}>{t('Удалось изучить?')}</Text>
+        <Action title={t('Отметить изученным')} disabled={busy} onPress={() => openCompletion()} />
+        <Action variant="text" title={t('Не сейчас')} onPress={dismissPrompt} />
+      </Card> : <Action title={t('Отметить изученным')} disabled={busy} onPress={() => openCompletion()} />)}
       {cachedAt !== undefined && <Notice>{t('Загруженная карточка ·')} {new Date(cachedAt).toLocaleString(locale)}</Notice>}
       <Action variant="outline" title={t('Редактировать')} disabled={busy || cachedAt !== undefined} onPress={() => beginEdit(item)} />
+      <Action variant="outline" title={t('Добавить к цели')} disabled={busy || cachedAt !== undefined}
+        onPress={() => router.push({ pathname: '/library/goals', params: { id: String(item.id) } })} />
       <Action variant="text" title={showActions ? t('Скрыть действия') : t('Другие действия')} onPress={() => setShowActions(!showActions)} />
       {showActions && <Card>
         {original && <><Text selectable style={styles.body}>{original}</Text><Body>{t('Открытий оригинала ·')} {item.open_count}</Body></>}
+        {item.status !== 'studied' && <Action variant="text" title={t('Главная мысль')} disabled={busy} onPress={() => openCompletion(true)} />}
         <Action variant="text" title={t('Карточки для повторения')} disabled={busy || cachedAt !== undefined}
           onPress={() => router.push({ pathname: '/review', params: { id: String(item.id) } })} />
         <Action variant="text" title={t('Добавить в недельный план')} disabled={busy || cachedAt !== undefined}

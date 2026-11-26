@@ -4,7 +4,7 @@ import { useAuth } from '../auth/context';
 import { API_ORIGIN } from '../auth/config';
 import { Action, Body } from '../components/ui';
 import { Notice } from '../library/ui';
-import { clearAccount, listJobs, ownerKey } from '../offline/store';
+import { clearAccount, hasPendingDrafts, ownerKey } from '../offline/store';
 import { useTranslation } from '../i18n';
 
 export function SignOut() {
@@ -27,8 +27,7 @@ export function SignOut() {
       }
     };
     try {
-      const jobs = owner ? await listJobs(owner) : [];
-      if (jobs.some(job => job.state !== 'synced')) {
+      if (owner && await hasPendingDrafts(owner)) {
         Alert.alert(t('Удалить черновики и выйти?'), t('Материалы, уже сохранённые на сервере, останутся в библиотеке.'), [
           { text: t('Остаться'), style: 'cancel' },
           { text: t('Удалить и выйти'), style: 'destructive', onPress: () => void signOut(true) },

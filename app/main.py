@@ -12,7 +12,8 @@ from app.config import settings
 from app.deps import DbSession
 from app.routers import (
     account, auth, categories, contents, email_verification, password_reset,
-    reminders, stats, unsubscribe, users, mobile_auth, app_links, push_devices, organization, library_import, pdf, week_plan, review,
+    reminders, stats, unsubscribe, users, mobile_auth, app_links, push_devices, organization, library_import, pdf, week_plan, review, learning,
+    learning_goals, completion,
 )
 
 # Путь строится от файла, а не от текущей папки: сервер можно запускать откуда угодно
@@ -73,6 +74,9 @@ def create_app() -> FastAPI:
     application.include_router(pdf.router, prefix="/mobile/library")
     application.include_router(week_plan.router)
     application.include_router(review.router)
+    application.include_router(learning.router)
+    application.include_router(learning_goals.router)
+    application.include_router(completion.router)
 
     @application.get("/health")
     def health():

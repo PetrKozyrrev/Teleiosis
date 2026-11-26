@@ -2,13 +2,14 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import { router } from 'expo-router';
 import { openURL } from 'expo-linking';
+import { AppState, type AppStateStatus } from 'react-native';
 import { enqueue, getJob, listJobs, retry, type Job } from '../src/offline/store';
 import type { Material, MaterialPage, Request } from '../src/library/model';
 import { useAuth } from '../src/auth/context';
 import { ApiError } from '../src/auth/api';
 import type { AuthController } from '../src/auth/controller';
-import Library from '../src/app/(tabs)/index';
-import AddLink from '../src/app/(tabs)/add-link';
+import Library from '../src/app/(tabs)/library';
+import AddLink from '../src/app/add-link';
 import MaterialRoute from '../src/app/library/[id]';
 import { pickPdf } from '../src/library/pdf';
 
@@ -139,7 +140,7 @@ test('pastes a link, persists the selected collection and confirms saving on the
   expect(router.push).not.toHaveBeenCalledWith('/queue');
   expect(screen.getByText('Ссылка сохранена на устройстве и появится в библиотеке после отправки.')).toBeTruthy();
   await press('Открыть библиотеку');
-  expect(router.navigate).toHaveBeenCalledWith('/');
+  expect(router.navigate).toHaveBeenCalledWith('/library');
 });
 
 test('dismisses confirmation five seconds after syncing or when opening the library', async () => {
@@ -163,7 +164,7 @@ test('dismisses confirmation five seconds after syncing or when opening the libr
     await press('Сохранить в библиотеку');
     expect(screen.getByText(success)).toBeTruthy();
     await press('Открыть библиотеку');
-    expect(router.navigate).toHaveBeenCalledWith('/');
+    expect(router.navigate).toHaveBeenCalledWith('/library');
     expect(screen.queryByText(success)).toBeNull();
   } finally {
     jest.useRealTimers();
@@ -177,7 +178,7 @@ test('saves a PDF link in the local queue with its category', async () => {
   await fireEvent.press(screen.getByRole('radio', { name: 'Техника' }));
   await press('Сохранить');
   expect(enqueue).toHaveBeenCalledWith('account-1', { url: item.url!, category_id: 3 }, undefined);
-  expect(router.dismissTo).toHaveBeenCalledWith('/');
+  expect(router.dismissTo).toHaveBeenCalledWith('/library');
 });
 
 test('edits only changed fields, displays fallback and hands the original to the OS', async () => {
@@ -194,6 +195,33 @@ test('edits only changed fields, displays fallback and hands the original to the
   await press('Открыть оригинал');
   expect(request).toHaveBeenCalledWith('/contents/12/open', 'POST');
   expect(openURL).toHaveBeenCalledWith(item.url!);
+});
+
+test('dismisses the return prompt without changing the material status', async () => {
+  mockRequestedId = '12';
+  let change!: (state: AppStateStatus) => void;
+  const previous = jest.isMockFunction(AppState.addEventListener)
+    ? jest.mocked(AppState.addEventListener).getMockImplementation() : undefined;
+  const events = jest.spyOn(AppState, 'addEventListener').mockImplementation((event, listener) => {
+    if (event === 'change') change = listener;
+    return { remove: jest.fn() };
+  });
+  try {
+    await render(<MaterialRoute />);
+    await press('Открыть оригинал');
+    expect(screen.queryByText('Удалось изучить?')).toBeNull();
+    await act(async () => { change('background'); change('active'); });
+    expect(screen.getByRole('header', { name: 'Удалось изучить?' })).toBeTruthy();
+    await press('Не сейчас');
+    expect(screen.queryByText('Удалось изучить?')).toBeNull();
+    expect(screen.getByText('Не просмотрено')).toBeTruthy();
+    expect(request.mock.calls.filter(([, method]) => method !== 'GET')).toEqual([['/contents/12/open', 'POST']]);
+    await press('Отметить изученным');
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/library/complete', params: { id: '12' } });
+  } finally {
+    if (previous) events.mockImplementation(previous);
+    else events.mockRestore();
+  }
 });
 
 test('preserves the user edit when the server detects a version conflict', async () => {

@@ -54,7 +54,7 @@ export default function IncomingShare() {
   }, [revision]);
 
   function dismissUnsupported() {
-    try { clearSharedPayloads(); router.replace('/'); }
+    try { clearSharedPayloads(); router.replace('/library'); }
     catch { setError(true); }
   }
 
@@ -68,7 +68,7 @@ export default function IncomingShare() {
       <Body>{t(result.message)}</Body>
       <Action title={t('Закрыть и очистить входящий материал')} onPress={dismissUnsupported} />
     </Card>}
-    <PendingMaterials owner={owner} inboxOnly onAssigned={() => router.replace('/')} />
-    <Action variant="text" title={t('В библиотеку')} onPress={() => router.replace('/')} />
+    <PendingMaterials owner={owner} inboxOnly onAssigned={() => router.replace('/library')} />
+    <Action variant="text" title={t('В библиотеку')} onPress={() => router.replace('/library')} />
   </Page>;
 }

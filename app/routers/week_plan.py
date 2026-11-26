@@ -5,15 +5,17 @@ from typing import Annotated
 from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
 
 from app.deps import CurrentUser, DbSession
-from app.models import Content, StudyGoal, StudyTask, StudyTaskEvent, WeekBudget
+from app.models import Content, StudyGoal, StudyGoalMaterial, StudyTask, StudyTaskEvent, WeekBudget
 from app.routers.contents import ContentId, get_own_content
 from app.routers.organization import lock_owner
 from app.schemas import MAX_BIGINT
-from app.stats import user_zone
+from app.stats import calendar_week_start, user_zone
 
 router = APIRouter(prefix="/mobile/plan", tags=["plan"])
+GOAL_LIMIT = 100
 
 
 def calendar_value(value: object) -> str:
@@ -69,6 +71,11 @@ def record(db, task, kind):
     db.add(StudyTaskEvent(task_id=task.id, version=task.version, kind=kind, day=task.day))
 
 
+def link_goal_material(db, owner_id: int, goal_id: int, content_id: int):
+    db.execute(insert(StudyGoalMaterial).values(goal_id=goal_id, content_id=content_id, user_id=owner_id)
+               .on_conflict_do_nothing(index_elements=["goal_id", "content_id"]))
+
+
 def task_out(task):
     return {key: getattr(task, key) for key in
             ("id", "goal_id", "content_id", "day", "minutes", "priority", "completed_at", "version")}
@@ -88,7 +95,7 @@ def summarize(tasks):
 def read_week(db: DbSession, user: CurrentUser, day: PlanDay | None = None):
     today = datetime.now(user_zone(user.timezone)).date()
     anchor = day or today
-    start = anchor - timedelta(days=anchor.weekday())
+    start = calendar_week_start(anchor)
     end = start + timedelta(days=6)
     goals = db.scalars(select(StudyGoal).where(StudyGoal.user_id == user.id).order_by(StudyGoal.id)).all()
     rows = db.execute(select(StudyTask, Content.title, StudyGoal.name)
@@ -107,7 +114,7 @@ def create_goal(data: GoalInput, db: DbSession, user: CurrentUser):
     lock_owner(db, user)
     goal = db.scalar(select(StudyGoal).where(StudyGoal.user_id == user.id, func.lower(StudyGoal.name) == func.lower(data.name)))
     if goal is None:
-        if db.scalar(select(func.count()).select_from(StudyGoal).where(StudyGoal.user_id == user.id)) >= 100:
+        if db.scalar(select(func.count()).select_from(StudyGoal).where(StudyGoal.user_id == user.id)) >= GOAL_LIMIT:
             raise HTTPException(409, {"code": "goal_limit"})
         goal = StudyGoal(user_id=user.id, name=data.name)
         db.add(goal)
@@ -118,7 +125,16 @@ def create_goal(data: GoalInput, db: DbSession, user: CurrentUser):
 @router.delete("/goals/{goal_id}", status_code=204)
 def delete_goal(goal_id: ContentId, db: DbSession, user: CurrentUser):
     lock_owner(db, user)
-    db.delete(owned(db, StudyGoal, user.id, goal_id))
+    goal = owned(db, StudyGoal, user.id, goal_id)
+    matching_task = select(StudyTask.id).where(
+        StudyTask.goal_id == goal_id, StudyTask.content_id == StudyGoalMaterial.content_id,
+    ).exists()
+    independent_link = select(StudyGoalMaterial.content_id).where(
+        StudyGoalMaterial.goal_id == goal_id, ~matching_task,
+    ).exists()
+    if goal.status != "active" or goal.result is not None or db.scalar(select(independent_link)):
+        raise HTTPException(409, {"code": "goal_archive_required"})
+    db.delete(goal)
     db.commit()
     return Response(status_code=204)
 
@@ -155,6 +171,7 @@ def create_task(data: TaskInput, db: DbSession, user: CurrentUser):
     db.add(task)
     db.flush()
     record(db, task, "created")
+    link_goal_material(db, user.id, task.goal_id, task.content_id)
     db.commit()
     return task_out(task)
 
@@ -178,11 +195,16 @@ def complete(task_id: ContentId, db: DbSession, user: CurrentUser, version: Vers
     task = owned(db, StudyTask, user.id, task_id)
     if task.completed_at is None:
         matches(task, version)
-        task.completed_at = datetime.now(timezone.utc)
-        task.version += 1
-        record(db, task, "completed")
+        finish_task(db, task, datetime.now(timezone.utc))
         db.commit()
     return task_out(task)
+
+
+def finish_task(db: DbSession, task: StudyTask, now: datetime) -> None:
+    if task.completed_at is None:
+        task.completed_at = now
+        task.version += 1
+        record(db, task, "completed")
 
 
 @router.delete("/tasks/{task_id}", status_code=204)

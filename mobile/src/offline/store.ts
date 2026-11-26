@@ -41,6 +41,10 @@ async function open() {
       PRIMARY KEY(owner, path)
     );
     CREATE TABLE IF NOT EXISTS imported_shares (id TEXT PRIMARY KEY NOT NULL);
+    CREATE TABLE IF NOT EXISTS reflection_drafts (
+      owner TEXT NOT NULL, content_id INTEGER NOT NULL, thought TEXT NOT NULL,
+      PRIMARY KEY(owner, content_id)
+    );
     UPDATE jobs SET state = 'pending' WHERE state = 'sending';
   `);
   return db;
@@ -63,6 +67,40 @@ export async function listJobs(owner: string) {
 
 export async function getJob(owner: string, id: string) {
   return (await database()).getFirstAsync<Job>('SELECT * FROM jobs WHERE owner = ? AND id = ?', owner, id);
+}
+
+async function pendingDrafts(db: Pick<SQLiteDatabase, 'getFirstAsync'>, owner: string) {
+  return Boolean(await db.getFirstAsync(
+    "SELECT 1 FROM jobs WHERE owner = ? AND state != 'synced' UNION ALL SELECT 1 FROM reflection_drafts WHERE owner = ? LIMIT 1",
+    owner, owner));
+}
+
+export async function hasPendingDrafts(owner: string) {
+  return pendingDrafts(await database(), owner);
+}
+
+export async function reflectionDraft(owner: string, id: number) {
+  return (await (await database()).getFirstAsync<{ thought: string }>(
+    'SELECT thought FROM reflection_drafts WHERE owner = ? AND content_id = ?', owner, id))?.thought ?? null;
+}
+
+export function saveReflectionDraft(owner: string, id: number, thought: string, expected: number) {
+  return mutate(async db => {
+    if (generation(owner) !== expected) throw new Error('Account changed');
+    if (!thought.trim()) {
+      await db.runAsync('DELETE FROM reflection_drafts WHERE owner = ? AND content_id = ?', owner, id);
+      return;
+    }
+    await db.runAsync(`INSERT INTO reflection_drafts(owner, content_id, thought) VALUES(?,?,?)
+      ON CONFLICT(owner,content_id) DO UPDATE SET thought = excluded.thought`, owner, id, thought);
+  });
+}
+
+export function clearReflectionDraft(owner: string, id: number, thought: string, expected: number) {
+  return mutate(async db => {
+    if (generation(owner) !== expected) return;
+    await db.runAsync('DELETE FROM reflection_drafts WHERE owner = ? AND content_id = ? AND thought = ?', owner, id, thought);
+  });
 }
 
 export async function enqueue(owner: string, payload: Draft, edit?: string) {
@@ -170,12 +208,12 @@ export async function clearAccount(owner: string, allowDraftDeletion: boolean) {
   if (!owner) return;
   ownerGenerations.set(owner, generation(owner) + 1);
   await mutate(db => db.withExclusiveTransactionAsync(async transaction => {
-    if (!allowDraftDeletion && await transaction.getFirstAsync(
-      "SELECT 1 FROM jobs WHERE owner = ? AND state != 'synced' LIMIT 1", owner)) {
-      throw new Error('В очереди есть материалы. Подтвердите удаление перед выходом.');
+    if (!allowDraftDeletion && await pendingDrafts(transaction, owner)) {
+      throw new Error('На устройстве есть черновики. Подтвердите удаление перед выходом.');
     }
     await transaction.runAsync('DELETE FROM snapshots WHERE owner = ?', owner);
     await transaction.runAsync('DELETE FROM jobs WHERE owner = ?', owner);
+    await transaction.runAsync('DELETE FROM reflection_drafts WHERE owner = ?', owner);
   }));
   changed();
 }
@@ -199,6 +237,7 @@ export async function clearDeletedAccount(owner: string) {
   await mutate(db => db.withExclusiveTransactionAsync(async transaction => {
     await transaction.runAsync('DELETE FROM snapshots WHERE owner = ?', owner);
     await transaction.runAsync('DELETE FROM jobs WHERE owner IN (?, ?)', owner, unassigned);
+    await transaction.runAsync('DELETE FROM reflection_drafts WHERE owner = ?', owner);
   }));
   changed();
 }
