@@ -15,8 +15,10 @@ export async function forgetMaterial(owner: string, id: number) {
   await mutate(db => db.runAsync(`
     DELETE FROM snapshots WHERE owner = ? AND (path = ? OR (path LIKE '/contents?%' AND EXISTS (
       SELECT 1 FROM json_each(snapshots.payload, '$.items') WHERE json_extract(value, '$.id') = ?
+    )) OR (path LIKE '/mobile/learning/time-budget?%' AND EXISTS (
+      SELECT 1 FROM json_each(snapshots.payload, '$.items') WHERE json_extract(value, '$.material_id') = ?
     )))
-  `, owner, `/contents/${id}`, id));
+  `, owner, `/contents/${id}`, id, id));
 }
 
 async function loaded(owner: string) {

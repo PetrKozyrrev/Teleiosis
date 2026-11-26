@@ -13,6 +13,7 @@ from app import pdf_storage as storage
 from app.activity import record_activity
 from app.config import settings
 from app.deps import CurrentUser, DbSession
+from app.learning_events import record_learning_event
 from app.models import Category, Content, PdfObject, User
 from app.routers.contents import ContentId, get_own_content
 from app.schemas import MAX_BIGINT, ContentOut
@@ -159,6 +160,7 @@ def create_pdf(db: DbSession, user: CurrentUser,
                            text_character_count=characters)
         db.add(material)
         db.flush()
+        record_learning_event(db, user, "material_saved", material.id, material_id=material.id, now=material.created_at)
         pending.user_id = owner
         pending.content_id = material.id
         pending.published = True

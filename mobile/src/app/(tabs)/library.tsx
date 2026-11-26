@@ -286,7 +286,7 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
               <Pressable accessibilityRole="button" onPress={() => { setMenu(undefined); router.push(detail); }}>
                 <Text style={styles.label} numberOfLines={3}>{item.title}</Text>
                 <Body>{linkDomain(item.url) ?? (item.content_type === 'pdf' ? 'PDF' : t(sources[item.source]))}</Body>
-                {(date || duration) && <Body>{[date, duration].filter(Boolean).join(' · ')}</Body>}
+                {duration && <Body>{duration}</Body>}
               </Pressable>
               <View style={libraryStyles.statusRow}>
                 <Pressable accessibilityRole="button" accessibilityLabel={t('Статус: {0}', t(statuses[item.status]))}
@@ -298,6 +298,7 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
                   {categories.find(category => category.id === item.category_id)?.name}
                 </Text>}
               </View>
+              {date && <Body>{date}</Body>}
             </View>
           </View>
           {online && <Pressable accessibilityRole="button" accessibilityLabel={t('Действия: {0}', item.title)}

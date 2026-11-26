@@ -13,7 +13,10 @@ def test_completion_migration_preserves_old_notes_and_refuses_lossy_downgrade(mi
     connection.execute(text("INSERT INTO users(email) VALUES ('note-migration@example.com')"))
     connection.execute(text("INSERT INTO contents(user_id,title,note) SELECT id,'Synthetic','Keep this note' FROM users"))
     migration.upgrade()
-    assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
+    def include(obj, name, kind, reflected, compare_to):
+        return kind != "table" or name != "learning_events"
+
+    assert compare_metadata(MigrationContext.configure(connection, opts={"include_object": include}), Base.metadata) == []
     connection.execute(text("INSERT INTO content_reflections(content_id,user_id,thought) SELECT id,user_id,'Takeaway' FROM contents"))
     with pytest.raises(RuntimeError, match="discard"):
         migration.downgrade()

@@ -244,3 +244,13 @@ ContentOut, ContentCreate и существующий submissions fingerprint н
 - `PUT /mobile/learning/materials/{id}/reflection` принимает `thought` (1–4000 символов после обрезки) и `previous` (версия либо `null` при первой записи). Возвращает `thought` и `version`. Повтор того же текста сохраняет версию. При другой мысли и устаревшей версии возвращается 412.
 
 JSON-экспорт v1 включает `reflections` с идентификаторами материалов и текстом. Библиотечный импорт этот раздел пропускает. Старые маршруты ручной смены статуса и завершения задания работают по прежним правилам.
+
+## Подбор по времени
+
+`GET /mobile/learning/time-budget?budget_minutes=15&limit=3` требует действующей сессии и возвращает `Cache-Control: no-store`. Допустимые бюджеты — 5, 15, 30, 60, `limit` — от 1 до 3 с дефолтом 3. Неверные значения отклоняются с 422.
+
+Ответ содержит `budget_minutes`, `local_date`, `items` и `has_unknown_duration`. В элементе присутствуют `material_id`, `title`, `source`, `content_type`, `status`, целая положительная `duration_minutes`, `reason` и nullable `goal_name`, `task_id`, `task_day`. Причины — `overdue_task`, `today_task`, `active_goal`, `fits_time`. `task_day` и приоритет срока используют локальный день аккаунта. Неизвестная длительность сигнализируется флагом, выдача содержит только известные оценки в пределах бюджета. [Полный порядок и ограничения](learning_product_implementation.md#e4-подбор-по-доступному-времени)
+
+## События учебного пилота
+
+`POST /mobile/learning/events` требует действующую сессию и UUID в `Idempotency-Key`. Разрешены клиентские события `today_viewed`, `next_action_opened`, `saved_material_reopened`, `time_budget_selected`, `recommendation_opened` и обязательный UUID `visit_id`. Для открытий требуется `material_id` своего материала. Для подбора и открытия рекомендации требуется `budget_minutes` из 5/15/30/60. При выборе бюджета дополнительно обязателен `has_results`. Остальные поля отклоняются с 422. Подтверждённый запрос и повтор того же ключа получают 204. При выключённом сборе валидный запрос получает 204 без записи. Серверные факты записываются только обработчиками доменных действий. [Окна и поля отчёта](learning_product_implementation.md#e5-внутренняя-аналитика-и-подготовка-пилота)

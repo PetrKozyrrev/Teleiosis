@@ -8,6 +8,7 @@ import { errorMessage, sources, type Request } from '../library/model';
 import { Loading, Notice } from '../library/ui';
 import { cachedSnapshot, readOnline, type Read } from '../offline/cache';
 import { subscribe } from '../offline/store';
+import { trackLearning } from './events';
 
 const path = '/mobile/learning/today';
 const reasons = {
@@ -61,7 +62,11 @@ export function Today({ request, owner }: { request: Request; owner: string | nu
       return value;
     };
     void readOnline<TodayData>(owner, currentRequest, path, key => cachedSnapshot(key, path))
-      .then(data => { if (active) setResult({ data }); })
+      .then(data => {
+        if (!active) return;
+        setResult({ data });
+        if (data.cachedAt === undefined) trackLearning(request, owner, { name: 'today_viewed' });
+      })
       .catch(error => { if (active) setResult({ error }); });
     return () => { active = false; };
   }, [owner, request, revision]));
@@ -100,7 +105,10 @@ export function Today({ request, owner }: { request: Request; owner: string | nu
             action.duration_minutes == null ? t('Время неизвестно') : t('≈ {0} мин', action.duration_minutes)].join(' · ')}</Body>
           <Body>{[t(reasons[action.reason]), action.task_day ? date.format(new Date(action.task_day)) : null].filter(Boolean).join(' · ')}</Body>
           <Action title={t('Открыть материал')} onPress={() => router.push({
-            pathname: '/library/[id]', params: { id: String(action.material_id), ...(action.task_id ? { taskId: String(action.task_id) } : {}) },
+            pathname: '/library/[id]', params: {
+              id: String(action.material_id), ...(action.task_id ? { taskId: String(action.task_id) } : {}),
+              ...(process.env.EXPO_PUBLIC_LEARNING_METRICS === '1' ? { learningEntry: 'today' } : {}),
+            },
           })} />
         </> : <Body>{t(
           libraryState === 'empty' ? 'Сохраните первый материал, чтобы начать обучение.'
@@ -111,6 +119,7 @@ export function Today({ request, owner }: { request: Request; owner: string | nu
         {libraryState === 'empty' && <Action title={t('Добавить')} onPress={add} />}
       </Card>
     </>}
+    <Action variant="outline" title={t('Сколько у вас времени?')} onPress={() => router.push('/time-budget')} />
     {result && <>
       <Card>
         <Text accessibilityRole="header" style={styles.label}>{t('Пора повторить')}</Text>

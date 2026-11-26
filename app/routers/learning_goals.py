@@ -5,6 +5,7 @@ from pydantic import BaseModel, StringConstraints, field_validator
 from sqlalchemy import and_, delete, func, select
 
 from app.deps import CurrentUser, DbSession
+from app.learning_events import record_learning_event
 from app.models import Content, StudyGoal, StudyGoalMaterial
 from app.routers.contents import ContentId, get_own_content
 from app.routers.organization import lock_owner
@@ -117,6 +118,7 @@ def create_goal(data: CreateGoal, db: DbSession, user: CurrentUser):
         goal = StudyGoal(user_id=user.id, name=data.name, result=data.result)
         db.add(goal)
         db.flush()
+        record_learning_event(db, user, "goal_created", goal.id)
     elif goal.result != data.result:
         raise HTTPException(409, {"code": "goal_name_taken"})
     result = get_goal(db, user.id, goal.id)
@@ -160,7 +162,7 @@ def add_material(goal_id: ContentId, data: AddMaterial, db: DbSession, user: Cur
     lock_owner(db, user)
     owned(db, StudyGoal, user.id, goal_id)
     get_own_content(db, user, data.content_id, lock=True)
-    link_goal_material(db, user.id, goal_id, data.content_id)
+    link_goal_material(db, user, goal_id, data.content_id)
     db.commit()
     return Response(status_code=204)
 

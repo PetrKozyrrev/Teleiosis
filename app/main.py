@@ -13,7 +13,7 @@ from app.deps import DbSession
 from app.routers import (
     account, auth, categories, contents, email_verification, password_reset,
     reminders, stats, unsubscribe, users, mobile_auth, app_links, push_devices, organization, library_import, pdf, week_plan, review, learning,
-    learning_goals, completion,
+    learning_goals, completion, time_budget, learning_events,
 )
 
 # Путь строится от файла, а не от текущей папки: сервер можно запускать откуда угодно
@@ -77,6 +77,8 @@ def create_app() -> FastAPI:
     application.include_router(learning.router)
     application.include_router(learning_goals.router)
     application.include_router(completion.router)
+    application.include_router(time_budget.router)
+    application.include_router(learning_events.router)
 
     @application.get("/health")
     def health():

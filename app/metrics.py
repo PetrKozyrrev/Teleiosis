@@ -6,6 +6,7 @@
 
 Данные грузятся в память: для закрытого теста (десятки и сотни пользователей) это нормально."""
 
+from argparse import ArgumentParser
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
@@ -13,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
+from app.learning_metrics import compute_learning_metrics, format_learning_report
 from app.models import Content, Reminder, User, UserActivity
 from app.stats import STATUSES, user_zone
 
@@ -228,8 +230,15 @@ def format_report(metrics: dict) -> str:
 
 
 def main() -> None:
+    parser = ArgumentParser()
+    parser.add_argument("--learning", action="store_true", help="Report the learning pilot cohort")
+    args = parser.parse_args()
+    now = datetime.now(timezone.utc)
     with SessionLocal() as db:
-        print(format_report(compute_metrics(db, datetime.now(timezone.utc))))
+        if args.learning:
+            print(format_learning_report(compute_learning_metrics(db, now)))
+        else:
+            print(format_report(compute_metrics(db, now)))
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ def test_migration_preserves_goals_tasks_and_history_and_refuses_lossy_downgrade
     before = connection.execute(text("SELECT * FROM study_tasks")).all()
     migration.upgrade()
     def include(obj, name, kind, reflected, compare_to):
-        return kind != "table" or name not in {"content_reflections", "learning_completions"}
+        return kind != "table" or name not in {"content_reflections", "learning_completions", "learning_events"}
 
     assert compare_metadata(MigrationContext.configure(connection, opts={"include_object": include}), Base.metadata) == []
     assert connection.execute(text("SELECT result,status,version FROM study_goals")).one() == (None, "active", 1)

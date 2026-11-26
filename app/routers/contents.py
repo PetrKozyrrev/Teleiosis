@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.activity import record_activity
 from app.deps import CurrentUser, DbSession
+from app.learning_events import record_learning_event
 from app.metadata import fetch_metadata
 from app.models import Content, ContentSubmission, ContentGroup, LibraryGroup, User
 from app.ratelimit import LINK_PREVIEW_USER, check_limits, make_key, record
@@ -198,6 +199,7 @@ def save_content(data: ContentCreate, db: DbSession, user: CurrentUser, *,
     save_receipt(content.id)
     for group_id in collection_ids or []:
         db.add(ContentGroup(user_id=user.id, content_id=content.id, group_id=group_id))
+    record_learning_event(db, user, "material_saved", content.id, material_id=content.id, now=content.created_at)
     db.commit()
     record_activity(db, user)
     db.refresh(content)
@@ -328,8 +330,8 @@ def change_content(content_id: int, data: ContentUpdate | MobileContentUpdate, d
         content.title = data.title
     if "note" in changes:
         content.note = note
-    if data.status is not None:
-        apply_content_status(content, data.status, datetime.now(timezone.utc))
+    if data.status is not None and apply_content_status(content, data.status, datetime.now(timezone.utc)):
+        record_learning_event(db, user, "material_studied", content.id, material_id=content.id, now=content.studied_at)
 
     if new_url is not None and new_url != content.url:
         meta = fetch_metadata(new_url)
@@ -368,10 +370,12 @@ def change_content(content_id: int, data: ContentUpdate | MobileContentUpdate, d
     return content
 
 
-def apply_content_status(content: Content, status: ContentStatus, now: datetime) -> None:
+def apply_content_status(content: Content, status: ContentStatus, now: datetime) -> bool:
     if content.status != status:
         content.status = status
         content.studied_at = now if status == "studied" else None
+        return status == "studied"
+    return False
 
 
 @router.delete("/{content_id}", status_code=status.HTTP_204_NO_CONTENT)

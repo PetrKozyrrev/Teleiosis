@@ -18,7 +18,7 @@ def schema_before_redesign(connection, *later_tables):
             return True
         return (
             (kind != "table" or name not in later_tables)
-            and (kind != "table" or name not in {"study_goal_materials", "content_reflections", "learning_completions"})
+            and (kind != "table" or name not in {"study_goal_materials", "content_reflections", "learning_completions", "learning_events"})
             and (kind != "column" or obj.table.name != "users" or name not in {"display_name", "weekly_reading_goal"})
             and (kind != "column" or obj.table.name != "contents" or name not in {"video_duration_seconds", "text_character_count"})
             and (kind != "index" or name != "ix_contents_user_studied")

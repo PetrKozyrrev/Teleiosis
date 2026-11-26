@@ -18,25 +18,29 @@ import { GroupSelection } from '../../library/GroupSelection';
 import { groupPath, organizationPath, type Group, type Organization } from '../../library/organization';
 import { MaterialThumbnail } from '../../library/MaterialThumbnail';
 import { useSourceReturn } from '../../learning/sourceReturn';
+import { trackLearning } from '../../learning/events';
 import { colors } from '../../theme';
 import { useLocale, useTranslation } from '../../i18n';
 
 export default function MaterialRoute() {
   const t = useTranslation();
-  const { id: param, draftId, inbox, edit, taskId } = useLocalSearchParams<{ id: string; draftId?: string; inbox?: string; edit?: string; taskId?: string }>();
+  const { id: param, draftId, inbox, edit, taskId, learningEntry, learningBudget } = useLocalSearchParams<{
+    id: string; draftId?: string; inbox?: string; edit?: string; taskId?: string; learningEntry?: string; learningBudget?: string;
+  }>();
   const id = param === 'new' ? 'new' : parseId(param);
   if (id === 'new' && draftId && inbox === '1') {
     return <MaterialScreen key={draftId} request={async () => { throw new ApiError(401); }} id={id} owner={unassigned} draftId={draftId} />;
   }
   return <LibraryAccess>{(request, owner) => id
     ? <MaterialScreen key={draftId ?? id} request={request} id={id} owner={owner} draftId={id === 'new' ? draftId : undefined}
-      openEditor={edit === '1'} taskId={parseId(taskId)} />
+      openEditor={edit === '1'} taskId={parseId(taskId)} learningEntry={learningEntry} learningBudget={learningBudget} />
     : <Page title={t('Материал')}><Notice>{t('Материал не найден.')}</Notice></Page>}
   </LibraryAccess>;
 }
 
-function MaterialScreen({ id, request, owner, draftId, openEditor, taskId }: {
+function MaterialScreen({ id, request, owner, draftId, openEditor, taskId, learningEntry, learningBudget }: {
   id: number | 'new'; request: Request; owner: string | null; draftId?: string; openEditor?: boolean; taskId?: number | null;
+  learningEntry?: string; learningBudget?: string;
 }) {
   const t = useTranslation();
   const navigation = useNavigation();
@@ -109,6 +113,14 @@ function MaterialScreen({ id, request, owner, draftId, openEditor, taskId }: {
         if (!active) return;
         setItem(result.value);
         setCachedAt(result.cachedAt);
+        if (result.cachedAt === undefined) {
+          trackLearning(request, owner, { name: 'saved_material_reopened', material_id: id });
+          if (learningEntry === 'today') trackLearning(request, owner, { name: 'next_action_opened', material_id: id });
+          const budget = Number(learningBudget);
+          if (learningEntry === 'budget' && (budget === 5 || budget === 15 || budget === 30 || budget === 60)) {
+            trackLearning(request, owner, { name: 'recommendation_opened', material_id: id, budget_minutes: budget });
+          }
+        }
         if (launchEditor.current && result.cachedAt === undefined) {
           launchEditor.current = false;
           beginEdit(result.value);
@@ -120,7 +132,7 @@ function MaterialScreen({ id, request, owner, draftId, openEditor, taskId }: {
       });
     }
     return () => { active = false; };
-  }, [beginEdit, id, owner, request, revision]));
+  }, [beginEdit, id, learningBudget, learningEntry, owner, request, revision]));
 
   useEffect(() => {
     if (!editing || owner === unassigned || creatingPdf) return;

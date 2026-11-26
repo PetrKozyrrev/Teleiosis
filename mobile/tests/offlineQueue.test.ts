@@ -219,3 +219,18 @@ test('reflection drafts are owner-scoped, survive reopening and require explicit
   expect(await store.hasPendingDrafts(owner)).toBe(false);
   await expect(store.saveReflectionDraft(owner, 9, 'Old write', priorGeneration)).rejects.toThrow();
 });
+
+test('forgetting a material invalidates only the owner’s recommendations that contain it', async () => {
+  const { cache } = loadModules();
+  const five = '/mobile/learning/time-budget?budget_minutes=5';
+  const fifteen = '/mobile/learning/time-budget?budget_minutes=15';
+  const matched = { items: [{ material_id: 9 }] };
+  const unmatched = { items: [{ material_id: 10 }] };
+  await cache.remember(owner, five, matched);
+  await cache.remember(owner, fifteen, unmatched);
+  await cache.remember(other, five, matched);
+  await cache.forgetMaterial(owner, 9);
+  expect(await cache.cachedSnapshot(owner, five)).toBeNull();
+  expect(await cache.cachedSnapshot(owner, fifteen)).toMatchObject({ value: unmatched });
+  expect(await cache.cachedSnapshot(other, five)).toMatchObject({ value: matched });
+});

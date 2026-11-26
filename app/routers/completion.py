@@ -7,6 +7,7 @@ from sqlalchemy import and_, select
 
 from app.activity import record_activity
 from app.deps import CurrentUser, DbSession
+from app.learning_events import record_learning_event
 from app.models import ContentReflection, LearningCompletion, StudyGoal, StudyTask
 from app.routers.contents import ContentId, apply_content_status, get_own_content
 from app.routers.organization import lock_owner
@@ -86,7 +87,8 @@ def complete_material(content_id: ContentId, data: CompletionInput, key: Operati
         raise HTTPException(412, {"code": "content_version_changed"})
 
     now = datetime.now(timezone.utc)
-    apply_content_status(material, "studied", now)
+    if apply_content_status(material, "studied", now):
+        record_learning_event(db, user, "material_studied", material.id, material_id=material.id, now=now)
     if task is not None:
         finish_task(db, task, now)
     db.add(LearningCompletion(user_id=user.id, key=key, content_id=content_id, task_id=data.task_id))
@@ -114,5 +116,6 @@ def save_reflection(content_id: ContentId, data: ReflectionInput, db: DbSession,
         reflection.version += 1
     db.flush()
     result = ReflectionOut.model_validate(reflection)
+    record_learning_event(db, user, "study_reflection_saved", f"{content_id}:{reflection.version}", material_id=content_id)
     db.commit()
     return result

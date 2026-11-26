@@ -9,6 +9,7 @@ from pydantic import Field, StringConstraints, field_validator
 from sqlalchemy import func, select
 
 from app.deps import CurrentUser, DbSession
+from app.learning_events import record_learning_event
 from app.models import Content, ReviewAnswer, ReviewCard, ReviewCreation
 from app.routers.contents import ContentId, get_own_content
 from app.routers.organization import lock_owner
@@ -104,6 +105,7 @@ def create_card(data: CreateCard, key: OperationKey, db: DbSession, user: Curren
     db.add(card)
     db.flush()
     db.add(ReviewCreation(user_id=user.id, key=key, fingerprint=fingerprint, card_id=card.id))
+    record_learning_event(db, user, "review_card_created", card.id, material_id=card.content_id)
     db.commit()
     return card_out(card)
 
@@ -147,6 +149,7 @@ def answer_card(card_id: ContentId, data: AnswerInput, key: OperationKey, versio
     card.version += 1
     receipt = ReviewAnswer(card_id=card.id, key=key, rating=data.rating, previous_version=previous, due_on=card.due_on)
     db.add(receipt)
+    record_learning_event(db, user, "review_completed", f"{card.id}:{key}", material_id=card.content_id)
     db.commit()
     return answer_out(receipt)
 

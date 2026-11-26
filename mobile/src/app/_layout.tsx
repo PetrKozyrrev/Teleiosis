@@ -24,6 +24,7 @@ export default function RootLayout() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="add-link" options={{ title: '' }} />
       <Stack.Screen name="progress" options={{ title: '' }} />
+      <Stack.Screen name="time-budget" options={{ title: '' }} />
       <Stack.Screen name="library/[id]" options={{ title: t('Материал') }} />
       <Stack.Screen name="library/complete" options={{ title: t('Завершение изучения') }} />
       <Stack.Screen name="library/organization" options={{ title: t('Теги и коллекции') }} />

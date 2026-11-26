@@ -16,6 +16,7 @@ from pydantic import (
 )
 
 from app.emails import normalize_email
+from app.duration import reading_minutes
 from app.timezones import is_valid_timezone
 from app.urls import clean_url
 
@@ -167,12 +168,7 @@ class ContentOut(BaseModel):
     @computed_field
     @property
     def reading_minutes(self) -> int | None:
-        if self.content_type == "video":
-            return None
-        characters = self.text_character_count
-        if self.url is None and self.content_type != "pdf" and self.note:
-            characters = len(" ".join(self.note.split()))
-        return (characters + 999) // 1000 if characters else None
+        return reading_minutes(self.content_type, self.url, self.note, self.text_character_count)
 
 class ContentPage(BaseModel):
     items: list[ContentOut]

@@ -699,5 +699,14 @@
   "Черновик сохранён на устройстве.": "Draft saved on this device.",
   "Сохранённая на сервере мысль: {0}": "Takeaway saved on the server: {0}",
   "На устройстве есть черновики. Подтвердите удаление перед выходом.": "This device has drafts. Confirm deletion before signing out.",
-  "Готово": "Done"
+  "Готово": "Done",
+  "Сколько у вас времени?": "How much time do you have?",
+  "Материал активной цели": "Material for an active goal",
+  "Подходит по времени": "Fits your available time",
+  "Нет связи с сервером. Сохранённого подбора на это время нет.": "Unable to reach the server. No recommendations are saved for this time budget.",
+  "Подбор по времени пока недоступен на сервере.": "Time-based suggestions are not available on this server yet.",
+  "На это время подходящих материалов нет.": "No materials fit this time budget.",
+  "Попробуйте выбрать больше времени.": "Try choosing more time.",
+  "Есть материалы без оценки времени": "Some materials have no time estimate",
+  "Цель: {0}": "Goal: {0}"
 }

@@ -8,6 +8,7 @@ from app.cookies import clear_session_cookie, cookie_name, set_session_cookie
 from app.csrf import require_same_origin
 from app.deps import DbSession
 from app.emails import normalize_email
+from app.learning_events import record_learning_event
 from app.models import User
 from app.passwords import hash_password, needs_rehash, verify_dummy, verify_password
 from app.ratelimit import (
@@ -76,6 +77,8 @@ def register_user(data: RegisterRequest, request: Request, db: DbSession, *, dis
     )
     db.add(user)
     try:
+        db.flush()
+        record_learning_event(db, user, "registration_completed", user.id, now=user.created_at)
         db.commit()
     except IntegrityError:
         # Занятый e-mail ловит ограничение БД (нет гонки «проверить, потом вставить»)

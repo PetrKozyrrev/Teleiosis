@@ -22,6 +22,8 @@ type GoalPath = '/mobile/learning/goals' | `/mobile/learning/goals?${string}` | 
 type CompletionPath = `/mobile/learning/materials/${number}/${'completion' | 'reflection'}`;
 export type LibraryPath = ReviewPath | PlanPath | GoalPath | CompletionPath | '/contents' | '/contents/submissions' | '/mobile/library/submissions' | `/contents?${string}` | `/contents/${number}`
   | '/mobile/profile' | `/mobile/reading-progress?${string}` | '/mobile/library/link-preview' | '/mobile/learning/today'
+  | `/mobile/learning/time-budget?budget_minutes=${5 | 15 | 30 | 60}`
+  | '/mobile/learning/events'
   | `/contents/${number}/open` | `/contents/${number}/versioned` | `/contents/${number}/reminder` | '/me' | '/me/settings' | '/me/export' | '/stats' | '/auth/change-password' | '/auth/delete-account' | '/categories' | `/categories/${number}`
   | '/mobile/library/tags' | '/mobile/library/collections'
   | `/mobile/library/tags/${number}` | `/mobile/library/collections/${number}`

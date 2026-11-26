@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     mobile_apple_team_id: str = ""
 
     push_enabled: bool = False
+    learning_metrics_enabled: bool = False
     rustore_project_id: str = ""
     rustore_service_token: SecretStr = Field(default_factory=lambda: SecretStr(""))
 

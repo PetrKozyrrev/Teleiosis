@@ -7,9 +7,9 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.deps import CurrentUser, DbSession
+from app.duration import estimated_minutes
 from app.models import Content, ReviewCard, StudyTask
 from app.routers.review import due_card_filters
-from app.schemas import ContentOut
 from app.stats import calendar_week_start, studied_materials, user_zone
 
 router = APIRouter(prefix="/mobile/learning", tags=["learning"])
@@ -47,12 +47,7 @@ class TodayOut(BaseModel):
 
 
 def material_action(material: Content, reason: Reason, task: StudyTask | None = None) -> NextAction:
-    if task is not None:
-        duration = task.minutes
-    elif material.video_duration_seconds and material.video_duration_seconds > 0:
-        duration = (material.video_duration_seconds + 59) // 60
-    else:
-        duration = ContentOut.model_validate(material).reading_minutes
+    duration = task.minutes if task is not None else estimated_minutes(material)
     return NextAction(
         material_id=material.id, title=material.title, source=material.source, content_type=material.content_type,
         task_id=task.id if task else None, task_day=task.day if task else None,

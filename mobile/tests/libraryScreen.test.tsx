@@ -120,7 +120,8 @@ test('shows a saved date, exact video length and approximate reading time on lib
   request.mockImplementation(async path => path === '/categories' ? [] : page(materials));
   await render(<Library />);
 
-  expect(await screen.findByText(/Добавлено .* · 12 мин 30 с/)).toBeTruthy();
+  expect(await screen.findByText('12 мин 30 с')).toBeTruthy();
+  expect(screen.getByText(/^Добавлено /)).toBeTruthy();
   expect(screen.getByText('≈ 3 мин чтения')).toBeTruthy();
   expect(screen.queryByText(/invalid/i)).toBeNull();
 });

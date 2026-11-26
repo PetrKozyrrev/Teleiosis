@@ -17,6 +17,7 @@ test('the app root and existing deep links resolve through the real tab layout',
     '(tabs)/goals': placeholder,
     'add-link': placeholder,
     'progress': placeholder,
+    'time-budget': placeholder,
     '(tabs)/settings': placeholder,
     'library/[id]': placeholder,
     'library/complete': placeholder,
@@ -25,6 +26,8 @@ test('the app root and existing deep links resolve through the real tab layout',
     'share-probe': placeholder,
   }, { initialUrl: '/' });
   expect(view.getSegments()).toEqual(['(tabs)']);
+  await testRouter.push('/time-budget');
+  await testRouter.back('/');
   await testRouter.navigate('/library');
   await testRouter.push('/library/42');
   expect(view.getSegments()).toEqual(['library', '[id]']);

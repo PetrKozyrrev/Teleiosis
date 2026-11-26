@@ -516,6 +516,25 @@ class LearningCompletion(Base):
     task_id: Mapped[int | None] = mapped_column(BigInteger)
 
 
+class LearningEvent(Base):
+    __tablename__ = "learning_events"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", "dedupe_key", name="uq_learning_event_once"),
+        CheckConstraint("budget_minutes IN (5,15,30,60)", name="ck_learning_event_budget"),
+        Index("ix_learning_event_occurred", "occurred_at"),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(40))
+    dedupe_key: Mapped[str] = mapped_column(String(80))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    local_day: Mapped[date] = mapped_column(Date)
+    material_id: Mapped[int | None] = mapped_column(BigInteger)
+    visit_id: Mapped[UUID | None] = mapped_column(Uuid)
+    budget_minutes: Mapped[int | None] = mapped_column(Integer)
+    has_results: Mapped[bool | None] = mapped_column(Boolean)
+
+
 class ReviewCard(Base):
     __tablename__ = "review_cards"
     __table_args__ = (

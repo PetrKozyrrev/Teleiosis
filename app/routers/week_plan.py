@@ -1,6 +1,7 @@
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, StringConstraints
@@ -8,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.deps import CurrentUser, DbSession
+from app.learning_events import record_learning_event
 from app.models import Content, StudyGoal, StudyGoalMaterial, StudyTask, StudyTaskEvent, WeekBudget
 from app.routers.contents import ContentId, get_own_content
 from app.routers.organization import lock_owner
@@ -71,9 +73,11 @@ def record(db, task, kind):
     db.add(StudyTaskEvent(task_id=task.id, version=task.version, kind=kind, day=task.day))
 
 
-def link_goal_material(db, owner_id: int, goal_id: int, content_id: int):
-    db.execute(insert(StudyGoalMaterial).values(goal_id=goal_id, content_id=content_id, user_id=owner_id)
-               .on_conflict_do_nothing(index_elements=["goal_id", "content_id"]))
+def link_goal_material(db, user, goal_id: int, content_id: int):
+    linked = db.scalar(insert(StudyGoalMaterial).values(goal_id=goal_id, content_id=content_id, user_id=user.id)
+                       .on_conflict_do_nothing(index_elements=["goal_id", "content_id"]).returning(StudyGoalMaterial.goal_id))
+    if linked is not None:
+        record_learning_event(db, user, "goal_material_linked", uuid4(), material_id=content_id)
 
 
 def task_out(task):
@@ -118,6 +122,8 @@ def create_goal(data: GoalInput, db: DbSession, user: CurrentUser):
             raise HTTPException(409, {"code": "goal_limit"})
         goal = StudyGoal(user_id=user.id, name=data.name)
         db.add(goal)
+        db.flush()
+        record_learning_event(db, user, "goal_created", goal.id)
         db.commit()
     return {"id": goal.id, "name": goal.name}
 
@@ -171,7 +177,7 @@ def create_task(data: TaskInput, db: DbSession, user: CurrentUser):
     db.add(task)
     db.flush()
     record(db, task, "created")
-    link_goal_material(db, user.id, task.goal_id, task.content_id)
+    link_goal_material(db, user, task.goal_id, task.content_id)
     db.commit()
     return task_out(task)
 
