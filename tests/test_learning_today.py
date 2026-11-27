@@ -102,6 +102,7 @@ def test_fallback_prefers_planned_then_oldest_unseen_and_leaves_future_tasks_out
     planned = material(session, user, "Read later", "planned", note="x" * 1001)
     action, _ = learning.select_next_action(session, user.id, day)
     assert (action.material_id, action.reason, action.duration_minutes) == (planned.id, "planned_material", 2)
+    assert action.goal_name is None
     planned.status = studied.status
     session.flush()
     action, _ = learning.select_next_action(session, user.id, day)
@@ -136,7 +137,7 @@ def test_today_scopes_every_section_and_uses_the_same_local_day(client, session)
         "local_date": "2026-11-23", "timezone": "Europe/Moscow",
         "next_action": {"material_id": entry.id, "title": entry.title, "source": "other",
                         "content_type": "other", "reason": "studied_task", "task_id": own_task.id,
-                        "duration_minutes": 25, "task_day": "2026-11-23"},
+                        "duration_minutes": 25, "task_day": "2026-11-23", "goal_name": "Synthetic goal"},
         "library_state": "available", "due_review_count": 1,
         "weekly_progress": {"week_start": "2026-11-23", "weekly_goal": 4, "weekly_completed": 1,
                             "tasks_total": 1, "tasks_done": 0},

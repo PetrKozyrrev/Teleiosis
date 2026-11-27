@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.deps import CurrentUser, DbSession
 from app.duration import estimated_minutes
-from app.models import Content, ReviewCard, StudyTask
+from app.models import Content, ReviewCard, StudyGoal, StudyTask
 from app.routers.review import due_card_filters
 from app.stats import calendar_week_start, studied_materials, user_zone
 
@@ -27,6 +27,7 @@ class NextAction(BaseModel):
     reason: Reason
     duration_minutes: int | None
     task_day: date | None = None
+    goal_name: str | None = None
 
 
 class WeeklyProgress(BaseModel):
@@ -46,12 +47,14 @@ class TodayOut(BaseModel):
     weekly_progress: WeeklyProgress
 
 
-def material_action(material: Content, reason: Reason, task: StudyTask | None = None) -> NextAction:
+def material_action(
+    material: Content, reason: Reason, task: StudyTask | None = None, goal_name: str | None = None,
+) -> NextAction:
     duration = task.minutes if task is not None else estimated_minutes(material)
     return NextAction(
         material_id=material.id, title=material.title, source=material.source, content_type=material.content_type,
         task_id=task.id if task else None, task_day=task.day if task else None,
-        reason=reason, duration_minutes=duration,
+        reason=reason, duration_minutes=duration, goal_name=goal_name,
     )
 
 
@@ -59,18 +62,19 @@ def select_next_action(db: Session, owner_id: int, local_day: date) -> tuple[Nex
     open_tasks = (StudyTask.user_id == owner_id, StudyTask.completed_at.is_(None))
     owned = Content.user_id == owner_id
     task = db.execute(
-        select(StudyTask, Content)
+        select(StudyTask, Content, StudyGoal.name)
         .join(Content, and_(Content.id == StudyTask.content_id, Content.user_id == StudyTask.user_id))
+        .join(StudyGoal, and_(StudyGoal.id == StudyTask.goal_id, StudyGoal.user_id == StudyTask.user_id))
         .where(*open_tasks, StudyTask.day <= local_day, Content.status != "irrelevant")
         .order_by(StudyTask.day, StudyTask.priority, StudyTask.id)
         .limit(1)
     ).first()
     if task is not None:
-        entry, material = task
+        entry, material, goal_name = task
         reason = "studied_task" if material.status == "studied" else (
             "overdue_task" if entry.day < local_day else "today_task"
         )
-        return material_action(material, reason, entry), "available"
+        return material_action(material, reason, entry, goal_name), "available"
 
     candidates = select(Content).where(owned, Content.status.in_(("planned", "unseen")))
     future_task = select(StudyTask.id).where(

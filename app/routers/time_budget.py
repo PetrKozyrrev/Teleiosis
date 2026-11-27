@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.dialects.postgresql import distinct_on
 
 from app.deps import CurrentUser, DbSession
@@ -25,6 +25,7 @@ class Recommendation(BaseModel):
     duration_minutes: int
     reason: Literal["overdue_task", "today_task", "active_goal", "fits_time"]
     goal_name: str | None
+    context_goal_name: str | None
     task_id: int | None
     task_day: date | None
 
@@ -41,13 +42,19 @@ def recommendations(db: DbSession, user: CurrentUser, budget_minutes: Budget, li
     budget = int(budget_minutes)
     day = datetime.now(user_zone(user.timezone)).date()
     open_tasks = (StudyTask.user_id == user.id, StudyTask.completed_at.is_(None))
-    due = select(StudyTask.content_id, StudyTask.id.label("task_id"), StudyTask.day.label("task_day")).where(
+    due = select(StudyTask.content_id, StudyTask.id.label("task_id"), StudyTask.day.label("task_day"),
+                 StudyGoal.name.label("task_goal_name")).join(
+        StudyGoal, and_(StudyGoal.id == StudyTask.goal_id, StudyGoal.user_id == StudyTask.user_id),
+    ).where(
         *open_tasks, StudyTask.day <= day,
     ).ext(distinct_on(StudyTask.content_id)).order_by(
         StudyTask.content_id, StudyTask.day, StudyTask.priority, StudyTask.id,
     ).subquery()
     future = select(StudyTask.content_id).where(*open_tasks, StudyTask.day > day).distinct().subquery()
-    active = select(StudyGoalMaterial.content_id, StudyGoal.name.label("goal_name")).join(
+    active = select(
+        StudyGoalMaterial.content_id, StudyGoal.name.label("goal_name"),
+        func.count().over(partition_by=StudyGoalMaterial.content_id).label("goal_count"),
+    ).join(
         StudyGoal, and_(StudyGoal.id == StudyGoalMaterial.goal_id, StudyGoal.user_id == StudyGoalMaterial.user_id),
     ).where(StudyGoalMaterial.user_id == user.id, StudyGoal.status == "active").ext(
         distinct_on(StudyGoalMaterial.content_id),
@@ -60,7 +67,7 @@ def recommendations(db: DbSession, user: CurrentUser, budget_minutes: Budget, li
     duration = sized.c.duration_minutes
     rows = db.execute(
         select(sized.c.material_id, sized.c.title, sized.c.source, sized.c.content_type, sized.c.status,
-               duration, active.c.goal_name, due.c.task_id, due.c.task_day)
+               duration, active.c.goal_name, active.c.goal_count, due.c.task_id, due.c.task_day, due.c.task_goal_name)
         .outerjoin(due, due.c.content_id == sized.c.material_id)
         .outerjoin(future, future.c.content_id == sized.c.material_id)
         .outerjoin(active, active.c.content_id == sized.c.material_id)
@@ -75,7 +82,10 @@ def recommendations(db: DbSession, user: CurrentUser, budget_minutes: Budget, li
             reason = "overdue_task" if row.task_day < day else "today_task"
         else:
             reason = "active_goal" if row.goal_name is not None else "fits_time"
-        items.append(dict(row, reason=reason))
+        context_goal = row.task_goal_name if row.task_id is not None else (
+            row.goal_name if row.goal_count == 1 else None
+        )
+        items.append(dict(row, reason=reason, context_goal_name=context_goal))
     unknown = db.scalar(select(select(Content.id).where(
         *eligible, estimated_minutes_sql(normalize_notes=False).is_(None),
     ).exists()))

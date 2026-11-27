@@ -8,11 +8,12 @@ import { errorMessage, sources, type Request } from '../library/model';
 import { Loading, Notice } from '../library/ui';
 import { cachedSnapshot, readOnline, type Read } from '../offline/cache';
 import { subscribe } from '../offline/store';
+import { BudgetPresets } from './BudgetPresets';
 import { trackLearning } from './events';
 
 const path = '/mobile/learning/today';
 const reasons = {
-  overdue_task: 'Просроченное задание',
+  overdue_task: 'Из плана на {0}',
   today_task: 'Задание на сегодня',
   studied_task: 'Задание по изученному материалу',
   planned_material: 'Запланировано в библиотеке',
@@ -28,6 +29,7 @@ type NextAction = {
   reason: keyof typeof reasons;
   duration_minutes: number | null;
   task_day: string | null;
+  goal_name?: string | null;
 };
 
 type TodayData = {
@@ -42,7 +44,7 @@ type Result = { data: Read<TodayData> } | { error: unknown };
 export function Today({ request, owner }: { request: Request; owner: string | null }) {
   const t = useTranslation();
   const locale = useLocale();
-  const [result, setResult] = useState<Result>();
+  const [response, setResponse] = useState<{ owner: string | null; result: Result }>();
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision(value => value + 1), []);
 
@@ -64,23 +66,30 @@ export function Today({ request, owner }: { request: Request; owner: string | nu
     void readOnline<TodayData>(owner, currentRequest, path, key => cachedSnapshot(key, path))
       .then(data => {
         if (!active) return;
-        setResult({ data });
+        setResponse({ owner, result: { data } });
         if (data.cachedAt === undefined) trackLearning(request, owner, { name: 'today_viewed' });
       })
-      .catch(error => { if (active) setResult({ error }); });
+      .catch(error => { if (active) setResponse({ owner, result: { error } }); });
     return () => { active = false; };
   }, [owner, request, revision]));
 
+  const result = response?.owner === owner ? response?.result : undefined;
   const data = result && 'data' in result ? result.data : undefined;
   const error = result && 'error' in result ? result.error : undefined;
   const action = data?.value.next_action;
   const libraryState = data?.value.library_state;
   const due = data?.value.due_review_count;
   const progress = data?.value.weekly_progress;
-  const date = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
+  const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const taskDate = action?.task_day ? date.format(new Date(action.task_day)) : null;
+  const fromEarlierPlan = action?.reason === 'overdue_task'
+    || (action?.task_day && data?.value.local_date && action.task_day < data.value.local_date);
   const add = () => router.navigate('/add-link');
+  const openPlan = () => router.push('/plan');
 
-  return <Page title={t('Сегодня')}>
+  return <Page title={t('Сегодня')} headingAction={
+    libraryState !== 'empty' && <Action variant="outline" title={t('Добавить')} onPress={add} />
+  }>
     {!result && <Card><Loading /></Card>}
     {result && 'error' in result && <Card>
       <Notice>{error instanceof ApiError && error.status === 404
@@ -97,19 +106,23 @@ export function Today({ request, owner }: { request: Request; owner: string | nu
         }).format(data.cachedAt))}</Notice>
         <Action variant="outline" title={t('Обновить')} onPress={refresh} />
       </Card>}
-      <Card>
+      <Card featured={Boolean(action)}>
         <Text accessibilityRole="header" style={styles.label}>{t('Следующее занятие')}</Text>
         {action ? <>
-          <Text style={styles.label}>{action.title}</Text>
+          <Text accessibilityRole="header" style={styles.heading}>{action.title}</Text>
           <Body>{[t(action.content_type === 'pdf' ? 'PDF' : sources[action.source] ?? 'Источник неизвестен'),
             action.duration_minutes == null ? t('Время неизвестно') : t('≈ {0} мин', action.duration_minutes)].join(' · ')}</Body>
-          <Body>{[t(reasons[action.reason]), action.task_day ? date.format(new Date(action.task_day)) : null].filter(Boolean).join(' · ')}</Body>
+          {action.task_id && action.goal_name && <Body>{t('Цель: {0}', action.goal_name)}</Body>}
+          <Body>{taskDate && (fromEarlierPlan || data.cachedAt !== undefined) ? t('Из плана на {0}', taskDate)
+            : action.reason === 'overdue_task' ? t('Задание из плана') : t(reasons[action.reason])}</Body>
+          {fromEarlierPlan && action.reason === 'studied_task' && <Body>{t(reasons.studied_task)}</Body>}
           <Action title={t('Открыть материал')} onPress={() => router.push({
             pathname: '/library/[id]', params: {
               id: String(action.material_id), ...(action.task_id ? { taskId: String(action.task_id) } : {}),
               ...(process.env.EXPO_PUBLIC_LEARNING_METRICS === '1' ? { learningEntry: 'today' } : {}),
             },
           })} />
+          <Action variant="outline" title={t('Выбрать другое')} onPress={() => router.push('/time-budget')} />
         </> : <Body>{t(
           libraryState === 'empty' ? 'Сохраните первый материал, чтобы начать обучение.'
             : libraryState === 'scheduled_later' ? 'Следующее занятие запланировано на другой день.'
@@ -117,31 +130,32 @@ export function Today({ request, owner }: { request: Request; owner: string | nu
             : 'Сведения о следующем занятии недоступны.',
         )}</Body>}
         {libraryState === 'empty' && <Action title={t('Добавить')} onPress={add} />}
+        <Action variant="text" title={t('План')} onPress={openPlan} />
       </Card>
     </>}
-    <Action variant="outline" title={t('Сколько у вас времени?')} onPress={() => router.push('/time-budget')} />
+    <Card>
+      <Text accessibilityRole="header" style={styles.label}>{t('Сколько у вас времени?')}</Text>
+      <BudgetPresets onSelect={value => router.push({ pathname: '/time-budget', params: { minutes: String(value) } })} />
+    </Card>
     {result && <>
-      <Card>
-        <Text accessibilityRole="header" style={styles.label}>{t('Пора повторить')}</Text>
+      <Card compact>
+        <Text accessibilityRole="header" style={styles.label}>{t(due && due > 0 ? 'Пора повторить' : 'Повторение')}</Text>
         <Body>{due == null ? t('Количество доступных карточек неизвестно.')
           : due === 0 ? t('Пока нет карточек для повторения.') : t('Доступно карточек: {0}', due)}</Body>
-        <Action variant="outline" title={t('Повторение')} onPress={() => router.push('/review')} />
+        <Action variant="text" title={t('Повторение')} onPress={() => router.push('/review')} />
       </Card>
-      <Card>
+      <Card compact>
         <Text accessibilityRole="header" style={styles.label}>{t('Недельный прогресс')}</Text>
         {progress ? <>
-          <Body>{t('Изучено материалов: {0} из {1}', progress.weekly_completed, progress.weekly_goal)}</Body>
-          {progress.tasks_total > 0 && <Body>{t('Выполнено заданий: {0} из {1}', progress.tasks_done, progress.tasks_total)}</Body>}
+          <Body>{t('Изучено {0} из {1} материалов', progress.weekly_completed, progress.weekly_goal)}</Body>
+          {progress.tasks_total > 0 && <Body>{t('Задания недели: выполнено {0} из {1}', progress.tasks_done, progress.tasks_total)}</Body>}
         </> : <Body>{t('Недельный прогресс недоступен.')}</Body>}
-        <Action variant="outline" title={t('Прогресс')} onPress={() => router.navigate('/progress')} />
+        <Action variant="text" title={t('Прогресс')} onPress={() => router.navigate('/progress')} />
       </Card>
       {data && data.cachedAt === undefined && (action === undefined || due == null || !progress) &&
         <Action variant="outline" title={t('Обновить')} onPress={refresh} />}
     </>}
-    <Card>
-      {libraryState !== 'empty' && <Action title={t('Добавить')} onPress={add} />}
-      <Action variant="outline" title={t('План')} onPress={() => router.push('/plan')} />
-      <Action variant="outline" title={t('Вся библиотека')} onPress={() => router.navigate('/library')} />
-    </Card>
+    {!data && <Action variant="text" title={t('План')} onPress={openPlan} />}
+    <Action variant="text" title={t('Вся библиотека')} onPress={() => router.navigate('/library')} />
   </Page>;
 }

@@ -68,7 +68,7 @@ def test_ranking_deduplication_and_future_or_foreign_exclusion(client, session):
     reserved = video(session, user, "Future", 300)
     too_long = video(session, user, "Long despite task estimate", 301)
     video(session, foreign, "Foreign", 300)
-    for goal, item in [(first, goal_item), (second, goal_item), (archived, ordinary)]:
+    for goal, item in [(first, goal_item), (second, goal_item), (archived, ordinary), (second, urgent)]:
         session.add(StudyGoalMaterial(goal_id=goal.id, content_id=item.id, user_id=user.id))
     earliest = task(session, first, urgent, "2026-11-22")
     task(session, second, urgent, "2026-11-24")
@@ -77,12 +77,17 @@ def test_ranking_deduplication_and_future_or_foreign_exclusion(client, session):
     rows = get(client, headers, 5)["items"]
     assert [row["material_id"] for row in rows] == [urgent.id, goal_item.id, ordinary.id]
     assert (rows[0]["reason"], rows[0]["task_id"], rows[0]["task_day"]) == ("overdue_task", earliest.id, "2026-11-22")
+    assert rows[0]["goal_name"] == second.name and rows[0]["context_goal_name"] == first.name
     assert (rows[1]["reason"], rows[1]["goal_name"]) == ("active_goal", first.name)
+    assert rows[1]["task_id"] is None and rows[1]["context_goal_name"] is None
     assert rows[2]["reason"] == "fits_time" and rows[2]["goal_name"] is None
     assert get(client, foreign_headers, 5)["local_date"] == "2026-11-22"
     assert [row["title"] for row in get(client, foreign_headers, 5)["items"]] == ["Foreign"]
     assert client.delete(f"/contents/{urgent.id}", headers=headers).status_code == 204
     assert [row["material_id"] for row in get(client, headers, 5)["items"]] == [goal_item.id, ordinary.id]
+    session.delete(session.get(StudyGoalMaterial, (second.id, goal_item.id)))
+    session.flush()
+    assert get(client, headers, 5)["items"][0]["context_goal_name"] == first.name
 
 
 def test_stable_age_and_id_tiebreak_and_duration_contract(session, client):

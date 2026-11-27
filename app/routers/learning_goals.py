@@ -5,9 +5,10 @@ from pydantic import BaseModel, StringConstraints, field_validator
 from sqlalchemy import and_, delete, func, select
 
 from app.deps import CurrentUser, DbSession
+from app.duration import estimated_minutes
 from app.learning_events import record_learning_event
 from app.models import Content, StudyGoal, StudyGoalMaterial
-from app.routers.contents import ContentId, get_own_content
+from app.routers.contents import ContentId, SORT_ORDER, get_own_content
 from app.routers.organization import lock_owner
 from app.routers.week_plan import GOAL_LIMIT, GoalInput, ObjectId, Version, Write, link_goal_material, matches, owned
 from app.schemas import MAX_BIGINT
@@ -63,6 +64,28 @@ class GoalMaterialPage(BaseModel):
     total: int
 
 
+class GoalDetailOut(GoalOut):
+    next_material: GoalMaterialOut | None
+
+
+class GoalCandidate(GoalMaterialOut):
+    content_type: str
+    duration_minutes: int | None
+    linked: bool
+
+
+class GoalCandidatePage(BaseModel):
+    items: list[GoalCandidate]
+    total: int
+
+
+def goal_membership(user_id: int, goal_id: int):
+    return select(StudyGoalMaterial.content_id).where(
+        StudyGoalMaterial.goal_id == goal_id, StudyGoalMaterial.user_id == user_id,
+        StudyGoalMaterial.content_id == Content.id,
+    ).exists()
+
+
 def goal_query(user_id: int, content_id: int | None = None):
     memberships = select(
         StudyGoalMaterial.goal_id,
@@ -103,9 +126,13 @@ def list_goals(db: DbSession, user: CurrentUser, status: GoalStatus | None = Non
     return {"items": rows, "total": db.scalar(select(func.count()).select_from(StudyGoal).where(*filters))}
 
 
-@router.get("/{goal_id}", response_model=GoalOut)
+@router.get("/{goal_id}", response_model=GoalDetailOut)
 def read_goal(goal_id: ContentId, db: DbSession, user: CurrentUser):
-    return get_goal(db, user.id, goal_id)
+    goal = get_goal(db, user.id, goal_id)
+    next_material = db.execute(select(Content.id, Content.title, Content.status)
+        .where(Content.user_id == user.id, Content.status.in_(("unseen", "planned")), goal_membership(user.id, goal_id))
+        .order_by(Content.status != "planned", *SORT_ORDER["oldest"]).limit(1)).mappings().first()
+    return dict(goal, next_material=next_material)
 
 
 @router.post("", response_model=GoalOut)
@@ -165,6 +192,26 @@ def add_material(goal_id: ContentId, data: AddMaterial, db: DbSession, user: Cur
     link_goal_material(db, user, goal_id, data.content_id)
     db.commit()
     return Response(status_code=204)
+
+
+@router.get("/{goal_id}/candidates", response_model=GoalCandidatePage)
+def list_candidates(
+    goal_id: ContentId, db: DbSession, user: CurrentUser,
+    q: Annotated[str, Query(max_length=100)] = "", limit: Limit = 20, offset: Offset = 0,
+):
+    if db.scalar(select(StudyGoal.id).where(StudyGoal.id == goal_id, StudyGoal.user_id == user.id)) is None:
+        raise HTTPException(404, "Goal not found")
+    filters = [Content.user_id == user.id]
+    if q.strip():
+        filters.append(Content.title.icontains(q.strip(), autoescape=True))
+    rows = db.execute(select(Content, goal_membership(user.id, goal_id).label("linked"))
+        .where(*filters).order_by(*SORT_ORDER["newest"]).limit(limit).offset(offset))
+    return {
+        "items": [{"id": material.id, "title": material.title, "status": material.status,
+                   "content_type": material.content_type, "duration_minutes": estimated_minutes(material), "linked": linked}
+                  for material, linked in rows],
+        "total": db.scalar(select(func.count()).select_from(Content).where(*filters)),
+    }
 
 
 @router.delete("/{goal_id}/materials/{content_id}", status_code=204)

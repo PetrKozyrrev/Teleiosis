@@ -136,7 +136,7 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
     }
   }
 
-  return <Page title={t('Добавить ссылку')} subtitle={t('Сохраните то, к чему хочется вернуться.')} brand
+  return <Page title={t('Добавить ссылку')} subtitle={t('Сохраните то, к чему хочется вернуться.')} brand insetFooter
     footer={<>
       <Action title={busy ? t('Сохранение…') : t('Сохранить в библиотеку')} disabled={!normalized || busy || !owner} onPress={() => void save()} />
       <Text style={[styles.body, screenStyles.tip]}>{t('Ссылки можно добавлять из меню «Поделиться».')}</Text>
@@ -152,7 +152,7 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
       </>} />
     <Body>{t('Статьи, видео и другие материалы, которые вы хотите перечитать.')}</Body>
     {url.trim() && !normalized && <Notice>{t('Укажите действительный адрес сайта.')}</Notice>}
-    {message && <Notice>{message}</Notice>}
+    {message && <Notice>{t(message)}</Notice>}
     {submission && <Card>
       <Notice>{job?.state === 'synced' ? t('Ссылка добавлена в библиотеку.')
         : job?.reason === 'duplicate' ? t('Эта ссылка уже есть в библиотеке.')
@@ -190,7 +190,7 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
 
 const screenStyles = StyleSheet.create({
   tip: { textAlign: 'center', fontSize: 12 },
-  clear: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  clear: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   preview: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   details: { flex: 1, gap: 5 },
   note: { minHeight: 74, textAlignVertical: 'top' },

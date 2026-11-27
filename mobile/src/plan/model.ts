@@ -22,6 +22,14 @@ export function validDay(day: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < '1900-01-01' || day > '2100-12-31') return false;
   return Number.isFinite(Date.parse(day)) && shiftDay(day, 0) === day;
 }
+export function mondayOf(day: string) {
+  const weekday = new Date(day + 'T00:00:00Z').getUTCDay();
+  return shiftDay(day, -((weekday + 6) % 7));
+}
+
+export function formatPlanDay(day: string, locale: string, options: Intl.DateTimeFormatOptions) {
+  return new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' }).format(new Date(day + 'T00:00:00Z'));
+}
 export function minutesValid(value: string, limit: number) {
   return /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= limit;
 }

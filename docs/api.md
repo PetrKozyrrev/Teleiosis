@@ -217,7 +217,7 @@ ContentOut, ContentCreate и существующий submissions fingerprint н
 | Поле | Значение |
 | --- | --- |
 | `local_date`, `timezone` | Календарный день `YYYY-MM-DD` в IANA-зоне аккаунта. Для некорректной исторической зоны используется UTC. |
-| `next_action` | Одно занятие или `null`. Поля `material_id`, `title`, `source`, `content_type`, `reason`, nullable `task_id`, `task_day` и `duration_minutes`. |
+| `next_action` | Одно занятие или `null`. Поля `material_id`, `title`, `source`, `content_type`, `reason`, nullable `task_id`, `task_day` и `duration_minutes`. Новое nullable поле `goal_name` содержит имя цели конкретного задания. При выборе из библиотеки оно равно `null`. |
 | `library_state` | `available` при наличии занятия, `empty` для пустой библиотеки, `scheduled_later` если ближайшее незавершённое задание в будущем и выбора на сегодня нет, `no_recommendation` для остальных случаев без рекомендации. |
 | `due_review_count` | Число собственных карточек без паузы, срок которых наступил. |
 | `weekly_progress` | `week_start` с понедельника, `weekly_goal` и `weekly_completed` по материалам, `tasks_total` и `tasks_done` по заданиям, назначенным на дни текущей недели. |
@@ -230,9 +230,10 @@ ContentOut, ContentCreate и существующий submissions fingerprint н
 
 - `GET /mobile/learning/goals` принимает `status`, `limit` (1–50), `offset` и опциональный `content_id` своего материала. Возвращает `items` и `total`. При переданном материале поле `linked` указывает наличие связи.
 - `POST /mobile/learning/goals` принимает `name` и необязательный `result`, возвращает активную цель. Повтор того же имени без учёта регистра и результата возвращает существующую цель. При другом результате возвращает 409 с `goal_name_taken`. Лимит 100 целей общий с недельным планом.
-- `GET /mobile/learning/goals/{id}` отдаёт `id`, `name`, `result`, `status`, `version`, `materials_total` и `materials_studied`. Состояния `active`, `completed` и `archived`. Счётчики исключают неактуальные материалы.
+- `GET /mobile/learning/goals/{id}` отдаёт `id`, `name`, `result`, `status`, `version`, `materials_total` и `materials_studied`. Состояния `active`, `completed` и `archived`. Счётчики исключают неактуальные материалы. Поле `next_material` содержит `id`, `title` и `status` первого связанного запланированного или непросмотренного материала. Запланированные приоритетнее, внутри статуса порядок по времени добавления и ID. При пустой выборке приходит `null`.
 - `PUT /mobile/learning/goals/{id}` принимает `name`, `result` и `status`. Для изменения нужен текущий `If-Match`, устаревшая версия с отличающимся запросом получает 412. Архивация и завершение сохраняют связи и задания.
 - `GET /mobile/learning/goals/{id}/materials` отдаёт страницу `items` и `total`, включая неактуальные материалы в самом списке. `POST` на тот же путь принимает `content_id`, повтор не создаёт дубликат. `DELETE /mobile/learning/goals/{id}/materials/{content_id}` удаляет только связь. Оба запроса возвращают 204. Чужие объекты дают 404.
+- `GET /mobile/learning/goals/{id}/candidates` отдаёт страницу материалов владельца для выбора в цель. Принимает `q` (поиск по названию до 100 символов), `limit` (1–50, по умолчанию 20) и `offset`. Ответ `items` и `total`. На строке есть `id`, `title`, `status`, `content_type`, nullable `duration_minutes` и булево `linked` именно для запрошенной цели. Для чужой или отсутствующей цели приходит 404. Множественный выбор сохраняется отдельными запросами `POST /materials` по одному материалу.
 - Маршруты недельного плана сохраняют формат. Legacy DELETE цели возвращает 409 `goal_archive_required`, если у неё заполнен результат, изменён статус или есть ссылка на материал без соответствующего задания. Старый сценарий удаления простой цели с подтверждением сохранён.
 
 ## Завершение изучения
@@ -250,6 +251,8 @@ JSON-экспорт v1 включает `reflections` с идентификат�
 `GET /mobile/learning/time-budget?budget_minutes=15&limit=3` требует действующей сессии и возвращает `Cache-Control: no-store`. Допустимые бюджеты — 5, 15, 30, 60, `limit` — от 1 до 3 с дефолтом 3. Неверные значения отклоняются с 422.
 
 Ответ содержит `budget_minutes`, `local_date`, `items` и `has_unknown_duration`. В элементе присутствуют `material_id`, `title`, `source`, `content_type`, `status`, целая положительная `duration_minutes`, `reason` и nullable `goal_name`, `task_id`, `task_day`. Причины — `overdue_task`, `today_task`, `active_goal`, `fits_time`. `task_day` и приоритет срока используют локальный день аккаунта. Неизвестная длительность сигнализируется флагом, выдача содержит только известные оценки в пределах бюджета. [Полный порядок и ограничения](learning_product_implementation.md#e4-подбор-по-доступному-времени)
+
+Новое nullable поле `context_goal_name` предназначено для отображения. С заданием оно содержит имя цели этого задания. Без задания имя возвращается, если у материала ровно одна активная цель. При нескольких активных целях клиент показывает общий контекст связи. Прежнее поле `goal_name` сохраняет семантику E4 и продолжает участвовать в ранжировании.
 
 ## События учебного пилота
 

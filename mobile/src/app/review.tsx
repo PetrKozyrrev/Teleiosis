@@ -129,15 +129,15 @@ function ReviewItem({ card, request, save, disabled }: { card: Card; request: Re
   return <Panel>
     <Body>{card.title}</Body><Body>{card.question}</Body>
     <Body>{t('Повторение ·')} {card.due_on}{card.paused ? t(' · приостановлено') : ''}</Body>
-    <Action title={t('Открыть материал')} onPress={() => router.push({ pathname: '/library/[id]', params: { id: String(card.content_id) } })} />
+    <Action variant="text" title={t('Открыть материал')} onPress={() => router.push({ pathname: '/library/[id]', params: { id: String(card.content_id) } })} />
     {!editing && <>
       {shown ? <><Body>{card.answer}</Body>{card.takeaway ? <Body>{t('Мой вывод ·')} {card.takeaway}</Body> : null}
         {!card.paused && <>
-          <Action title={t('Не помню')} disabled={disabled} onPress={() => rate('again')} />
-          <Action title={t('Помню')} disabled={disabled} onPress={() => rate('remembered')} />
+          <Action variant="outline" title={t('Не помню')} disabled={disabled} onPress={() => rate('again')} />
+          <Action variant="outline" title={t('Помню')} disabled={disabled} onPress={() => rate('remembered')} />
         </>}
       </> : <Action title={t('Показать ответ')} disabled={disabled} onPress={() => setShown(true)} />}
-      <Action title={t('Изменить карточку и расписание')} disabled={disabled} onPress={() => setEditing(true)} />
+      <Action variant="text" title={t('Изменить карточку и расписание')} disabled={disabled} onPress={() => setEditing(true)} />
     </>}
     {editing && <>
       <Field label={t('Изменить вопрос')} multiline value={question} onChangeText={setQuestion} maxLength={500} editable={!disabled} />
@@ -149,11 +149,11 @@ function ReviewItem({ card, request, save, disabled }: { card: Card; request: Re
       <Action title={t('Сохранить карточку')} disabled={disabled || !question.trim() || !answer.trim() || !validDay(day)}
         onPress={() => void save(() => request(path, 'PUT', { question: question.trim(), answer: answer.trim(),
           takeaway: takeaway.trim(), due_on: day, paused }, options))} />
-      <Action title={t('Отменить изменения')} disabled={disabled} onPress={() => setEditing(false)} />
-      <Action title={t('Удалить карточку')} disabled={disabled} onPress={() => Alert.alert(t('Удалить карточку?'), t('Карточка и история её ответов будут удалены.'),
+      <Action variant="text" title={t('Отменить изменения')} disabled={disabled} onPress={() => setEditing(false)} />
+      <Action variant="danger" title={t('Удалить карточку')} disabled={disabled} onPress={() => Alert.alert(t('Удалить карточку?'), t('Карточка и история её ответов будут удалены.'),
         [{ text: t('Отмена'), style: 'cancel' }, { text: t('Удалить'), style: 'destructive', onPress: () => void save(() => request(path, 'DELETE', undefined, options)) }])} />
     </>}
-    <Action title={t('История ответов')} disabled={disabled || historyBusy} onPress={() => void loadHistory(0)} />
+    <Action variant="text" title={t('История ответов')} disabled={disabled || historyBusy} onPress={() => void loadHistory(0)} />
     {historyError && <Notice>{historyError}</Notice>}
     {history && <>
       {history.total === 0 && <Body>{t('Ответов пока нет.')}</Body>}

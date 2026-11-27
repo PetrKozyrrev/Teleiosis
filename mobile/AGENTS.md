@@ -43,7 +43,7 @@ The user accepted the local 9B result and authorized local 9C work on 2026-11-21
 
 ## Rules
 
-- Preview APK handoff requires a successful `scripts/check_android_apk.py` report with matching SHA-256. Keep `preview-policy.json`, package.json, and app.config.ts versions consistent. Never change the pinned certificate just to make a failing build pass. See ../docs/mobile_release.md for block 8 checks, dependency audit policy, and rollout boundaries.
+- Build a local Android preview APK for owner testing at the end of each mobile development stage. Preview APK handoff requires a successful `scripts/check_android_apk.py` report with matching SHA-256. Keep `preview-policy.json`, package.json, and app.config.ts versions consistent. Never change the pinned certificate just to make a failing build pass. See ../docs/mobile_release.md for block 8 checks, dependency audit policy, and rollout boundaries.
 - After dependency changes run `npm run audit:dependencies` and `npm run test:toolchain` along with lint/typecheck and the mobile suite. Preserve the `test-exclude@6.0.0` glob callback exception until the React Native Babel preset migrates. Do not replace it with the modern glob API without testing that consumer.
 
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.

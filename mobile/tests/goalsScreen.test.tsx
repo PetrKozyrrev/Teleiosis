@@ -1,11 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { expect, jest, test } from '@jest/globals';
 import { router } from 'expo-router';
-import { GoalDetail, GoalsList } from '../src/learning/goals';
+import { Alert } from 'react-native';
+import { ApiError } from '../src/auth/api';
+import { GoalDetail, GoalPicker, GoalsList } from '../src/learning/goals';
 import type { Request } from '../src/library/model';
 
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), navigate: jest.fn() },
+  router: { push: jest.fn(), navigate: jest.fn(), back: jest.fn() },
   useFocusEffect: (callback: () => void) =>
     jest.requireActual<typeof import('react')>('react').useEffect(callback, [callback]),
 }));
@@ -15,6 +17,16 @@ const goal = { id: 42, name: 'Освоить Python', result: null, status: 'act
   materials_total: 0, materials_studied: 0 };
 const material = { id: 12, title: 'Курс Python', status: 'unseen' };
 const press = (name: string) => fireEvent.press(screen.getByRole('button', { name }));
+async function confirm(name: string) {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, actions) => {
+    actions?.find(action => action.text === name)?.onPress?.();
+  });
+  try {
+    await press(name);
+  } finally {
+    alert.mockRestore();
+  }
+}
 
 test('creates a goal without a deadline, progress target, or required description', async () => {
   const request = jest.fn<Request>().mockResolvedValueOnce({ items: [], total: 0 }).mockResolvedValueOnce(goal)
@@ -43,26 +55,22 @@ test('links one material to two goals and allows an independent unlink', async (
   expect(screen.getAllByText('Материал уже связан с целью.')).toHaveLength(1);
 });
 
-test('adds a library material, schedules through the existing plan, edits, completes and archives', async () => {
+test('opens the material picker and schedules, edits, completes and archives the goal', async () => {
   let current = { ...goal };
-  let linked = false;
   const request = jest.fn<Request>().mockImplementation(async (url, method, body) => {
     if (method === 'PUT') {
       current = { ...current, ...(body as typeof goal), version: current.version + 1 };
       return current;
     }
-    if (method === 'POST') linked = true;
-    if (url.startsWith('/contents?') || url.startsWith(`${path}/42/materials?`)) {
-      const items = linked || url.startsWith('/contents?') ? [material] : [];
-      return { items, total: items.length };
+    if (url.startsWith(`${path}/42/materials?`)) {
+      return { items: [material], total: 1 };
     }
     return current;
   });
   await render(<GoalDetail request={request} id={42} />);
   expect(screen.getByText('Добавьте материалы')).toBeTruthy();
   await press('Добавить из библиотеки');
-  await press('Курс Python');
-  expect(request).toHaveBeenCalledWith(`${path}/42/materials`, 'POST', { content_id: 12 });
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/goals/materials', params: { goalId: '42' } });
   await press('Запланировать материал');
   expect(router.push).toHaveBeenCalledWith({ pathname: '/plan', params: { id: '12', goalId: '42' } });
   await press('Редактировать цель');
@@ -71,9 +79,38 @@ test('adds a library material, schedules through the existing plan, edits, compl
   expect(request).toHaveBeenCalledWith(`${path}/42`, 'PUT', {
     name: goal.name, result: 'Написать программу', status: 'active',
   }, { version: 1 });
-  await press('Завершить цель');
+  await confirm('Завершить цель');
   expect(screen.getByText('Завершённая цель')).toBeTruthy();
-  await press('Архивировать цель');
+  await confirm('Архивировать цель');
   expect(screen.getByText('Архивная цель')).toBeTruthy();
   expect(screen.getByText(/Курс Python ·/)).toBeTruthy();
+});
+
+test('selects across pages, skips linked materials and retries only unconfirmed writes', async () => {
+  const first = { ...material, content_type: 'video', duration_minutes: 5, linked: false };
+  const already = { ...first, id: 13, title: 'Уже связан', linked: true };
+  const second = { ...first, id: 14, title: 'Практика Python', duration_minutes: null };
+  let attempts = 0;
+  const request = jest.fn<Request>().mockImplementation(async (url, method, body) => {
+    if (method === 'POST') {
+      if ((body as { content_id: number }).content_id === 14 && attempts++ === 0) throw new ApiError(502);
+      return;
+    }
+    return { items: url.includes('offset=0') ? [first, already] : [second], total: 101 };
+  });
+  await render(<GoalPicker request={request} id={42} />);
+  const check = (name: RegExp) => screen.getByRole('checkbox', { name });
+  expect(check(/Уже связан/).props.accessibilityState).toMatchObject({ checked: true, disabled: true });
+  await fireEvent.press(check(/Курс Python/));
+  await press('Следующая страница');
+  await fireEvent.press(check(/Практика Python/));
+  expect(screen.getByText('Выбрано: 2')).toBeTruthy();
+  await press('Добавить выбранные');
+  expect(screen.getByText('Добавлено: 1. Осталось добавить: 1.')).toBeTruthy();
+  await press('Повторить добавление');
+  expect(screen.getByText('Добавлено: 1. Осталось добавить: 0.')).toBeTruthy();
+  expect(request.mock.calls.filter(call => call[1] === 'POST')).toEqual([12, 14, 14].map(content_id =>
+    [`${path}/42/materials`, 'POST', { content_id }]));
+  await press('Готово');
+  expect(router.back).toHaveBeenCalled();
 });

@@ -20,9 +20,9 @@ jest.mock('../src/offline/store', () => ({
 const owner = 'https://example.com/1';
 const path = '/mobile/learning/time-budget?budget_minutes=';
 const item = { material_id: 42, title: 'Тестовый материал', source: 'web', status: 'planned',
-  content_type: 'article', duration_minutes: 5, reason: 'today_task', goal_name: 'Цель',
+  content_type: 'article', duration_minutes: 5, reason: 'today_task', context_goal_name: 'Цель',
   task_id: 7, task_day: '2026-11-26' };
-const response = (budget: number, items = [item], unknown = false) => ({
+const response = (budget: number, items: unknown[] = [item], unknown = false) => ({
   budget_minutes: budget, local_date: '2026-11-26', items, has_unknown_duration: unknown,
 });
 const press = (name: string) => fireEvent.press(screen.getByRole('button', { name }));
@@ -63,6 +63,19 @@ test('a slower previous budget cannot replace the current results', async () => 
   expect(screen.getByText('Есть материалы без оценки времени')).toBeTruthy();
   await act(async () => resolveFirst(response(5)));
   expect(screen.queryByText(item.title)).toBeNull();
+});
+
+test('loads a preselected budget and leaves the task ID off alternatives without a task', async () => {
+  const alternative = { ...item, material_id: 43, title: 'Другой материал', reason: 'active_goal',
+    task_id: null, task_day: null, context_goal_name: null, goal_name: 'Неоднозначная цель' };
+  const request = jest.fn<Request>().mockResolvedValue(response(15, [item, alternative]));
+  await render(<TimeBudget request={request} owner={owner} initialBudget={15} />);
+  expect(request.mock.calls[0]).toEqual([`${path}15`, 'GET']);
+  expect(screen.getByText('Рекомендуемый материал')).toBeTruthy();
+  expect(screen.getByText('Другие варианты')).toBeTruthy();
+  expect(screen.queryByText('Цель: Неоднозначная цель')).toBeNull();
+  await press('Открыть материал: Другой материал');
+  expect(router.push).toHaveBeenLastCalledWith({ pathname: '/library/[id]', params: { id: '43' } });
 });
 
 test('loads only the active owner and budget snapshot, labels it stale and refreshes after returning', async () => {

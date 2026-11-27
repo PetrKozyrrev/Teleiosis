@@ -6,9 +6,9 @@ import { colors } from '../theme';
 export function MaterialThumbnail({ imageUrl, kind, size = 72 }: { imageUrl?: string | null; kind?: string; size?: number }) {
   const [failed, setFailed] = useState<string>();
   const image = imageUrl?.startsWith('https://') && failed !== imageUrl ? imageUrl : undefined;
-  const placeholder = kind === 'video' ? require('../../design/icons/schematic_design_preview_video.png')
-    : kind === 'article' ? require('../../design/icons/schematic_design_preview_article.png')
-    : require('../../design/icons/schematic_design_preview.png');
+  const placeholder = kind === 'video' ? require('../../assets/thumbnail-video.png')
+    : kind === 'article' ? require('../../assets/thumbnail-article.png')
+    : require('../../assets/thumbnail-default.png');
   return <View style={[styles.frame, { width: size, height: size }]} accessible={false}>
     {image ? <Image source={{ uri: image }} onError={() => setFailed(image)} style={StyleSheet.absoluteFill} />
       : kind === 'note' || kind === 'pdf'

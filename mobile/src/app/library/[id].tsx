@@ -398,7 +398,8 @@ function MaterialScreen({ id, request, owner, draftId, openEditor, taskId, learn
         <Text accessibilityRole="header" style={styles.label}>{t('Удалось изучить?')}</Text>
         <Action title={t('Отметить изученным')} disabled={busy} onPress={() => openCompletion()} />
         <Action variant="text" title={t('Не сейчас')} onPress={dismissPrompt} />
-      </Card> : <Action title={t('Отметить изученным')} disabled={busy} onPress={() => openCompletion()} />)}
+      </Card> : <Action variant={original || item.content_type === 'pdf' ? 'outline' : 'primary'}
+        title={t('Отметить изученным')} disabled={busy} onPress={() => openCompletion()} />)}
       {cachedAt !== undefined && <Notice>{t('Загруженная карточка ·')} {new Date(cachedAt).toLocaleString(locale)}</Notice>}
       <Action variant="outline" title={t('Редактировать')} disabled={busy || cachedAt !== undefined} onPress={() => beginEdit(item)} />
       <Action variant="outline" title={t('Добавить к цели')} disabled={busy || cachedAt !== undefined}

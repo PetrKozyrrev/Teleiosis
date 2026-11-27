@@ -18,7 +18,7 @@ type ReviewPath = '/mobile/review' | `/mobile/review?${string}` | `/mobile/revie
   | `/mobile/review/${number}/answers` | `/mobile/review/${number}/history?${string}`;
 type GoalPath = '/mobile/learning/goals' | `/mobile/learning/goals?${string}` | `/mobile/learning/goals/${number}`
   | `/mobile/learning/goals/${number}/materials` | `/mobile/learning/goals/${number}/materials?${string}`
-  | `/mobile/learning/goals/${number}/materials/${number}`;
+  | `/mobile/learning/goals/${number}/materials/${number}` | `/mobile/learning/goals/${number}/candidates?${string}`;
 type CompletionPath = `/mobile/learning/materials/${number}/${'completion' | 'reflection'}`;
 export type LibraryPath = ReviewPath | PlanPath | GoalPath | CompletionPath | '/contents' | '/contents/submissions' | '/mobile/library/submissions' | `/contents?${string}` | `/contents/${number}`
   | '/mobile/profile' | `/mobile/reading-progress?${string}` | '/mobile/library/link-preview' | '/mobile/learning/today'

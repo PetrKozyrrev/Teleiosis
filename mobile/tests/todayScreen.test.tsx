@@ -5,8 +5,13 @@ import TodayScreen from '../src/app/(tabs)/index';
 import { ApiError } from '../src/auth/api';
 import { useAuth } from '../src/auth/context';
 import type { AuthController } from '../src/auth/controller';
+import { saveLanguage } from '../src/i18n';
 import type { Request } from '../src/library/model';
 
+jest.mock('expo-sqlite/kv-store', () => ({
+  __esModule: true,
+  default: { getItem: async () => null, setItem: async () => {} },
+}));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), navigate: jest.fn() },
   useFocusEffect: (callback: () => void) =>
@@ -68,8 +73,8 @@ test('shows next action and opens the existing detail, review, progress, add, pl
   expect(screen.getByText('Сайт · Время неизвестно')).toBeTruthy();
   expect(screen.getByText('Следующий непросмотренный материал')).toBeTruthy();
   expect(screen.getByText('Доступно карточек: 2')).toBeTruthy();
-  expect(screen.getByText('Изучено материалов: 1 из 4')).toBeTruthy();
-  expect(screen.getByText('Выполнено заданий: 1 из 2')).toBeTruthy();
+  expect(screen.getByText('Изучено 1 из 4 материалов')).toBeTruthy();
+  expect(screen.getByText('Задания недели: выполнено 1 из 2')).toBeTruthy();
   await press('Открыть материал');
   expect(router.push).toHaveBeenCalledWith({ pathname: '/library/[id]', params: { id: '42' } });
   await press('Повторение');
@@ -143,8 +148,39 @@ test('only uses the offline snapshot for its owner and discards the previous acc
 });
 
 test('passes a specific task from Today to the material without changing library entry points', async () => {
-  request.mockResolvedValue({ ...data, next_action: { ...data.next_action, task_id: 7 } });
+  request.mockResolvedValue({ ...data, next_action: {
+    ...data.next_action, task_id: 7, task_day: '2026-11-24', reason: 'studied_task', goal_name: 'Точная цель',
+  } });
   await render(<TodayScreen />);
+  expect(screen.getByText('Из плана на 24 ноября')).toBeTruthy();
+  expect(screen.getByText('Цель: Точная цель')).toBeTruthy();
   await press('Открыть материал');
   expect(router.push).toHaveBeenCalledWith({ pathname: '/library/[id]', params: { id: '42', taskId: '7' } });
+});
+
+test('starts every preset in one tap and offers a neutral alternative route', async () => {
+  await render(<TodayScreen />);
+  for (const minutes of ['5', '15', '30', '60']) {
+    await press(`${minutes} мин`);
+    expect(router.push).toHaveBeenLastCalledWith({ pathname: '/time-budget', params: { minutes } });
+  }
+  await press('Выбрать другое');
+  expect(router.push).toHaveBeenLastCalledWith('/time-budget');
+});
+
+test('localizes the plan date and controls without shortening the content title', async () => {
+  const title = 'A long material title '.repeat(8).trim();
+  request.mockResolvedValue({ ...data, next_action: {
+    ...data.next_action, title, task_id: 7, task_day: '2026-11-24', reason: 'overdue_task',
+  } });
+  await saveLanguage('en');
+  try {
+    await render(<TodayScreen />);
+    expect(screen.getByRole('header', { name: title })).toBeTruthy();
+    expect(screen.getByText('From the plan for November 24')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '15 min' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Choose another' })).toBeTruthy();
+  } finally {
+    await act(async () => saveLanguage('ru'));
+  }
 });

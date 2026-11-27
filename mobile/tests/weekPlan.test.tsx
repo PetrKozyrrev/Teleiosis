@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { beforeEach, expect, jest, test } from '@jest/globals';
+import { Alert } from 'react-native';
 import PlanRoute from '../src/app/plan';
 import { ApiError } from '../src/auth/api';
 import type { Request } from '../src/library/model';
@@ -44,7 +45,7 @@ test('uses the goal selected in goal detail when scheduling a material', async (
 
 test('uses the configured count-based progress and requires a manual duration', async () => {
   await render(<PlanRoute />);
-  expect(screen.getByText('Выполнено 1 из 2 · 50 %')).toBeTruthy();
+  expect(screen.getByText('Задания недели: выполнено 1 из 2')).toBeTruthy();
   expect(screen.getByText(/План превышает бюджет на 30 мин/)).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Запланировать материал' }).props.accessibilityState.disabled).toBe(true);
   await fireEvent.changeText(screen.getByLabelText('Длительность в минутах'), '22');
@@ -57,11 +58,20 @@ test('uses the configured count-based progress and requires a manual duration', 
 test.each([412, 0, 401])('requires a fresh read after a rejected completion (%s)', async status => {
   await render(<PlanRoute />);
   mockRequest.mockRejectedValueOnce(new ApiError(status));
-  await press('Завершить задание');
+  await press('Другие действия');
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, actions) => {
+    actions?.find(action => action.text === 'Завершить задание')?.onPress?.();
+  });
+  try {
+    await press('Завершить задание');
+  } finally {
+    alert.mockRestore();
+  }
   expect(mockRequest).toHaveBeenLastCalledWith('/mobile/plan/tasks/3/complete', 'PUT', undefined, { version: 2 });
   expect(screen.getByRole('button', { name: 'Завершить задание' }).props.accessibilityState.disabled).toBe(true);
   expect(mockRequest.mock.calls.filter(call => call[1] === 'PUT')).toHaveLength(1);
   await press('Обновить план');
+  await press('Другие действия');
   expect(screen.getByRole('button', { name: 'Завершить задание' }).props.accessibilityState.disabled).toBe(false);
 });
 
@@ -71,7 +81,18 @@ test('ignores a previous load after refresh', async () => {
   await render(<PlanRoute />);
   await press('Обновить план');
   await act(async () => resolve({ ...week, summary: { ...week.summary, done: 0 } }));
-  expect(screen.getByText('Выполнено 1 из 2 · 50 %')).toBeTruthy();
+  expect(screen.getByText('Задания недели: выполнено 1 из 2')).toBeTruthy();
+});
+
+test('moves a task using a localized calendar date without a material write', async () => {
+  await render(<PlanRoute />);
+  await press('Другие действия');
+  await fireEvent.press(screen.getByRole('button', { name: /Выбрать дату: 16 ноября/ }));
+  await fireEvent.press(screen.getByRole('button', { name: /17 ноября 2026/ }));
+  await press('Перенести задание');
+  expect(mockRequest.mock.calls.filter(call => call[1] === 'PUT')).toEqual([
+    ['/mobile/plan/tasks/3/day', 'PUT', { day: '2026-11-17' }, { version: 2 }],
+  ]);
 });
 
 test('calendar navigation across year boundaries and leap dates', () => {
