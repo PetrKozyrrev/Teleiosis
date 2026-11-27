@@ -3,11 +3,12 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../auth/api';
 import { Action, Body, Card, Field, Page } from '../components/ui';
-import { useTranslation } from '../i18n';
+import { useLocale, useTranslation } from '../i18n';
 import { errorMessage, type Material, type Request } from '../library/model';
 import { Choice, Loading, Notice } from '../library/ui';
 import { forgetMaterial, remember } from '../offline/cache';
 import { clearReflectionDraft, generation, reflectionDraft, saveReflectionDraft } from '../offline/store';
+import { formatPlanDay } from '../plan/model';
 
 type Reflection = { thought: string; version: number };
 type Context = {
@@ -33,6 +34,7 @@ export function Completion({ id, taskId, reflectionOnly, request, owner }: {
   id: number; taskId: number | null; reflectionOnly: boolean; request: Request; owner: string | null;
 }) {
   const t = useTranslation();
+  const locale = useLocale();
   const path = `/mobile/learning/materials/${id}` as const;
   const [context, setContext] = useState<Context>();
   const [result, setResult] = useState<Result>();
@@ -45,6 +47,7 @@ export function Completion({ id, taskId, reflectionOnly, request, owner }: {
   const [storedDraft, setStoredDraft] = useState<string | null>(null);
   const [draftError, setDraftError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [writingThought, setWritingThought] = useState(false);
   const attempt = useRef<Attempt | null>(null);
   const locked = useRef(false);
   const draftWrite = useRef(0);
@@ -154,22 +157,26 @@ export function Completion({ id, taskId, reflectionOnly, request, owner }: {
   }
 
   const completed = result?.material.status === 'studied';
-  const showReflection = Boolean(completed || reflectionOnly || draft?.trim());
+  const showReflection = Boolean(writingThought || reflectionOnly || draft?.trim());
   const canConfirm = Boolean(context && (!selectedTask || taskId || context.tasks.some(task => task.id === selectedTask)));
   const thought = draft ?? context?.reflection?.thought ?? '';
-  return <Page title={t('Завершение изучения')} subtitle={context?.material.title}>
+  const taskLabel = (task: Context['tasks'][number]) =>
+    `${task.goal_name} · ${formatPlanDay(task.day, locale, { dateStyle: 'long' })}`;
+  const sourceTask = context?.tasks.find(task => task.id === taskId);
+  return <Page title={t(completed ? 'Материал изучен' : 'Завершение изучения')} subtitle={context?.material.title}>
     {message && <Notice>{message}</Notice>}
     {loading && !context && <Loading />}
     {!reflectionOnly && !completed && <Card>
-      {taskId ? <Body>{t('Будет завершено задание, из которого открыт материал.')}</Body> : context && context.tasks.length > 0 &&
+      {taskId ? <Body>{sourceTask ? t('Будет завершено задание: {0}', taskLabel(sourceTask))
+        : t('Будет завершено задание, из которого открыт материал.')}</Body> : context && context.tasks.length > 0 &&
         <Choice label={t('Также завершить задание')} value={selectedTask} disabled={busy || loading}
           onChange={setSelectedTask} options={[{ value: null, label: t('Только материал') },
-            ...context.tasks.map(task => ({ value: task.id, label: `${task.goal_name} · ${task.day}` }))]} />}
+            ...context.tasks.map(task => ({ value: task.id, label: taskLabel(task) }))]} />}
       <Action title={t('Отметить изученным')} disabled={busy || loading || needsReload || !canConfirm} onPress={confirm} />
     </Card>}
-    {completed && <Card>
-      <Notice>{t(result.task_completed ? 'Материал изучен. Задание завершено.' : 'Материал изучен')}</Notice>
-    </Card>}
+    {completed && result.task_completed && <Notice>{t('Задание завершено.')}</Notice>}
+    {completed && !showReflection && <Action variant="outline" title={t('Главная мысль (необязательно)')}
+      disabled={busy} onPress={() => setWritingThought(true)} />}
     {showReflection && <Card>
       <Field label={t('Главная мысль (необязательно)')} maxLength={4000} multiline value={thought}
         editable={!busy && draft !== undefined} onChangeText={changeDraft} />
@@ -189,6 +196,7 @@ export function Completion({ id, taskId, reflectionOnly, request, owner }: {
       <Action variant="outline" title={t('Выбрать следующий материал')} disabled={busy}
         onPress={() => router.dismissTo('/library')} />
     </>}
-    <Action variant="text" title={t(completed || reflectionOnly ? 'Готово' : 'Отмена')} disabled={busy} onPress={done} />
+    <Action variant={completed ? 'primary' : 'text'} title={t(completed || reflectionOnly ? 'Готово' : 'Отмена')}
+      disabled={busy} onPress={done} />
   </Page>;
 }

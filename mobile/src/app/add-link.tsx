@@ -20,7 +20,7 @@ const successNoticeDuration = 5_000;
 
 export default function AddLink() {
   const t = useTranslation();
-  return <LibraryAccess title={t('Добавить ссылку')} brand>{(request, owner) => <LinkForm request={request} owner={owner} />}</LibraryAccess>;
+  return <LibraryAccess title={t('Добавить материал')} brand>{(request, owner) => <LinkForm request={request} owner={owner} />}</LibraryAccess>;
 }
 
 function LinkForm({ request, owner }: { request: Request; owner: string | null }) {
@@ -136,11 +136,17 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
     }
   }
 
-  return <Page title={t('Добавить ссылку')} subtitle={t('Сохраните то, к чему хочется вернуться.')} brand insetFooter
+  return <Page title={t('Добавить материал')} brand insetFooter
     footer={<>
       <Action title={busy ? t('Сохранение…') : t('Сохранить в библиотеку')} disabled={!normalized || busy || !owner} onPress={() => void save()} />
       <Text style={[styles.body, screenStyles.tip]}>{t('Ссылки можно добавлять из меню «Поделиться».')}</Text>
     </>}>
+    <View style={screenStyles.kinds}>
+      <Action variant="outline" title={t('Заметка')} style={screenStyles.kind}
+        onPress={() => router.push({ pathname: '/library/[id]', params: { id: 'new', kind: 'note' } })} />
+      <Action variant="outline" title="PDF" style={screenStyles.kind}
+        onPress={() => router.push({ pathname: '/library/[id]', params: { id: 'new', kind: 'pdf' } })} />
+    </View>
     <Field label={t('Ссылка')} placeholder={t('Вставьте или введите URL')} value={url} onChangeText={changeUrl} keyboardType="url" maxLength={2048} editable={!busy}
       leading={<Ionicons name="link-outline" size={20} color={colors.muted} />}
       trailing={<>
@@ -165,6 +171,8 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
           router.navigate('/library');
         }} />}
     </Card>}
+    {job?.state === 'synced' && job.server_id !== null && <Action variant="text" title={t('Добавить к цели')}
+      onPress={() => router.push({ pathname: '/library/goals', params: { id: String(job.server_id) } })} />}
     {normalized && <>
       <Text style={styles.label}>{t('Предпросмотр')}</Text>
       <Card><View style={screenStyles.preview}>
@@ -183,12 +191,13 @@ function LinkForm({ request, owner }: { request: Request; owner: string | null }
       <Field label={t('Заметка (необязательно)')} placeholder={t('Зачем вы сохраняете материал?')} value={note} onChangeText={setNote} multiline
         maxLength={10000} editable={!busy} autoCapitalize="sentences" style={screenStyles.note} />
     </>}
-    <Action variant="text" title={t('Добавить заметку или PDF')} onPress={() => router.push('/library/new')} />
     <PendingMaterials owner={owner} failuresOnly excludeId={job?.reason === 'duplicate' ? undefined : submission} />
   </Page>;
 }
 
 const screenStyles = StyleSheet.create({
+  kinds: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  kind: { flexGrow: 1 },
   tip: { textAlign: 'center', fontSize: 12 },
   clear: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   preview: { flexDirection: 'row', alignItems: 'center', gap: 12 },

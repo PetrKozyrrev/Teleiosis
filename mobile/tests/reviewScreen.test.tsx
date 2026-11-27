@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import ReviewRoute from '../src/app/review';
 import { ApiError } from '../src/auth/api';
+import { router } from 'expo-router';
 import type { Request } from '../src/library/model';
 
 jest.mock('../src/offline/store', () => ({ ownerKey: () => 'synthetic' }));
@@ -13,15 +14,16 @@ jest.mock('../src/library/ui', () => ({
   LibraryAccess: ({ children }: { children: (request: Request) => React.ReactNode }) => children(mockRequest),
 }));
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), dismissTo: jest.fn() }, useLocalSearchParams: () => ({ id: '7' }),
+  router: { push: jest.fn(), dismissTo: jest.fn() }, useLocalSearchParams: () => mockSession ? { mode: 'session' } : { id: '7' },
   useFocusEffect: (cb: () => void) => jest.requireActual<typeof import('react')>('react').useEffect(cb, [cb]),
 }));
 const mockRequest = jest.fn<Request>();
+let mockSession: boolean;
 const card = { id: 3, content_id: 7, title: 'Synthetic source', question: 'Synthetic question',
   answer: 'Hidden answer', takeaway: 'Synthetic takeaway', due_on: '2026-11-22', paused: false, version: 2, stage: 1 };
 const result = { items: [card], total: 1, today: '2026-11-22' };
 const press = (name: string) => fireEvent.press(screen.getByRole('button', { name }));
-beforeEach(() => { mockRequest.mockReset().mockResolvedValue(result); });
+beforeEach(() => { mockSession = false; mockRequest.mockReset().mockResolvedValue(result); });
 
 test('reveals the answer before rating and sends version and operation key once', async () => {
   await render(<ReviewRoute />);
@@ -75,4 +77,89 @@ test('paused cards can be read without accepting a rating', async () => {
   await press('Показать ответ');
   expect(screen.getByText('Hidden answer')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Помню' })).toBeNull();
+});
+
+test('sequential round keeps again cards for a voluntary next round and recounts on the server', async () => {
+  mockSession = true;
+  const second = { ...card, id: 4, question: 'Second question' };
+  mockRequest.mockResolvedValueOnce({ ...result, items: [card, second], total: 2 })
+    .mockResolvedValueOnce({})
+    .mockResolvedValueOnce({})
+    .mockResolvedValue(result);
+  await render(<ReviewRoute />);
+  expect(screen.getByText('Карточка 1 из 2')).toBeTruthy();
+  expect(screen.queryByText(second.question)).toBeNull();
+  await press('Показать ответ');
+  await press('Не помню');
+  expect(screen.getByText('Карточка 2 из 2')).toBeTruthy();
+  expect(screen.queryByText(card.question)).toBeNull();
+  await press('Показать ответ');
+  await press('Помню');
+  expect(screen.getByText('Обработано карточек: 2')).toBeTruthy();
+  expect(screen.getByText('Осталось к повторению: 1')).toBeTruthy();
+  expect(mockRequest).toHaveBeenLastCalledWith('/mobile/review?due=true&offset=0&limit=1', 'GET');
+  await press('Ещё один раунд');
+  expect(screen.getByText('Карточка 1 из 1')).toBeTruthy();
+  expect(screen.queryByText(card.answer)).toBeNull();
+  await press('На сегодня');
+  expect(mockRequest.mock.calls.filter(call => call[1] === 'POST')).toHaveLength(2);
+  expect(router.dismissTo).toHaveBeenCalledWith('/');
+});
+
+test('does not advance after timeout, ignores repeated taps and retries the same operation', async () => {
+  mockSession = true;
+  let reject!: (error: ApiError) => void;
+  mockRequest.mockResolvedValueOnce(result)
+    .mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }))
+    .mockResolvedValueOnce({})
+    .mockResolvedValueOnce({ ...result, items: [], total: 0 });
+  await render(<ReviewRoute />);
+  await press('Показать ответ');
+  const rate = screen.getByRole('button', { name: 'Помню' });
+  await fireEvent.press(rate);
+  await fireEvent.press(rate);
+  expect(mockRequest.mock.calls.filter(call => call[1] === 'POST')).toHaveLength(1);
+  await act(async () => reject(new ApiError(0)));
+  expect(screen.getByText('Карточка 1 из 1')).toBeTruthy();
+  expect(screen.queryByText('Раунд завершён')).toBeNull();
+  await press('Повторить отправку оценки');
+  expect(mockRequest.mock.calls[2]).toEqual(mockRequest.mock.calls[1]);
+  expect(screen.getByText('Осталось к повторению: 0')).toBeTruthy();
+});
+
+test('snapshots multiple pages before revealing any card', async () => {
+  mockSession = true;
+  const items = Array.from({ length: 50 }, (_, index) => ({ ...card, id: index + 1 }));
+  mockRequest.mockResolvedValueOnce({ ...result, items, total: 51 })
+    .mockResolvedValueOnce({ ...result, items: [{ ...card, id: 51 }], total: 51 });
+  await render(<ReviewRoute />);
+  expect(screen.getByText('Карточка 1 из 51')).toBeTruthy();
+  expect(mockRequest).toHaveBeenLastCalledWith('/mobile/review?due=true&offset=50&limit=50', 'GET');
+  expect(screen.getAllByRole('button', { name: 'Показать ответ' })).toHaveLength(1);
+});
+
+test('shows an empty review round with no rating action', async () => {
+  mockSession = true;
+  mockRequest.mockResolvedValueOnce({ ...result, items: [], total: 0 });
+  await render(<ReviewRoute />);
+  expect(screen.getByRole('header', { name: 'Карточек к повторению пока нет.' })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Показать ответ' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Ещё один раунд' })).toBeNull();
+  expect(mockRequest).toHaveBeenCalledTimes(1);
+});
+
+test('can skip a stale card without writing another rating and keeps management available', async () => {
+  mockSession = true;
+  mockRequest.mockResolvedValueOnce(result)
+    .mockRejectedValueOnce(new ApiError(412))
+    .mockResolvedValueOnce({ ...result, items: [], total: 0 });
+  await render(<ReviewRoute />);
+  await press('Показать ответ');
+  await press('Помню');
+  expect(screen.getByText('Карточка 1 из 1')).toBeTruthy();
+  await press('Пропустить карточку');
+  expect(screen.getByText('Обработано карточек: 0')).toBeTruthy();
+  expect(mockRequest.mock.calls.filter(call => call[1] === 'POST')).toHaveLength(1);
+  await press('Управление карточками');
+  expect(router.push).toHaveBeenCalledWith('/review');
 });

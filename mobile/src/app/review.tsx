@@ -7,13 +7,16 @@ import { Choice, LibraryAccess, Loading, Notice } from '../library/ui';
 import { parseId, type Request } from '../library/model';
 import { validDay } from '../plan/model';
 import { reviewError, type Card, type CardPage, type HistoryPage } from '../review/model';
+import { ReviewSession } from '../review/Session';
 import { useTranslation } from '../i18n';
 
 type Save = (operation: () => Promise<unknown>, after?: () => void) => Promise<void>;
 
 export default function ReviewRoute() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
-  return <LibraryAccess>{request => <Review request={request} contentId={parseId(id)} />}</LibraryAccess>;
+  const { id, mode } = useLocalSearchParams<{ id?: string; mode?: string }>();
+  return <LibraryAccess>{request => mode === 'session' && !id
+    ? <ReviewSession request={request} />
+    : <Review key={id ?? 'all'} request={request} contentId={parseId(id)} />}</LibraryAccess>;
 }
 
 function Review({ request, contentId }: { request: Request; contentId: number | null }) {

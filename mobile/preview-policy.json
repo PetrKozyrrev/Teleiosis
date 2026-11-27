@@ -1,8 +1,8 @@
 {
   "package": "ru.teleiosis.mobile.dev",
   "api_origin": "https://teleiosistest.tw1.ru",
-  "version": "0.17.0",
-  "version_code": 25,
+  "version": "0.18.0",
+  "version_code": 26,
   "certificate_sha256": "fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c",
   "min_sdk": 24,
   "min_target_sdk": 36,

@@ -25,7 +25,7 @@ jest.mock('../src/auth/context', () => ({ useAuth: jest.fn() }));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), navigate: jest.fn(), dismissTo: jest.fn() },
   useFocusEffect: (callback: () => void) => jest.requireActual<typeof import('react')>('react').useEffect(callback, [callback]),
-  useLocalSearchParams: () => ({ id: mockRequestedId }),
+  useLocalSearchParams: () => ({ id: mockRequestedId, kind: mockKind }),
   useNavigation: () => ({ isFocused: () => true }),
 }));
 jest.mock('expo-linking', () => ({ openURL: jest.fn() }));
@@ -43,6 +43,7 @@ const item: Material = {
 const user = { id: 1, email: 'test@example.com', timezone: 'UTC', reminders_enabled: false, reminder_time: '10:00', email_verified_at: null };
 const page = (items: Material[], total = items.length, offset = 0): MaterialPage => ({ items, total, limit: 10, offset });
 let mockRequestedId: string;
+let mockKind: string | undefined;
 
 function press(name: string) {
   return fireEvent.press(screen.getByRole('button', { name }));
@@ -50,6 +51,7 @@ function press(name: string) {
 
 beforeEach(() => {
   mockRequestedId = 'new';
+  mockKind = undefined;
   jest.mocked(pickPdf).mockReset();
   jest.mocked(enqueue).mockReset().mockResolvedValue(undefined);
   jest.mocked(getJob).mockReset().mockResolvedValue(null);
@@ -160,6 +162,8 @@ test('dismisses confirmation five seconds after syncing or when opening the libr
     await act(() => jest.advanceTimersByTime(1));
     expect(screen.queryByText(success)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Открыть библиотеку' })).toBeNull();
+    await press('Добавить к цели');
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/library/goals', params: { id: '12' } });
 
     await press('Вставить');
     await press('Сохранить в библиотеку');
@@ -170,6 +174,21 @@ test('dismisses confirmation five seconds after syncing or when opening the libr
   } finally {
     jest.useRealTimers();
   }
+});
+
+test('opens note and PDF capture directly and saves a note without classification', async () => {
+  const capture = await render(<AddLink />);
+  await press('Заметка');
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/library/[id]', params: { id: 'new', kind: 'note' } });
+  await press('PDF');
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/library/[id]', params: { id: 'new', kind: 'pdf' } });
+  await capture.unmount();
+  mockKind = 'note';
+  await render(<MaterialRoute />);
+  expect(screen.queryByLabelText('Ссылка')).toBeNull();
+  await fireEvent.changeText(screen.getByLabelText('Текст заметки'), 'Быстрая заметка');
+  await press('Сохранить');
+  expect(enqueue).toHaveBeenCalledWith('account-1', { note: 'Быстрая заметка', category_id: null }, undefined);
 });
 
 test('saves a PDF link in the local queue with its category', async () => {

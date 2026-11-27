@@ -41,7 +41,8 @@ test('timeout never shows success and retry uses the same key and task', async (
   await press('Отметить изученным');
   expect(request.mock.calls[2]).toEqual(request.mock.calls[1]);
   expect(request.mock.calls[1]).toEqual([`${path}/completion`, 'POST', { task_id: 7 }, { version: 3, idempotencyKey: expect.any(String) }]);
-  expect(screen.getByText('Материал изучен. Задание завершено.')).toBeTruthy();
+  expect(screen.getByRole('header', { name: 'Материал изучен' })).toBeTruthy();
+  expect(screen.getByText('Задание завершено.')).toBeTruthy();
   await press('Создать вопрос для повторения');
   expect(router.push).toHaveBeenCalledWith({ pathname: '/review', params: { id: '42' } });
   await press('Готово');
@@ -56,6 +57,8 @@ test('by default leaves the active task open and optionally saves a thought', as
   expect(screen.getByRole('button', { name: 'Также завершить задание · Только материал' })).toBeTruthy();
   await press('Отметить изученным');
   expect(request.mock.calls[1][2]).toEqual({ task_id: null });
+  expect(screen.queryByLabelText('Главная мысль (необязательно)')).toBeNull();
+  await press('Главная мысль (необязательно)');
   await fireEvent.changeText(screen.getByLabelText('Главная мысль (необязательно)'), 'Идея');
   await press('Сохранить главную мысль');
   expect(request).toHaveBeenCalledWith(`${path}/reflection`, 'PUT', { thought: 'Идея', previous: null });

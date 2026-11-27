@@ -95,8 +95,9 @@ function ProfileView({ request }: { request: Request }) {
     </View></Card>
     <Text style={screenStyles.section}>{t('Настройки чтения')}</Text>
     <Card>
-      <ProfileRow icon="disc-outline" title={t('Недельная цель')} value={profile ? t('{0} в неделю', profile.weekly_reading_goal) : undefined}
+      <ProfileRow icon="disc-outline" title={t('Недельная норма')} value={profile?.weekly_reading_goal?.toString()}
         disabled={cannotEdit} onPress={() => { setEditing('goal'); setGoal(String(profile?.weekly_reading_goal ?? '')); }} />
+      <Body>{t('Число изученных материалов за неделю. Бюджет времени задаётся в недельном плане.')}</Body>
       <View style={screenStyles.divider} />
       <ProfileRow icon="notifications-outline" title={t('Напоминания о чтении')} trailing={<BrandToggle label={t('Напоминания о чтении')}
         checked={Boolean(user?.reminders_enabled)} disabled={!user || busy || offline} onChange={changeReminders} />} />
@@ -108,7 +109,7 @@ function ProfileView({ request }: { request: Request }) {
     {editing && <Modal transparent animationType="fade" onRequestClose={() => { if (!busy) setEditing(undefined); }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={screenStyles.modal} accessibilityViewIsModal>
         <View style={screenStyles.dialog}><Card>
-          <Text accessibilityRole="header" style={styles.heading}>{editing === 'name' ? t('Редактировать профиль') : t('Недельная цель')}</Text>
+          <Text accessibilityRole="header" style={styles.heading}>{editing === 'name' ? t('Редактировать профиль') : t('Недельная норма')}</Text>
           {editing === 'name'
             ? <Field label={t('Имя')} value={name} onChangeText={setName} editable={!busy} maxLength={80} autoCapitalize="words" />
             : <Field label={t('Материалов в неделю')} value={goal} onChangeText={setGoal} keyboardType="number-pad" maxLength={3} editable={!busy} />}

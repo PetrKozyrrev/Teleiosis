@@ -78,7 +78,7 @@ test('shows next action and opens the existing detail, review, progress, add, pl
   await press('Открыть материал');
   expect(router.push).toHaveBeenCalledWith({ pathname: '/library/[id]', params: { id: '42' } });
   await press('Повторение');
-  expect(router.push).toHaveBeenCalledWith('/review');
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/review', params: { mode: 'session' } });
   await press('План');
   expect(router.push).toHaveBeenCalledWith('/plan');
   await press('Прогресс');

@@ -5,7 +5,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ApiError } from '../auth/api';
 import { Action, Body, Card, Field, Page, styles } from '../components/ui';
 import { useTranslation } from '../i18n';
-import { errorMessage, statuses, type Material, type Request } from '../library/model';
+import { errorMessage, materialKinds, statuses, type Material, type Request } from '../library/model';
 import { Choice, Loading, Notice } from '../library/ui';
 import { colors } from '../theme';
 
@@ -253,10 +253,6 @@ function GoalEditor({ goal, onSave, busy }: {
   </Card>;
 }
 
-const candidateTypes: Record<string, string> = {
-  article: 'Статья', video: 'Видео', note: 'Заметка', pdf: 'PDF', other: 'Материал',
-};
-
 export function GoalPicker({ request, id }: { request: Request; id: number }) {
   const t = useTranslation();
   const [text, setText] = useState('');
@@ -323,7 +319,7 @@ export function GoalPicker({ request, id }: { request: Request; id: number }) {
     {data?.items.map(material => {
       const alreadyLinked = linked.has(material.id);
       const checked = alreadyLinked || pending.includes(material.id);
-      const details = [t(candidateTypes[material.content_type] ?? 'Материал'), t(statuses[material.status]),
+      const details = [t(materialKinds[material.content_type] ?? 'Материал'), t(statuses[material.status]),
         material.duration_minutes ? t('≈ {0} мин', material.duration_minutes) : t('Время неизвестно')].join(' · ');
       return <Pressable key={material.id} accessibilityRole="checkbox"
         accessibilityLabel={[material.title, details, alreadyLinked ? t('Материал уже связан с целью.') : null].filter(Boolean).join('. ')}

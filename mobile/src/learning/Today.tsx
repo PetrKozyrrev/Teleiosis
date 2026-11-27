@@ -142,7 +142,7 @@ export function Today({ request, owner }: { request: Request; owner: string | nu
         <Text accessibilityRole="header" style={styles.label}>{t(due && due > 0 ? 'Пора повторить' : 'Повторение')}</Text>
         <Body>{due == null ? t('Количество доступных карточек неизвестно.')
           : due === 0 ? t('Пока нет карточек для повторения.') : t('Доступно карточек: {0}', due)}</Body>
-        <Action variant="text" title={t('Повторение')} onPress={() => router.push('/review')} />
+        <Action variant="text" title={t('Повторение')} onPress={() => router.push({ pathname: '/review', params: { mode: 'session' } })} />
       </Card>
       <Card compact>
         <Text accessibilityRole="header" style={styles.label}>{t('Недельный прогресс')}</Text>

@@ -4,6 +4,8 @@ export const statuses = {
   unseen: 'Не просмотрено', planned: 'Запланировано', studied: 'Изучено', irrelevant: 'Неактуально',
 };
 export const sources = { youtube: 'YouTube', telegram: 'Telegram', web: 'Сайт', other: 'Заметка' };
+export const materialKinds: Readonly<Record<string, string>> = { article: 'Статья', video: 'Видео', note: 'Заметка', pdf: 'PDF' };
+export const clearStudiedExplanation = 'Материал перестанет учитываться как изученный. Главная мысль, карточки и выполненные задания сохранятся.';
 export const sorts = { newest: 'Сначала новые', oldest: 'Сначала старые', title: 'По названию' };
 export const searchScopes = {
   '': 'Название · доступно офлайн',

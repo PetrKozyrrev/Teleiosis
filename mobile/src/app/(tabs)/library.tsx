@@ -6,7 +6,7 @@ import { Alert, AppState, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Te
 import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
 import { ApiError } from '../../auth/api';
 import {
-  errorMessage, initialFilters, linkDomain, listPath, maxOffset, searchScopes, sorts, sources, statuses,
+  clearStudiedExplanation, errorMessage, initialFilters, linkDomain, listPath, materialKinds, maxOffset, searchScopes, sorts, sources, statuses,
   type Category, type Filters, type Material, type MaterialPage, type Request, type Status,
 } from '../../library/model';
 import { Choice, LibraryAccess, Loading, Notice, optionsOf } from '../../library/ui';
@@ -171,10 +171,15 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
   function changeStatus(item: Material, status: Status) {
     if (!item.version || item.status === status) { setMenu(undefined); return; }
     const expected = owner ? generation(owner) : undefined;
-    void runMutation(async () => {
+    const apply = () => void runMutation(async () => {
       const updated = await request(`/contents/${item.id}/versioned`, 'PATCH', { status }, { version: item.version });
       if (owner) await remember(owner, `/contents/${item.id}`, updated, expected).catch(() => {});
     });
+    if (item.status !== 'studied') { apply(); return; }
+    setMenu(undefined);
+    Alert.alert(t('Снять отметку «Изучено»?'), t(clearStudiedExplanation), [
+      { text: t('Отмена'), style: 'cancel' }, { text: t('Снять отметку'), onPress: apply },
+    ]);
   }
 
   function remove(item: Material) {
@@ -269,6 +274,8 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
         const createdAt = item.created_at ? new Date(item.created_at) : null;
         const date = createdAt && Number.isFinite(createdAt.getTime())
           ? t('Добавлено {0}', createdAt.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })) : null;
+        const kind = item.content_type && materialKinds[item.content_type];
+        const origin = item.url ? linkDomain(item.url) ?? t(sources[item.source] ?? 'Источник неизвестен') : null;
         const seconds = item.video_duration_seconds;
         let duration: string | null = null;
         if (seconds && seconds > 0) {
@@ -283,22 +290,23 @@ function LibraryList({ request, owner }: { request: Request; owner: string | nul
               <MaterialThumbnail imageUrl={item.image_url} kind={item.content_type} />
             </Pressable>
             <View style={libraryStyles.grow}>
-              <Pressable accessibilityRole="button" onPress={() => { setMenu(undefined); router.push(detail); }}>
-                <Text style={styles.label} numberOfLines={3}>{item.title}</Text>
-                <Body>{linkDomain(item.url) ?? (item.content_type === 'pdf' ? 'PDF' : t(sources[item.source]))}</Body>
-                {duration && <Body>{duration}</Body>}
+              <Pressable accessibilityRole="button" style={libraryStyles.materialTitle}
+                onPress={() => { setMenu(undefined); router.push(detail); }}>
+                <Text style={styles.label}>{item.title}</Text>
               </Pressable>
               <View style={libraryStyles.statusRow}>
                 <Pressable accessibilityRole="button" accessibilityLabel={t('Статус: {0}', t(statuses[item.status]))}
                   disabled={!online || !item.version} accessibilityState={{ disabled: !online || !item.version, expanded: currentMenu === 'status' }}
-                  onPress={event => openMenu(item, 'status', event)} style={[libraryStyles.status, libraryStyles[item.status]]}>
+                  hitSlop={8} onPress={event => openMenu(item, 'status', event)} style={[libraryStyles.status, libraryStyles[item.status]]}>
                   <Text style={[libraryStyles.statusText, item.status === 'unseen' && libraryStyles.unseenText]}>{t(statuses[item.status])}</Text>
                 </Pressable>
                 {item.category_id !== null && <Text style={[styles.body, libraryStyles.grow]} numberOfLines={1}>
                   {categories.find(category => category.id === item.category_id)?.name}
                 </Text>}
               </View>
-              {date && <Body>{date}</Body>}
+              <Body>{[kind ? t(kind) : null, origin].filter(Boolean).join(' · ') || t(sources[item.source] ?? 'Источник неизвестен')}</Body>
+              {duration && <Body>{duration}</Body>}
+              {date && <Text style={libraryStyles.materialDate}>{date}</Text>}
             </View>
           </View>
           {online && <Pressable accessibilityRole="button" accessibilityLabel={t('Действия: {0}', item.title)}
@@ -358,7 +366,9 @@ const libraryStyles = StyleSheet.create({
   sortControl: { flexShrink: 1, minWidth: 0 },
   material: { position: 'relative', borderRadius: 16, backgroundColor: colors.surface, padding: 12, gap: 3 },
   materialContent: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 34 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
+  materialTitle: { minHeight: 48, justifyContent: 'center' },
+  materialDate: { ...styles.body, fontSize: 12 },
+  statusRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 4 },
   status: { minHeight: 32, borderRadius: 8, paddingHorizontal: 8, justifyContent: 'center' },
   unseen: { backgroundColor: colors.tint },
   planned: { backgroundColor: colors.coolTint },
@@ -368,11 +378,10 @@ const libraryStyles = StyleSheet.create({
   unseenText: { color: colors.primary },
   actions: { gap: 10 },
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  footerAction: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, padding: 8,
-    backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 12 },
+  footerAction: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, padding: 6, borderRadius: 12 },
   footerActionTile: { width: '48%' },
   footerActionPressed: { backgroundColor: colors.tint },
-  footerActionIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
+  footerActionIcon: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   footerActionLabel: { flex: 1 },
   more: { position: 'absolute', right: 4, top: 3, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   menuOverlay: { flex: 1 },

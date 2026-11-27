@@ -7,7 +7,7 @@ import { ApiError } from '../../auth/api';
 import { useAuth } from '../../auth/context';
 import { Action, Body, Card, Field, Page, styles } from '../../components/ui';
 import {
-  errorMessage, linkDomain, linkInput, originalUrl, parseId, sources, statuses,
+  clearStudiedExplanation, errorMessage, linkDomain, linkInput, originalUrl, parseId, sources, statuses,
   type Category, type Material, type Request, type Status,
 } from '../../library/model';
 import { Choice, LibraryAccess, Loading, Notice, optionsOf } from '../../library/ui';
@@ -24,23 +24,25 @@ import { useLocale, useTranslation } from '../../i18n';
 
 export default function MaterialRoute() {
   const t = useTranslation();
-  const { id: param, draftId, inbox, edit, taskId, learningEntry, learningBudget } = useLocalSearchParams<{
-    id: string; draftId?: string; inbox?: string; edit?: string; taskId?: string; learningEntry?: string; learningBudget?: string;
+  const { id: param, draftId, inbox, edit, taskId, learningEntry, learningBudget, kind } = useLocalSearchParams<{
+    id: string; draftId?: string; inbox?: string; edit?: string; taskId?: string; learningEntry?: string; learningBudget?: string; kind?: string;
   }>();
   const id = param === 'new' ? 'new' : parseId(param);
+  const initialKind = id === 'new' && !draftId && (kind === 'note' || kind === 'pdf') ? kind : 'link';
   if (id === 'new' && draftId && inbox === '1') {
     return <MaterialScreen key={draftId} request={async () => { throw new ApiError(401); }} id={id} owner={unassigned} draftId={draftId} />;
   }
   return <LibraryAccess>{(request, owner) => id
-    ? <MaterialScreen key={draftId ?? id} request={request} id={id} owner={owner} draftId={id === 'new' ? draftId : undefined}
+    ? <MaterialScreen key={draftId ?? `${id}:${initialKind}`} request={request} id={id} owner={owner} draftId={id === 'new' ? draftId : undefined}
+      initialKind={initialKind}
       openEditor={edit === '1'} taskId={parseId(taskId)} learningEntry={learningEntry} learningBudget={learningBudget} />
     : <Page title={t('Материал')}><Notice>{t('Материал не найден.')}</Notice></Page>}
   </LibraryAccess>;
 }
 
-function MaterialScreen({ id, request, owner, draftId, openEditor, taskId, learningEntry, learningBudget }: {
+function MaterialScreen({ id, request, owner, draftId, openEditor, taskId, learningEntry, learningBudget, initialKind = 'link' }: {
   id: number | 'new'; request: Request; owner: string | null; draftId?: string; openEditor?: boolean; taskId?: number | null;
-  learningEntry?: string; learningBudget?: string;
+  learningEntry?: string; learningBudget?: string; initialKind?: 'link' | 'note' | 'pdf';
 }) {
   const t = useTranslation();
   const navigation = useNavigation();
@@ -58,7 +60,7 @@ function MaterialScreen({ id, request, owner, draftId, openEditor, taskId, learn
   const [editing, setEditing] = useState(id === 'new');
   const [showActions, setShowActions] = useState(false);
   const [url, setUrl] = useState('');
-  const [kind, setKind] = useState<'link' | 'note' | 'pdf'>('link');
+  const [kind, setKind] = useState(initialKind);
   const [selectedPdf, setSelectedPdf] = useState<SelectedPdf | null>(null);
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
@@ -436,6 +438,7 @@ function MaterialScreen({ id, request, owner, draftId, openEditor, taskId, learn
       {id !== 'new' && editBase?.url && <Field label={t('Ссылка')} value={url} onChangeText={setUrl}
         keyboardType="url" maxLength={2048} editable={!busy} />}
       {id !== 'new' && <Choice label={t('Статус')} value={status} onChange={setStatus} disabled={busy} options={optionsOf(statuses)} />}
+      {editBase?.status === 'studied' && status !== 'studied' && <Body>{t(clearStudiedExplanation)}</Body>}
       {!creatingPdf && <Field label={kind === 'note' || (item && !item.url && item.content_type !== 'pdf') ? t('Текст заметки') : t('Заметка (необязательно)')}
         value={note} onChangeText={setNote} onFocus={revealFocusedField} multiline maxLength={10000} editable={!busy} autoCapitalize="sentences"
         style={{ minHeight: 120, maxHeight: 250, textAlignVertical: 'top' }} />}
