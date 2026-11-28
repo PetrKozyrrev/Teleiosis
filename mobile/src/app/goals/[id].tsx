@@ -9,7 +9,7 @@ export default function GoalRoute() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const value = parseId(id);
   const t = useTranslation();
-  return <LibraryAccess title={t('Цель')}>{request => value
-    ? <GoalDetail key={value} id={value} request={request} />
+  return <LibraryAccess title={t('Цель')}>{(request, owner) => value
+    ? <GoalDetail key={value} id={value} request={request} owner={owner} />
     : <Page title={t('Цель')}><Notice>{t('Недоступно')}</Notice></Page>}</LibraryAccess>;
 }

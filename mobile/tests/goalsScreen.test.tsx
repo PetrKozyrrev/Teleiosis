@@ -1,13 +1,18 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { expect, jest, test } from '@jest/globals';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 import { ApiError } from '../src/auth/api';
 import { GoalDetail, GoalPicker, GoalsList } from '../src/learning/goals';
 import type { Request } from '../src/library/model';
+import { forgetGoalRecommendations } from '../src/offline/cache';
+
+jest.mock('../src/offline/cache', () => ({
+  forgetGoalRecommendations: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
 
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), navigate: jest.fn(), back: jest.fn() },
+  router: { push: jest.fn(), navigate: jest.fn(), back: jest.fn(), canGoBack: () => true, replace: jest.fn() },
   useFocusEffect: (callback: () => void) =>
     jest.requireActual<typeof import('react')>('react').useEffect(callback, [callback]),
 }));
@@ -68,7 +73,7 @@ test('opens the material picker and schedules, edits, completes and archives the
     return current;
   });
   await render(<GoalDetail request={request} id={42} />);
-  expect(screen.getByText('Добавьте материалы')).toBeTruthy();
+  expect(screen.queryByText('Добавьте материалы')).toBeNull();
   await press('Добавить из библиотеки');
   expect(router.push).toHaveBeenCalledWith({ pathname: '/goals/materials', params: { goalId: '42' } });
   await press('Запланировать материал');
@@ -84,6 +89,49 @@ test('opens the material picker and schedules, edits, completes and archives the
   await confirm('Архивировать цель');
   expect(screen.getByText('Архивная цель')).toBeTruthy();
   expect(screen.getByText(/Курс Python ·/)).toBeTruthy();
+});
+
+test('shows the desired result separately from the empty material section and opens the picker', async () => {
+  const request = jest.fn<Request>().mockImplementation(async url => url.includes('/materials?')
+    ? { items: [], total: 0 } : { ...goal, result: 'Решить пять задач' });
+  await render(<GoalDetail request={request} id={42} />);
+  expect(screen.getByRole('header', { name: 'Желаемый результат' })).toBeTruthy();
+  expect(screen.getByText('Решить пять задач')).toBeTruthy();
+  expect(screen.queryByText('Добавьте материалы')).toBeNull();
+  await press('Добавить материалы');
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/goals/materials', params: { goalId: '42' } });
+});
+
+test('permanently removes an archived goal only after confirmation and refreshes its learning snapshots', async () => {
+  const request = jest.fn<Request>().mockImplementation(async (url, method) => {
+    if (method === 'DELETE') return;
+    return url.includes('/materials?') ? { items: [], total: 0 } : { ...goal, status: 'archived', version: 3 };
+  });
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  try {
+    await render(<GoalDetail request={request} id={42} owner="https://example.com/1" />);
+    await press('Удалить цель');
+    expect(request.mock.calls.some(([, method]) => method === 'DELETE')).toBe(false);
+    expect(alert.mock.calls[0][1]).toContain('Материалы останутся в библиотеке.');
+    await act(() => alert.mock.calls[0][2]?.find(button => button.style === 'destructive')?.onPress?.());
+    expect(request).toHaveBeenCalledWith(`${path}/42`, 'DELETE', undefined, { version: 3 });
+    expect(forgetGoalRecommendations).toHaveBeenCalledWith('https://example.com/1');
+    expect(router.back).toHaveBeenCalled();
+  } finally {
+    alert.mockRestore();
+  }
+});
+
+test('keeps the goal visible and explains the missing DELETE on an older server', async () => {
+  const request = jest.fn<Request>().mockImplementation(async (url, method) => {
+    if (method === 'DELETE') throw new ApiError(405);
+    return url.includes('/materials?') ? { items: [], total: 0 } : goal;
+  });
+  await render(<GoalDetail request={request} id={42} />);
+  await confirm('Удалить цель');
+  expect(screen.getByText('Для удаления целей требуется обновление сервера.')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Удалить цель' })).toBeTruthy();
+  expect(router.back).not.toHaveBeenCalled();
 });
 
 test('selects across pages, skips linked materials and retries only unconfirmed writes', async () => {

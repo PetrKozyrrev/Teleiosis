@@ -88,8 +88,8 @@ export function pdfError(error: unknown, creating = false) {
     case 'pdf_quota': return 'Достигнут лимит 20 PDF или 100 МиБ. После удаления дождитесь очистки хранилища.';
     case 'pdf_removed': return 'Загрузка прервалась. Повторите с тем же файлом.';
     case 'pdf_service_unavailable': return 'Проверка или хранилище временно недоступны. Повторите с тем же файлом.';
-    case 'invalid_pdf':
-    case 'unsupported_pdf': return 'Нужен исправный PDF без шифрования, вложенных файлов и активных элементов.';
+    case 'invalid_pdf': return 'Сервер не распознал полученный файл как PDF (invalid_pdf).';
+    case 'unsupported_pdf': return 'Сервер отклонил структуру PDF (unsupported_pdf). Попробуйте пересохранить документ в PDF.';
     case 'invalid_pdf_name': return 'Проверьте имя файла. Допускается до 120 символов с расширением .pdf.';
     case 'invalid_pdf_title': return 'Проверьте название материала. Допускается до 300 символов.';
     case 'unsafe_pdf': return 'Антивирусная проверка отклонила файл.';

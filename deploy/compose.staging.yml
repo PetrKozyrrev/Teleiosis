@@ -55,6 +55,8 @@ services:
     mem_limit: 2300m
     environment:
       FRESHCLAM_CHECKS: "2"
+    healthcheck:
+      test: ["CMD", "clamdscan", "--config-file=/etc/clamav/clamd.conf", "--ping=1"]
     volumes:
       - ./clamd.staging.conf:/etc/clamav/clamd.conf:ro
       - ./freshclam.staging.conf:/etc/clamav/freshclam.conf:ro

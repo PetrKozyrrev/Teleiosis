@@ -174,6 +174,16 @@ def update_goal(goal_id: ContentId, data: UpdateGoal, version: Version, db: DbSe
     return result
 
 
+@router.delete("/{goal_id}", status_code=204)
+def delete_goal(goal_id: ContentId, version: Version, db: DbSession, user: CurrentUser):
+    lock_owner(db, user)
+    goal = owned(db, StudyGoal, user.id, goal_id)
+    matches(goal, version)
+    db.delete(goal)
+    db.commit()
+    return Response(status_code=204)
+
+
 @router.get("/{goal_id}/materials", response_model=GoalMaterialPage)
 def list_materials(goal_id: ContentId, db: DbSession, user: CurrentUser, limit: Limit = 20, offset: Offset = 0):
     get_goal(db, user.id, goal_id)

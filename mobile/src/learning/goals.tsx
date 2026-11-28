@@ -7,6 +7,7 @@ import { Action, Body, Card, Field, Page, styles } from '../components/ui';
 import { useTranslation } from '../i18n';
 import { errorMessage, materialKinds, statuses, type Material, type Request } from '../library/model';
 import { Choice, Loading, Notice } from '../library/ui';
+import { forgetGoalRecommendations } from '../offline/cache';
 import { colors } from '../theme';
 
 const path = '/mobile/learning/goals';
@@ -39,6 +40,14 @@ function candidateError(error: unknown) {
   return goalError(error);
 }
 
+function goalDeletionError(error: unknown) {
+  if (error instanceof ApiError && !error.gateway) {
+    if (error.status === 405) return 'Для удаления целей требуется обновление сервера.';
+    if (error.status === 412) return 'Цель изменилась. Обновите её перед удалением.';
+  }
+  return goalError(error);
+}
+
 function useGoalData<T>(load: () => Promise<T>, readError = goalError) {
   const [data, setData] = useState<T>();
   const [message, setMessage] = useState('');
@@ -60,7 +69,7 @@ function useGoalData<T>(load: () => Promise<T>, readError = goalError) {
     return () => { epoch.current++; };
   }, [load, readError, revision]));
 
-  async function save(operation: () => Promise<unknown>, done?: (value: unknown) => void) {
+  async function save(operation: () => Promise<unknown>, done?: (value: unknown) => void, describe = goalError) {
     if (saving.current) return;
     const current = epoch.current;
     saving.current = true;
@@ -73,7 +82,7 @@ function useGoalData<T>(load: () => Promise<T>, readError = goalError) {
         refresh();
       }
     } catch (error) {
-      if (current === epoch.current) setMessage(goalError(error));
+      if (current === epoch.current) setMessage(describe(error));
     } finally {
       if (current === epoch.current) {
         setBusy(false);
@@ -96,7 +105,7 @@ function Steps({ offset, total, change, disabled }: {
 
 function GoalProgress({ goal }: { goal: Goal }) {
   const t = useTranslation();
-  if (!goal.materials_total) return <Body>{t('Добавьте материалы')}</Body>;
+  if (!goal.materials_total) return null;
   const label = t('Изучено {0} из {1} материалов', goal.materials_studied, goal.materials_total);
   return <View style={goalStyles.progress} accessible accessibilityRole="progressbar" accessibilityLabel={label}
     accessibilityValue={{ min: 0, max: goal.materials_total, now: goal.materials_studied }}>
@@ -165,7 +174,7 @@ export function GoalsList({ request, contentId }: { request: Request; contentId?
   </Page>;
 }
 
-export function GoalDetail({ request, id }: { request: Request; id: number }) {
+export function GoalDetail({ request, id, owner = null }: { request: Request; id: number; owner?: string | null }) {
   const t = useTranslation();
   const [offset, setOffset] = useState(0);
   const goalPath = `${path}/${id}` as const;
@@ -181,23 +190,42 @@ export function GoalDetail({ request, id }: { request: Request; id: number }) {
     pathname: '/library/[id]', params: { id: String(material.id) },
   });
   const next = data?.goal.next_material;
+  function remove(goal: Goal) {
+    Alert.alert(t('Удалить цель «{0}»?', goal.name),
+      t('Цель, связи с материалами, задания и их история будут удалены навсегда. Материалы останутся в библиотеке.'), [
+        { text: t('Отмена'), style: 'cancel' },
+        { text: t('Удалить цель'), style: 'destructive', onPress: () => void save(async () => {
+          try {
+            await request(goalPath, 'DELETE', undefined, { version: goal.version });
+          } catch (error) {
+            if (!(error instanceof ApiError && !error.gateway && error.status === 404)) throw error;
+          }
+          if (owner) await forgetGoalRecommendations(owner).catch(() => {});
+        }, () => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/goals');
+        }, goalDeletionError) },
+      ]);
+  }
   return <Page title={data?.goal.name ?? t('Цель')}>
     {message && <Notice>{message}</Notice>}
     {!data && !message && <Loading />}
     {data && <>
-      <Card>
-        {data.goal.result && <Body>{data.goal.result}</Body>}
-        <GoalProgress goal={data.goal} />
-      </Card>
+      {data.goal.result && <Card>
+        <Text accessibilityRole="header" style={styles.label}>{t('Желаемый результат')}</Text>
+        <Body>{data.goal.result}</Body>
+      </Card>}
       {next && data.goal.status === 'active' && <Card featured>
         <Text style={styles.label}>{t('Материал для изучения')}</Text>
         <Text style={styles.heading}>{next.title}</Text>
         <Action title={t('Открыть материал')} onPress={() => open(next)} />
       </Card>}
-      <Action variant={next && data.goal.status === 'active' ? 'outline' : 'primary'}
-        title={t('Добавить из библиотеки')} disabled={busy}
-        onPress={() => router.push({ pathname: '/goals/materials', params: { goalId: String(id) } })} />
       <Text accessibilityRole="header" style={styles.label}>{t('Связанные материалы')}</Text>
+      <GoalProgress goal={data.goal} />
+      {data.materials.total === 0 && <Body>{t('В этой цели пока нет материалов.')}</Body>}
+      <Action variant={next && data.goal.status === 'active' ? 'outline' : 'primary'}
+        title={t(data.materials.total === 0 ? 'Добавить материалы' : 'Добавить из библиотеки')} disabled={busy}
+        onPress={() => router.push({ pathname: '/goals/materials', params: { goalId: String(id) } })} />
       {data.materials.items.map(material => <Card key={material.id}>
         <Body>{material.title} · {t(statuses[material.status])}</Body>
         <Action variant="text" title={t('Открыть материал')} onPress={() => open(material)} />
@@ -209,7 +237,7 @@ export function GoalDetail({ request, id }: { request: Request; id: number }) {
         )} />
       </Card>)}
       <Steps offset={offset} total={data.materials.total} change={setOffset} disabled={busy} />
-      <GoalEditor key={data.goal.version} goal={data.goal} busy={busy} onSave={(name, result, status) => {
+      <GoalEditor key={data.goal.version} goal={data.goal} busy={busy} onDelete={() => remove(data.goal)} onSave={(name, result, status) => {
         void save(() => request(goalPath, 'PUT', { name, result, status }, { version: data.goal.version }));
       }} />
     </>}
@@ -217,8 +245,8 @@ export function GoalDetail({ request, id }: { request: Request; id: number }) {
   </Page>;
 }
 
-function GoalEditor({ goal, onSave, busy }: {
-  goal: Goal; onSave: (name: string, result: string | null, status: Status) => void; busy: boolean;
+function GoalEditor({ goal, onSave, onDelete, busy }: {
+  goal: Goal; onSave: (name: string, result: string | null, status: Status) => void; onDelete: () => void; busy: boolean;
 }) {
   const t = useTranslation();
   const [name, setName] = useState(goal.name);
@@ -249,6 +277,7 @@ function GoalEditor({ goal, onSave, busy }: {
         onPress={() => changeStatus('archived', 'Архивировать цель')} />}
       {goal.status !== 'active' && <Action variant="text" title={t('Вернуть в активные')} disabled={busy}
         onPress={() => changeStatus('active', 'Вернуть в активные')} />}
+      <Action variant="danger" title={t('Удалить цель')} disabled={busy} onPress={onDelete} />
     </>}
   </Card>;
 }

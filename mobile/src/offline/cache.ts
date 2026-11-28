@@ -21,6 +21,13 @@ export async function forgetMaterial(owner: string, id: number) {
   `, owner, `/contents/${id}`, id, id));
 }
 
+export async function forgetGoalRecommendations(owner: string) {
+  await mutate(db => db.runAsync(
+    "DELETE FROM snapshots WHERE owner = ? AND (path = '/mobile/learning/today' OR path LIKE '/mobile/learning/time-budget?%')",
+    owner,
+  ));
+}
+
 async function loaded(owner: string) {
   const rows = await (await database()).getAllAsync<Snapshot>(
     "SELECT * FROM snapshots WHERE owner = ? AND (path LIKE '/contents/%' OR path LIKE '/contents?%') ORDER BY updated_at DESC",

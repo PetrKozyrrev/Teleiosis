@@ -1,4 +1,4 @@
-from app.models import Content, StudyGoalMaterial, User
+from app.models import Content, StudyGoalMaterial, StudyTaskEvent, User
 from sqlalchemy import func, select
 
 from tests.helpers import auth_headers as auth
@@ -144,3 +144,34 @@ def test_goal_picker_paginates_search_and_reports_only_its_goal_membership(clien
     assert client.get(endpoint, headers=auth(2)).status_code == 404
     detail = client.get(f"{GOALS}/{first['id']}", headers=auth(1)).json()
     assert detail["next_material"] == {"id": related, "title": "2026 notes %", "status": "planned"}
+
+
+def test_delete_archived_goal_is_versioned_and_keeps_material_and_other_goal(client, session):
+    first = goal(client, "Old goal", "Old outcome")
+    second = goal(client, "Current goal")
+    material = content(client, "Shared material", "studied")
+    day = client.get(TODAY, headers=auth(1)).json()["local_date"]
+    tasks = []
+    for entry in (first, second):
+        response = client.post(PLAN + "/tasks", headers=auth(1), json={
+            "goal_id": entry["id"], "content_id": material, "day": day, "minutes": 15, "priority": 1,
+        })
+        assert response.status_code == 200
+        tasks.append(response.json()["id"])
+    archived = update(client, first, status="archived").json()
+    endpoint = f"{GOALS}/{first['id']}"
+    headers = auth(1) | {"If-Match": f'"{archived["version"]}"'}
+    assert client.delete(endpoint, headers={"If-Match": '"2"'}).status_code == 401
+    assert client.delete(endpoint, headers=auth(2) | {"If-Match": '"2"'}).status_code == 404
+    assert client.delete(endpoint, headers=auth(1)).status_code == 422
+    assert client.delete(endpoint, headers=auth(1) | {"If-Match": '"1"'}).status_code == 412
+    assert client.delete(f"{PLAN}/goals/{first['id']}", headers=auth(1)).status_code == 409
+    assert client.get(endpoint, headers=auth(1)).status_code == 200
+
+    assert client.delete(endpoint, headers=headers).status_code == 204
+    assert client.delete(endpoint, headers=headers).status_code == 404
+    assert client.get(endpoint, headers=auth(1)).status_code == 404
+    assert client.get(f"/contents/{material}", headers=auth(1)).json()["status"] == "studied"
+    assert client.get(f"{GOALS}/{second['id']}/materials", headers=auth(1)).json()["total"] == 1
+    assert [task["id"] for task in client.get(PLAN, headers=auth(1)).json()["tasks"]] == [tasks[1]]
+    assert session.scalars(select(StudyTaskEvent.task_id).order_by(StudyTaskEvent.task_id)).all() == [tasks[1]]

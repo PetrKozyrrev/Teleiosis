@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import { router } from 'expo-router';
 import { openURL } from 'expo-linking';
-import { AppState, type AppStateStatus } from 'react-native';
+import { Alert, AppState, type AppStateStatus } from 'react-native';
 import { enqueue, getJob, listJobs, retry, type Job } from '../src/offline/store';
 import type { Material, MaterialPage, Request } from '../src/library/model';
 import { useAuth } from '../src/auth/context';
@@ -80,6 +80,94 @@ test('opens category management from the library with filters closed', async () 
   await press('Фильтры и сортировка');
   expect(screen.getByRole('button', { name: 'Категория · Все категории' })).toBeTruthy();
   expect(screen.getAllByRole('button', { name: 'Управлять категориями' })).toHaveLength(1);
+});
+
+test('a long press selects saved materials and one confirmation removes just the selection', async () => {
+  const entries = new Map([item, { ...item, id: 13, title: 'Вторая карточка' }, { ...item, id: 14, title: 'Оставить' }]
+    .map(row => [row.id, row]));
+  request.mockImplementation(async (path, method) => {
+    if (path === '/categories') return [];
+    if (method === 'DELETE') { entries.delete(Number(path.split('/').pop())); return; }
+    return page([...entries.values()]);
+  });
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  try {
+    await render(<Library />);
+    await fireEvent(await screen.findByRole('button', { name: item.title }), 'longPress');
+    expect(screen.getByRole('checkbox', { name: item.title, checked: true })).toBeTruthy();
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Вторая карточка' }));
+    expect(screen.getByText('Выбрано: 2')).toBeTruthy();
+    expect(router.push).not.toHaveBeenCalled();
+    await press('Удалить выбранные');
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(alert.mock.calls[0][1]).toContain('Выбрано: 2');
+    expect(request.mock.calls.filter(call => call[1] === 'DELETE')).toHaveLength(0);
+    await act(() => alert.mock.calls[0][2]?.find(button => button.style === 'destructive')?.onPress?.());
+    expect(request.mock.calls.filter(call => call[1] === 'DELETE')).toEqual([
+      ['/contents/12', 'DELETE'], ['/contents/13', 'DELETE'],
+    ]);
+    expect(await screen.findByRole('button', { name: 'Оставить' })).toBeTruthy();
+    expect(screen.queryByText(item.title)).toBeNull();
+  } finally {
+    alert.mockRestore();
+  }
+});
+
+test.each(['Статус: Не просмотрено', `Действия: ${item.title}`])(
+  'a long press on the %s control also selects the card',
+  async name => {
+    request.mockImplementation(async path => path === '/categories' ? [] : page([item]));
+    await render(<Library />);
+    const control = await screen.findByRole('button', { name });
+    await fireEvent(control, 'longPress');
+    expect(screen.getByRole('checkbox', { name: item.title, checked: true })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Закрыть меню' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Добавить' }).props.accessibilityState.disabled).toBe(true);
+    expect(router.push).not.toHaveBeenCalled();
+    await press('Отменить выбор');
+    expect(screen.getByRole('button', { name })).toBeTruthy();
+    await press(item.title);
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/library/[id]', params: { id: '12' } });
+  },
+);
+
+test('after a partial deletion retries only the failed and unattempted selections across pages', async () => {
+  const entries = new Map(Array.from({ length: 11 }, (_, index) => {
+    const id = index + 1;
+    return [id, { ...item, id, title: `Карточка ${id}` }];
+  }));
+  let failed = false;
+  request.mockImplementation(async (path, method) => {
+    if (path === '/categories') return [];
+    if (method === 'DELETE') {
+      const id = Number(path.split('/').pop());
+      if (id === 2 && !failed) { failed = true; throw new ApiError(503); }
+      entries.delete(id);
+      return;
+    }
+    const params = new URLSearchParams(path.split('?')[1]);
+    const offset = Number(params.get('offset'));
+    return page([...entries.values()].slice(offset, offset + 10), entries.size, offset);
+  });
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    buttons?.find(button => button.style === 'destructive')?.onPress?.();
+  });
+  try {
+    await render(<Library />);
+    await fireEvent(await screen.findByRole('button', { name: 'Карточка 1' }), 'longPress');
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Карточка 2' }));
+    await press('Показать больше');
+    await fireEvent.press(await screen.findByRole('checkbox', { name: 'Карточка 11' }));
+    await press('Удалить выбранные');
+    expect(await screen.findByText(/Удалено: 1. Осталось удалить: 2./)).toBeTruthy();
+    expect(await screen.findByRole('checkbox', { name: 'Карточка 2', checked: true })).toBeTruthy();
+    await press('Удалить выбранные');
+    expect(request.mock.calls.filter(call => call[1] === 'DELETE')).toEqual([
+      ['/contents/1', 'DELETE'], ['/contents/2', 'DELETE'], ['/contents/2', 'DELETE'], ['/contents/11', 'DELETE'],
+    ]);
+  } finally {
+    alert.mockRestore();
+  }
 });
 
 test('shows only incoming drafts in the library and offers retry on Add Link', async () => {

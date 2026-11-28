@@ -71,6 +71,7 @@ function ImportView({ request }: { request: Request }) {
 
   return <Page title={t('Импорт библиотеки')}><Card>
     <Body>{t('Выберите JSON-выгрузку Teleiosis до 2 МиБ и 500 материалов. Для проверки и импорта требуется подключение.')}</Body>
+    <Body>{t('Импорт переносит материалы и организацию библиотеки. PDF-файлы, цели, задания, главные мысли и карточки этим способом не восстанавливаются.')}</Body>
     {state.session?.user.email && <Body>{t('Аккаунт:')} {state.session.user.email}</Body>}
     <Action title={t('Выбрать файл')} disabled={busy} onPress={choose} />
     {file && <>
